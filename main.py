@@ -41,7 +41,7 @@ def rider_zrs_bulk():
     try:
         zp = ZwiftPower(ZWIFT_USERNAME, ZWIFT_PASSWORD)
         zp.login()
-        delay = 1  # delay in seconds between requests
+        delay = 10  # delay in seconds between requests
         for rid in rider_ids:
             print(rid)
             zrs = zp.get_rider_zrs(rid)
