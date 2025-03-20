@@ -27,11 +27,13 @@ def rider_zrs_bulk():
     Returns a JSON array with each rider's racing score.
     """
     rider_ids_str = request.args.get("rider_ids")
+    print(rider_ids_str)
     if not rider_ids_str:
         return jsonify({"error": "Missing rider_ids query parameter"}), 400
 
     try:
         rider_ids = [int(r.strip()) for r in rider_ids_str.split(",") if r.strip()]
+        print(rider_ids)
     except ValueError:
         return jsonify({"error": "Invalid rider_ids format; must be comma-separated integers"}), 400
 
@@ -41,6 +43,7 @@ def rider_zrs_bulk():
         zp.login()
         delay = 1  # delay in seconds between requests
         for rid in rider_ids:
+            print(rid)
             zrs = zp.get_rider_zrs(rid)
             if zrs:
                 results.append({"rider_id": rid, "zrs": zrs})
