@@ -1,9 +1,16 @@
-import functions_framework
-from flask import Response, request
-
-@functions_framework.http
-def app(request):
-    # Check if the request is for /favicon.ico
-    if request.path == '/favicon.ico':
-        return Response(status=204)
-    return "Hello, world!"
+# main.py
+def hello_world(request):
+    """Responds to any HTTP request.
+    Args:
+        request (flask.Request): HTTP request object.
+    Returns:
+        The response text or any set of values that can be turned into a
+        Response object using `make_response
+        <http://flask.pocoo.org/docs/1.0/api/#flask.Flask.make_response>`.
+    """
+    request_json = request.get_json()
+    if request_json and 'name' in request_json:
+        name = request_json['name']
+    else:
+        name = 'World'
+    return f'Hello {name}!'
