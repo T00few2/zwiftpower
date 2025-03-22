@@ -21,9 +21,11 @@ def get_authenticated_session() -> requests.Session:
     now = time.time()
     # If we have a session and it hasn't expired yet, reuse it.
     if cached_session and cached_session_timestamp and (now - cached_session_timestamp < SESSION_VALIDITY):
+        print("Using cached authenticated session (container is warm).")
         return cached_session
 
     # Otherwise, create a new session and log in.
+    print("No valid session found. Logging in again.")
     new_session = requests.Session()
     new_session.headers.update({
         "User-Agent": (
