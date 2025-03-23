@@ -89,6 +89,28 @@ def team_riders(club_id: int):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/team_results/<int:club_id>', methods=['GET'])
+def team_results(club_id: int):
+    try:
+        session = get_authenticated_session()
+        zp = ZwiftPower(ZWIFT_USERNAME, ZWIFT_PASSWORD)
+        zp.session = session
+        data = zp.get_team_results(club_id)
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/rider_data/<int:rider_id>', methods=['GET'])
+def rider_data(rider_id: int):
+    try:
+        session = get_authenticated_session()
+        zp = ZwiftPower(ZWIFT_USERNAME, ZWIFT_PASSWORD)
+        zp.session = session
+        data = zp.get_rider_data_json(rider_id)
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 8080))
     app.run(host='0.0.0.0', port=port)
