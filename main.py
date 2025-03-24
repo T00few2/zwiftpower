@@ -120,28 +120,32 @@ def rider_data(rider_id: int):
 @app.route('/generate_and_post_commentary/<int:club_id>', methods=['POST'])
 def generate_and_post_commentary(club_id):
     try:
-        # Step 1: Fetch team results
+        print(f"[DEBUG] Starting commentary generation for club ID: {club_id}")
+
         session = get_authenticated_session()
+        print("[DEBUG] Authenticated session established")
+
         zp = ZwiftPower(ZWIFT_USERNAME, ZWIFT_PASSWORD)
         zp.session = session
         results = zp.get_team_results(club_id)
 
+        print("[DEBUG] Team results fetched:", results)
+
         if not results:
             return jsonify({"error": "No results found"}), 404
 
-        # Step 2: Generate commentary
         commentator = ZwiftCommentator(api_key=OPENAI_KEY)
         commentary = commentator.generate_commentary(results)
 
-        if not commentary:
-            return jsonify({"error": "No commentary generated"}), 500
+        print("[DEBUG] Commentary generated:\n", commentary)
 
-        # Step 3: Send to Discord
         response = commentator.send_to_discord_api(
             channel_id=DISCORD_GOSSIP_ID,
             message=commentary,
             api_url=DISCORD_BOT_URL
         )
+
+        print("[DEBUG] Discord response:", response)
 
         if response and response.get("success"):
             return jsonify({"success": True, "message": commentary})
@@ -149,7 +153,9 @@ def generate_and_post_commentary(club_id):
             return jsonify({"error": "Failed to send to Discord", "details": response}), 500
 
     except Exception as e:
+        print("[ERROR] Exception occurred:", e)
         return jsonify({"error": str(e)}), 500
+
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 8080))
