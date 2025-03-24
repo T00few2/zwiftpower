@@ -128,6 +128,7 @@ def generate_and_post_commentary(club_id):
         zp = ZwiftPower(ZWIFT_USERNAME, ZWIFT_PASSWORD)
         zp.session = session
         results = zp.get_team_results(club_id)
+        results_summary = zp.analyze_team_results(results)
 
         print("[DEBUG] Team results fetched:", results)
 
@@ -135,7 +136,7 @@ def generate_and_post_commentary(club_id):
             return jsonify({"error": "No results found"}), 404
 
         commentator = ZwiftCommentator(api_key=OPENAI_KEY)
-        commentary = commentator.generate_commentary(results)
+        commentary = commentator.generate_commentary(results_summary)
 
         print("[DEBUG] Commentary generated:\n", commentary)
 
