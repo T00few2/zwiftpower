@@ -43,10 +43,6 @@ class ZwiftPower:
         # 2) Zwift SSO login page
         zwift_login_url = resp1.headers["Location"]
         resp2 = self.session.get(zwift_login_url, allow_redirects=False)
-        
-        print("Status:", resp2.status_code)
-        print("Headers:", resp2.headers)
-        print("--- HTML: ---\n", resp2.text[:2000])
 
         # 3) Parse Zwift SSO form
         soup = BeautifulSoup(resp2.text, 'html.parser')
