@@ -2,6 +2,7 @@ import os
 import time
 from flask import Flask, request, jsonify
 from zwiftpower import ZwiftPower  # your ZwiftPower class
+from zwiftcommentator import ZwiftCommentator  # your ZwiftCommentator class
 import requests
 
 app = Flask(__name__)
@@ -14,6 +15,11 @@ SESSION_VALIDITY = 3600  # seconds (adjust based on how long the session is expe
 # Get credentials from environment variables.
 ZWIFT_USERNAME = os.getenv("ZWIFT_USERNAME", "your_username")
 ZWIFT_PASSWORD = os.getenv("ZWIFT_PASSWORD", "your_password")
+
+OPENAI_KEY = os.getenv("OPENAI_KEY", "your_openai_key")
+
+DISCORD_GOSSIP_ID = os.getenv("DISCORD_GOSSIP_ID", "your_discord_gossip_id")
+DISCORD_BOT_URL = os.getenv("DISCORD_BOT_URL", "your_discord_bot_url")
 
 def get_authenticated_session() -> requests.Session:
     """Return a cached, authenticated session if available and still valid; otherwise, log in."""
@@ -108,6 +114,40 @@ def rider_data(rider_id: int):
         zp.session = session
         data = zp.get_rider_data_json(rider_id)
         return jsonify(data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
+@app.route('/generate_and_post_commentary/<int:club_id>', methods=['POST'])
+def generate_and_post_commentary(club_id):
+    try:
+        # Step 1: Fetch team results
+        session = get_authenticated_session()
+        zp = ZwiftPower(ZWIFT_USERNAME, ZWIFT_PASSWORD)
+        zp.session = session
+        results = zp.get_team_results(club_id)
+
+        if not results:
+            return jsonify({"error": "No results found"}), 404
+
+        # Step 2: Generate commentary
+        commentator = ZwiftCommentator(api_key=OPENAI_KEY)
+        commentary = commentator.generate_commentary(results)
+
+        if not commentary:
+            return jsonify({"error": "No commentary generated"}), 500
+
+        # Step 3: Send to Discord
+        response = commentator.send_to_discord_api(
+            channel_id=DISCORD_GOSSIP_ID,
+            message=commentary,
+            api_url=DISCORD_BOT_URL
+        )
+
+        if response and response.get("success"):
+            return jsonify({"success": True, "message": commentary})
+        else:
+            return jsonify({"error": "Failed to send to Discord", "details": response}), 500
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

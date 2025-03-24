@@ -1,5 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
+from collections import defaultdict
+import html
 
 class ZwiftPower:
     """
@@ -132,3 +134,123 @@ class ZwiftPower:
             if score_td and score_td.find("b"):
                 return score_td.find("b").get_text(strip=True)
         return None
+    
+    def analyze_team_results(self, team_results: dict) -> dict:
+        """
+        Given a dict from get_team_results (containing 'events' and 'data'),
+        produce three analyses:
+          1) top 10 events (by zid) with participants,
+          2) top 10 events (by event title) aggregated,
+          3) a list of riders with the most top-3 positions_in_cat.
+
+        Returns a dict with three keys:
+          {
+            "top_10_by_zid": [...],
+            "top_10_by_title": [...],
+            "top_3_riders": [...]
+          }
+        }
+        """
+        # ===========================
+        # 1) Top 10 events BY ZID
+        # ===========================
+        events = team_results["events"]
+        rows = team_results["data"]
+
+        # Group riders by zid
+        by_event = defaultdict(list)
+        for row in rows:
+            # Use html.unescape() for rider names
+            rider_name = html.unescape(row["name"])
+
+            new_row = dict(row)  # copy to avoid mutating original
+            new_row["name"] = rider_name
+
+            zid = new_row["zid"]
+            by_event[zid].append(new_row)
+
+        # Count how many riders each zid has
+        event_counts = [(zid, len(riders)) for zid, riders in by_event.items()]
+        # Sort descending by participant count
+        event_counts.sort(key=lambda x: x[1], reverse=True)
+        # Take top 10
+        top_zids = event_counts[:10]
+
+        top_10_by_zid = []
+        for zid, rider_count in top_zids:
+            event_info = events.get(zid, {})
+            event_title = event_info.get("title", f"(No title for {zid})")
+            riders_for_this_zid = by_event[zid]
+
+            # Build participant list
+            participants = []
+            for r in riders_for_this_zid:
+                participants.append({
+                    "name": r["name"],
+                    "zwid": r["zwid"]
+                })
+
+            top_10_by_zid.append({
+                "zid": zid,
+                "title": event_title,
+                "rider_count": rider_count,
+                "participants": participants
+            })
+
+        # ===========================
+        # 2) Top 10 events BY TITLE
+        # ===========================
+        title_counts = defaultdict(int)
+
+        for row in rows:
+            zid = row["zid"]
+            evt_obj = events.get(zid, {})
+            raw_title = evt_obj.get("title", "(No title)")
+            event_title = html.unescape(raw_title)
+            title_counts[event_title] += 1
+
+        # Sort descending
+        sorted_by_count = sorted(title_counts.items(), key=lambda x: x[1], reverse=True)
+        # Take top 10
+        sorted_by_count = sorted_by_count[:10]
+
+        top_10_by_title = []
+        for title, count in sorted_by_count:
+            top_10_by_title.append({
+                "event_name": title,
+                "participant_count": count
+            })
+
+        # ===========================
+        # 3) Riders with the MOST top 3 FINISHES in their category
+        # ===========================
+        top_3_counter = defaultdict(int)
+        for row in rows:
+            pos_in_cat = row.get("position_in_cat")
+            if pos_in_cat is not None and pos_in_cat <= 3:
+                # Convert name
+                rider_name = html.unescape(row["name"])
+                zwid = row["zwid"]
+                # Could key by just zwid or by (rider_name, zwid)
+                key = (rider_name, zwid)
+                top_3_counter[key] += 1
+
+        # Sort by number of top-3 finishes, descending
+        sorted_top_3 = sorted(top_3_counter.items(), key=lambda x: x[1], reverse=True)
+
+        top_3_riders = []
+        for (name, zwid), count in sorted_top_3:
+            top_3_riders.append({
+                "name": name,
+                "zwid": zwid,
+                "top_3_count": count
+            })
+
+        # ===========================
+        # Return all three analyses in a dict
+        # ===========================
+        return {
+            "top_10_by_zid": top_10_by_zid,
+            "top_10_by_title": top_10_by_title,
+            "top_3_riders": top_3_riders
+        }
