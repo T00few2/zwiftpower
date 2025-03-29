@@ -21,7 +21,17 @@ og nævn deres placeringer i de forskellige løb.
 
 Brug en engagerende og lidt dramatisk stil.
 
+Data description:
+top_10_by_zid: events with most DZR participants by race id
+top_10_by_title: events with most DZR participants by event title (can be across multiple races)
+top_3_riders: DZR riders with most top-3 finishes in their category
+winners: list of winners in races
+top_watts_per_kg_20min: top riders by 20-minute power
+top_watts_per_kg_5min: top riders by 5-minute power
+top_watts_per_kg_1min": top riders by 1-minute power
+
 Data:
+
 {json.dumps(data, ensure_ascii=False, indent=2)}
 
 Kommentar:

@@ -138,6 +138,10 @@ class ZwiftPower:
           1) top 10 events (by zid) with participants,
           2) top 10 events (by event title) aggregated,
           3) a list of riders with the most top-3 positions_in_cat.
+          4) a list of winners (position_in_cat == 1)
+          5) a list of top riders by wkg1200 (20-minute power)
+          6) a list of top riders by wkg300 (5-minute power)
+          7) a list of top riders by wkg60 (1-minute power)
 
         Returns a dict with three keys:
           {
@@ -185,7 +189,7 @@ class ZwiftPower:
                 participants.append({
                     "name": r["name"],
                     "zwid": r["zwid"],
-                    "position_in_event": r["position_in_cat"]
+                    #"position_in_event": r["position_in_cat"]
                 })
 
             top_10_by_zid.append({
@@ -381,11 +385,11 @@ class ZwiftPower:
         # Return all three analyses in a dict
         # ===========================
         return {
-            "top_10_by_zid": top_10_by_zid,
-            "top_10_by_title": top_10_by_title,
-            "top_3_riders": top_3_riders,
-            "winners": winners,
-            "top_watts_per_kg_20min": top_wkg1200,
-            "top_watts_per_kg_5min": top_wkg300,
-            "top_watts_per_kg_1min": top_wkg60
+            "top_10_by_zid": top_10_by_zid, # top 10 events with most participants by race id
+            "top_10_by_title": top_10_by_title, # top 10 events with most participants by event title (can be across multiple races)
+            "top_3_riders": top_3_riders, # top 3 riders with most top-3 finishes in their category
+            "winners": winners, # list of winners in races
+            "top_watts_per_kg_20min": top_wkg1200, # top riders by 20-minute power
+            "top_watts_per_kg_5min": top_wkg300, # top riders by 5-minute power
+            "top_watts_per_kg_1min": top_wkg60 # top riders by 1-minute power
         }
