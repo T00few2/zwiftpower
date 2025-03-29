@@ -161,6 +161,7 @@ class ZwiftPower:
 
             new_row = dict(row)  # copy to avoid mutating original
             new_row["name"] = rider_name
+            new_row["position_in_cat"] = row.get("position_in_cat")
 
             zid = new_row["zid"]
             by_event[zid].append(new_row)
@@ -183,7 +184,8 @@ class ZwiftPower:
             for r in riders_for_this_zid:
                 participants.append({
                     "name": r["name"],
-                    "zwid": r["zwid"]
+                    "zwid": r["zwid"],
+                    "position_in_event": r["position_in_cat"]
                 })
 
             top_10_by_zid.append({
@@ -223,7 +225,8 @@ class ZwiftPower:
         top_3_counter = defaultdict(int)
         for row in rows:
             pos_in_cat = row.get("position_in_cat")
-            if pos_in_cat is not None and pos_in_cat <= 3:
+            type = row.get("f_t")
+            if pos_in_cat is not None and pos_in_cat <= 3 and type == 'TYPE_RACE ':
                 # Convert name
                 rider_name = html.unescape(row["name"])
                 zwid = row["zwid"]
@@ -241,6 +244,27 @@ class ZwiftPower:
                 "zwid": zwid,
                 "top_3_count": count
             })
+        
+        # ===========================
+        # 4) Winners (position_in_cat == 1)
+        # ===========================
+        winners = []
+        for row in rows:
+            pos_in_cat = row.get("position_in_cat")
+            type = row.get("f_t")
+            if pos_in_cat is not None and pos_in_cat <= 1 and type == 'TYPE_RACE ':
+                # Convert name
+                rider_name = html.unescape(row["name"])
+                zwid = row["zwid"]
+                zid = row["zid"]
+                evt_obj = events.get(zid, {})
+                raw_title = evt_obj.get("title", "(No title)")
+                event_title = html.unescape(raw_title)
+                winners.append({
+                    "name": rider_name,
+                    "zwid": zwid,
+                    "event_title": event_title
+                })
 
         # ===========================
         # Return all three analyses in a dict
@@ -248,5 +272,6 @@ class ZwiftPower:
         return {
             "top_10_by_zid": top_10_by_zid,
             "top_10_by_title": top_10_by_title,
-            "top_3_riders": top_3_riders
+            "top_3_riders": top_3_riders,
+            "winners": winners
         }
