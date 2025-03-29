@@ -44,7 +44,7 @@ Kommentar:
                 {"role": "user", "content": prompt}
             ],
             temperature=0.8,
-            max_tokens=600
+            max_tokens=800
         )
 
         return response.choices[0].message.content
