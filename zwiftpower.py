@@ -265,6 +265,117 @@ class ZwiftPower:
                     "zwid": zwid,
                     "event_title": event_title
                 })
+                
+        # ==============================================================
+        # 5) Top riders by wkg1200 (20-minute power)
+        # 6) Top riders by wkg300  (5-minute  power)
+        # ==============================================================
+        # We’ll track each rider’s best 20-min and 5-min stats:
+        # best_20min[(rider_name, zwid)] = {"value": float, "event_title": str}
+        # best_5min [(rider_name, zwid)] = {"value": float, "event_title": str}
+        best_20min = defaultdict(lambda: {"value": 0.0, "event_title": None})
+        best_5min  = defaultdict(lambda: {"value": 0.0, "event_title": None})
+        best_1min  = defaultdict(lambda: {"value": 0.0, "event_title": None})
+
+        for row in rows:
+            rider_name = html.unescape(row["name"])
+            zwid = row["zwid"]
+            rider_id = (rider_name, zwid)
+
+            zid = row["zid"]
+            event_info = events.get(zid, {})
+            # If you want to unescape the event's title just in case
+            raw_title = event_info.get("title", f"(No title for {zid})")
+            event_title = html.unescape(raw_title)
+            
+            wgk60_raw = row.get("wkg60")
+            pos_in_cat = row.get("position_in_cat")
+            if isinstance(wgk60_raw, list) and len(wgk60_raw) > 0:
+                wkg60_str = wgk60_raw[0]
+                # If it's numeric, parse to float
+                if isinstance(wkg60_str, str) and wkg60_str.replace('.', '', 1).isdigit():
+                    val_60 = float(wkg60_str)
+                    # If higher than our current best, update
+                    if val_60 > best_1min[rider_id]["value"]:
+                        best_1min[rider_id]["value"] = val_60
+                        best_1min[rider_id]["event_title"] = event_title
+                        best_1min[rider_id]["position_in_cat"] = pos_in_cat
+
+            # row["wkg1200"] looks like ['3.2', 0] if using your data structure
+            wkg1200_raw = row.get("wkg1200")
+            pos_in_cat = row.get("position_in_cat")
+            if isinstance(wkg1200_raw, list) and len(wkg1200_raw) > 0:
+                wkg1200_str = wkg1200_raw[0]  # e.g. "3.2"
+                # If it's numeric, parse to float
+                if isinstance(wkg1200_str, str) and wkg1200_str.replace('.', '', 1).isdigit():
+                    val_1200 = float(wkg1200_str)
+                    # If higher than our current best, update
+                    if val_1200 > best_20min[rider_id]["value"]:
+                        best_20min[rider_id]["value"] = val_1200
+                        best_20min[rider_id]["event_title"] = event_title
+                        best_20min[rider_id]["position_in_cat"] = pos_in_cat
+
+            # Same logic for wkg300 (5-min)
+            wkg300_raw = row.get("wkg300")
+            pos_in_cat = row.get("position_in_cat")
+            if isinstance(wkg300_raw, list) and len(wkg300_raw) > 0:
+                wkg300_str = wkg300_raw[0]
+                if isinstance(wkg300_str, str) and wkg300_str.replace('.', '', 1).isdigit():
+                    val_300 = float(wkg300_str)
+                    if val_300 > best_5min[rider_id]["value"]:
+                        best_5min[rider_id]["value"] = val_300
+                        best_5min[rider_id]["event_title"] = event_title
+                        best_5min[rider_id]["position_in_cat"] = pos_in_cat
+
+        # Now we can sort them descending by the "value"
+        sorted_20min = sorted(
+            best_20min.items(),
+            key=lambda x: x[1]["value"],
+            reverse=True
+        )[:3]
+
+        sorted_5min = sorted(
+            best_5min.items(),
+            key=lambda x: x[1]["value"],
+            reverse=True
+        )[:3]
+        
+        sorted_1min = sorted(
+            best_1min.items(),
+            key=lambda x: x[1]["value"],
+            reverse=True
+        )[:3]
+
+        # Build final lists
+        top_wkg1200 = []
+        for (name, zwid), info in sorted_20min:
+            top_wkg1200.append({
+                "name": name,
+                "zwid": zwid,
+                "wkg1200": info["value"],
+                "event_title": info["event_title"],
+                "position_in_cat": info["position_in_cat"]
+            })
+
+        top_wkg300 = []
+        for (name, zwid), info in sorted_5min:
+            top_wkg300.append({
+                "name": name,
+                "zwid": zwid,
+                "wkg300": info["value"],
+                "event_title": info["event_title"],
+                "position_in_cat": info["position_in_cat"]
+            })
+        
+        top_wkg60 = []
+        for (name, zwid), info in sorted_1min:
+            top_wkg60.append({
+                "name": name,
+                "zwid": zwid,
+                "wkg60": info["value"],
+                "event_title": info["event_title"],
+                "position_in_cat": info["position_in_cat"]
+            })
 
         # ===========================
         # Return all three analyses in a dict
@@ -273,5 +384,8 @@ class ZwiftPower:
             "top_10_by_zid": top_10_by_zid,
             "top_10_by_title": top_10_by_title,
             "top_3_riders": top_3_riders,
-            "winners": winners
+            "winners": winners,
+            "top_watts_per_kg_20min": top_wkg1200,
+            "top_watts_per_kg_5min": top_wkg300,
+            "top_watts_per_kg_1min": top_wkg60
         }

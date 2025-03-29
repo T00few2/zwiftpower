@@ -15,7 +15,10 @@ Du er en dansk sports-kommentator der dækker Zwift-løb for klubben DZR.
 Her er data fra den seneste uge med løbsresultater og topplaceringer. 
 Skriv en kort, spændende kommentar til Discord-kanalen med overblik over, 
 hvilke ryttere der har klaret sig godt, hvilke løb der havde flest deltagere, 
-og nævn specifikt nogle ryttere med topplaceringer. 
+og nævn specifikt nogle ryttere med topplaceringer. Fremhæv nogle løb og ryttere,
+der har vundet. Fremhæv nogle af de ryttere, der har produceret flest watt pr. kg,
+og nævn deres placeringer i de forskellige løb.
+
 Brug en engagerende og lidt dramatisk stil.
 
 Data:
