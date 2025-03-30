@@ -1,18 +1,17 @@
 import os
 import time
 from flask import Flask, request, jsonify
-from zwiftpower import ZwiftPower  # your ZwiftPower class
-from zwiftcommentator import ZwiftCommentator  # your ZwiftCommentator class
+from zwiftpower import ZwiftPower
+from zwiftcommentator import ZwiftCommentator
 import requests
 
 app = Flask(__name__)
 
 # Global variable to cache an authenticated session.
 cached_session = None
-cached_session_timestamp = None  # Optionally, track when we logged in
-SESSION_VALIDITY = 3600  # seconds (adjust based on how long the session is expected to be valid)
+cached_session_timestamp = None 
+SESSION_VALIDITY = 3600  # seconds (how long the session is expected to be valid)
 
-# Get credentials from environment variables.
 ZWIFT_USERNAME = os.getenv("ZWIFT_USERNAME", "your_username")
 ZWIFT_PASSWORD = os.getenv("ZWIFT_PASSWORD", "your_password")
 
@@ -72,7 +71,7 @@ def rider_zrs_bulk():
         # Create a ZwiftPower instance using the authenticated session.
         zp = ZwiftPower(ZWIFT_USERNAME, ZWIFT_PASSWORD)
         zp.session = session
-        delay = 10  # seconds between requests (as required by robots.txt)
+        delay = 10  # seconds between requests
         for rid in rider_ids:
             zrs = zp.get_rider_zrs(rid)
             if zrs:
