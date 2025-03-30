@@ -39,6 +39,17 @@ class ZwiftCommentator:
     Kommentaren må meget gerne slutte med en kort konklusion og klubopbakning som fx:
     "DZR leverer – uge efter uge. Vi ses på rullerne!"
 
+Databeskrivelse:
+
+top_10_by_zid: events with most participants by race id
+top_10_by_title: events with most participants by event title (can be across multiple races)
+most_events_riders: riders with most completed events
+most_top_3_riders: riders with most top-3 finishes in their category
+winners: list of winners in races
+top_watts_per_kg_20min: top riders by 20-minute power
+top_watts_per_kg_5min: top riders by 5-minute power
+top_watts_per_kg_1min: top riders by 1-minute power
+
 Data:
 
 {json.dumps(data, ensure_ascii=False, indent=2)}
