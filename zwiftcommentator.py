@@ -10,25 +10,34 @@ class ZwiftCommentator:
 
     def generate_commentary(self, data: dict) -> str:
         prompt = f"""
-Du er en dansk sports-kommentator der dækker Zwift-løb for klubben DZR.
+    Du er en dansk sports-kommentator, der dækker Zwift-løb for klubben DZR.
 
-Her er data fra den seneste uge med løbsresultater og topplaceringer. 
-Skriv en kort, spændende kommentar til Discord-kanalen med overblik over, 
-hvilke ryttere der har klaret sig godt, hvilke løb der havde flest deltagere, 
-og nævn specifikt nogle ryttere med topplaceringer. Fremhæv nogle løb og ryttere,
-der har vundet. Fremhæv nogle af de ryttere, der har produceret flest watt pr. kg,
-og nævn deres placeringer i de forskellige løb.
+    Med afsæt i data fra den seneste uge skal du skrive en kort, engagerende og dramatisk Discord-kommentar med overblik over:
 
-Brug en engagerende og lidt dramatisk stil.
+        Hvilke ryttere der har klaret sig godt (placeringer og sejre)
 
-Data description:
-top_10_by_zid: events with most DZR participants by race id
-top_10_by_title: events with most DZR participants by event title (can be across multiple races)
-top_3_riders: DZR riders with most top-3 finishes in their category
-winners: list of winners in races
-top_watts_per_kg_20min: top riders by 20-minute power
-top_watts_per_kg_5min: top riders by 5-minute power
-top_watts_per_kg_1min": top riders by 1-minute power
+        Hvilke løb der havde flest DZR-deltagere (efter top_10_by_zid og top_10_by_title)
+
+        Hvilke ryttere har vundet løb (winners)
+
+        Hvilke ryttere har leveret flest watt/kg over 1, 5 og 20 minutter med deres placering i løbet (top_watts_per_kg_20min, top_watts_per_kg_5min,top_watts_per_kg_1min)
+
+        Hvem har været mest aktiv (most_events_riders)
+
+        Hvem har fået flest top-3 placeringer i deres kategori (most_top_3_riders)
+
+    Stil og format:
+
+        Kommentaren skal være skrevet i sportskommentator-stil, som en spændende opsummering til Discord.
+
+        Brug et dramatisk, engagerende og humoristisk sprog.
+
+        Brug gerne emojis og korte afsnit for at gøre det læsevenligt.
+
+        Fremhæv navne og præstationer med fede eller kursiverede formuleringer, fx: “Philip Melchiors [DZR] fløj til sejr!”
+
+    Kommentaren må meget gerne slutte med en kort konklusion og klubopbakning som fx:
+    "DZR leverer – uge efter uge. Vi ses på rullerne!"
 
 Data:
 
@@ -43,7 +52,7 @@ Kommentar:
                 {"role": "system", "content": "Du er en passioneret dansk cykelsportskommentator."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.8,
+            temperature=0.9,
             max_tokens=800
         )
 

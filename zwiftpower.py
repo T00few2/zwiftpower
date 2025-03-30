@@ -239,7 +239,7 @@ class ZwiftPower:
                 top_3_counter[key] += 1
 
         # Sort by number of top-3 finishes, descending
-        sorted_top_3 = sorted(top_3_counter.items(), key=lambda x: x[1], reverse=True)
+        sorted_top_3 = sorted(top_3_counter.items(), key=lambda x: x[1], reverse=True)[:3]
 
         top_3_riders = []
         for (name, zwid), count in sorted_top_3:
@@ -380,6 +380,29 @@ class ZwiftPower:
                 "event_title": info["event_title"],
                 "position_in_cat": info["position_in_cat"]
             })
+        
+        # ===========================
+        # 7) The three riders with the most completed events
+        # ===========================
+        event_counter = defaultdict(int)
+        for row in rows:
+            # Convert name
+            rider_name = html.unescape(row["name"])
+            zwid = row["zwid"]
+            # Could key by just zwid or by (rider_name, zwid)
+            key = (rider_name, zwid)
+            event_counter[key] += 1
+
+        # Sort by number of top-3 finishes, descending
+        sorted_most_events = sorted(event_counter.items(), key=lambda x: x[1], reverse=True)[:3]
+
+        most_event_riders = []
+        for (name, zwid), count in sorted_most_events:
+            most_event_riders.append({
+                "name": name,
+                "zwid": zwid,
+                "events_count": count
+            })
 
         # ===========================
         # Return all three analyses in a dict
@@ -387,7 +410,8 @@ class ZwiftPower:
         return {
             "top_10_by_zid": top_10_by_zid, # top 10 events with most participants by race id
             "top_10_by_title": top_10_by_title, # top 10 events with most participants by event title (can be across multiple races)
-            "top_3_riders": top_3_riders, # top 3 riders with most top-3 finishes in their category
+            "most_events_riders": most_event_riders, # top 3 riders with most completed events
+            "most_top_3_riders": top_3_riders, # top 3 riders with most top-3 finishes in their category
             "winners": winners, # list of winners in races
             "top_watts_per_kg_20min": top_wkg1200, # top riders by 20-minute power
             "top_watts_per_kg_5min": top_wkg300, # top riders by 5-minute power
