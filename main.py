@@ -4,6 +4,7 @@ from flask import Flask, request, jsonify
 from zwiftpower import ZwiftPower
 from zwiftcommentator import ZwiftCommentator
 import requests
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 
@@ -158,20 +159,13 @@ def generate_and_post_commentary(club_id):
     
 @app.route('/generate_and_post_upgrades', methods=['POST'])
 def generate_and_post_upgrades():
-    """
-    Example POST body (JSON):
-    {
-        "today": "250402",
-        "yesterday": "250401"
-    }
-    """
+   
     try:
         print("[DEBUG] Starting upgrade comment generation...")
 
-        # Extract and validate dates from request
-        req_data = request.get_json()
-        today = req_data.get("today")
-        yesterday = req_data.get("yesterday")
+        today = datetime.now().strftime("%y%m%d")
+        yesterday = (datetime.now() - timedelta(days=1)).strftime("%y%m%d")
+
 
         if not today or not yesterday:
             return jsonify({"error": "Missing 'today' or 'yesterday' in request body"}), 400
