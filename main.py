@@ -155,7 +155,62 @@ def generate_and_post_commentary(club_id):
     except Exception as e:
         print("[ERROR] Exception occurred:", e)
         return jsonify({"error": str(e)}), 500
+    
+@app.route('/generate_and_post_upgrades', methods=['POST'])
+def generate_and_post_upgrades():
+    """
+    Example POST body (JSON):
+    {
+        "today": "250402",
+        "yesterday": "250401"
+    }
+    """
+    try:
+        print("[DEBUG] Starting upgrade comment generation...")
 
+        # Extract and validate dates from request
+        req_data = request.get_json()
+        today = req_data.get("today")
+        yesterday = req_data.get("yesterday")
+
+        if not today or not yesterday:
+            return jsonify({"error": "Missing 'today' or 'yesterday' in request body"}), 400
+
+        # Build the compare endpoint URL
+        compare_url = f"https://www.dzrracingseries.com/api/zr/compare?today={today}&yesterday={yesterday}"
+
+        # Fetch the upgrade data
+        print(f"[DEBUG] Fetching upgrade data from {compare_url}")
+        response = requests.get(compare_url)
+        response.raise_for_status()
+        upgrade_data = response.json()
+
+        if not upgrade_data.get("upgradedZPCategory") and not upgrade_data.get("upgradedZwiftRacingCategory"):
+            return jsonify({"message": "No upgrades today."}), 200
+
+        # Generate upgrade comment
+        commentator = ZwiftCommentator(api_key=OPENAI_KEY)
+        comment = commentator.generate_upgrade_comment(upgrade_data)
+
+        print("[DEBUG] Upgrade comment generated:\n", comment)
+
+        # Post comment to Discord
+        discord_response = commentator.send_to_discord_api(
+            channel_id=DISCORD_GOSSIP_ID,
+            message=comment,
+            api_url=DISCORD_BOT_URL
+        )
+
+        print("[DEBUG] Discord response:", discord_response)
+
+        if discord_response and discord_response.get("success"):
+            return jsonify({"success": True, "message": comment})
+        else:
+            return jsonify({"error": "Failed to send to Discord", "details": discord_response}), 500
+
+    except Exception as e:
+        print("[ERROR] Exception occurred:", e)
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 8080))

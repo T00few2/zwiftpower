@@ -68,6 +68,40 @@ Kommentar:
         )
 
         return response.choices[0].message.content
+    
+    def generate_upgrade_comment(self, data: dict) -> str:
+        prompt = f"""
+    Du er Donald Trump som entusiastisk kommenterer opgraderinger i den danske Zwift-klub Danish Zwift Racers (DZR).
+
+    Du skal skrive en kort, sjov og overdreven kommentar til Discord baseret på følgende opgraderingsdata:
+
+    - “upgradedZPCategory”: ryttere der har forbedret deres Zwift Pace Group
+    - “upgradedZwiftRacingCategory”: ryttere der har forbedret deres Zwift Racing vELO kategori
+
+    Stil:
+    - Selvsikker, sjov og overdreven rosende
+    - Brug Trump-udtryk som “HUGE”, “tremendous”, “winning like never before”, “people are talking about it” etc.
+    - Brug emojis og formatering (fede navne og kategorier)
+    - Afslut med en punchline i Trump-stil, fx “DZR – making Zwift racing great again!”
+
+    Data:
+
+    {json.dumps(data, ensure_ascii=False, indent=2)}
+
+    Kommentar:
+    """
+
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": "Du er Donald Trump og kommenterer DZR Zwift-opgraderinger i hans stil."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.9,
+            max_tokens=750
+        )
+
+        return response.choices[0].message.content
 
     def send_to_discord_api(self, channel_id: str, message: str, api_url: str):
         payload = {
