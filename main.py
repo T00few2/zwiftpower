@@ -5,6 +5,7 @@ from zwiftpower import ZwiftPower
 from zwiftcommentator import ZwiftCommentator
 import requests
 from datetime import datetime, timedelta
+import firebase
 
 app = Flask(__name__)
 
@@ -204,6 +205,21 @@ def generate_and_post_upgrades():
 
     except Exception as e:
         print("[ERROR] Exception occurred:", e)
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/discord_users', methods=['GET'])
+def get_discord_users():
+    """Retrieve all discord users from Firebase"""
+    try:
+        # Get limit parameter from query string, default to 100
+        limit = request.args.get('limit', default=100, type=int)
+        
+        # Call the get_collection function from firebase module
+        users = firebase.get_collection('discord_users', limit=limit)
+        
+        # Return the users as JSON
+        return jsonify({"users": users, "count": len(users)})
+    except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
