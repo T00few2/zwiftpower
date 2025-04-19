@@ -115,12 +115,11 @@ Kommentar:
         
         Args:
             message (str): The original message text with rider names
-            club_riders (dict): Results from zp.analyze_team_results() containing names and ZwiftIDs
-            fb (FirebaseAPI, optional): Firebase API instance. Creates one if not provided.
             
         Returns:
             str: Modified message with Discord mentions
-        """     
+        """
+
         # Get Discord users from Firebase
         discord_users = fb.get_collection("discord_users")
          
@@ -131,20 +130,19 @@ Kommentar:
                 # Store the mapping from ZwiftID to Discord ID
                 zwiftid_to_discord[user["zwiftID"]] = user["discordID"]
         
-        print("[DEBUG] ZwiftID to Discord mapping:\n", zwiftid_to_discord)
-        
         # Replace names with Discord mentions in the message
         modified_message = message
         
-        # Process each name from the team results
+        # Replace (ZwiftID: <ZwiftID>) with Discord mentions in the message
         for zwiftid,discord_id in zwiftid_to_discord.items():
             
-            # Create a pattern to find the name in the message
-            # We use word boundaries to avoid partial matches
             pattern = '(ZwiftID: ' + zwiftid + ')'
             
             # Replace with Discord mention format: <@DISCORD_ID>
             modified_message = re.sub(pattern, f"<@{discord_id}>", modified_message, flags=re.IGNORECASE)
+        
+        # Remove any remaining (ZwiftID: X) patterns that weren't replaced
+        modified_message = re.sub(r'\(ZwiftID: [^)]+\)', '', modified_message)
         
         return modified_message
 
@@ -163,9 +161,7 @@ Kommentar:
         
         # Tag Discord users in the message
         tagged_message = self.tag_discord_users(message)
-        
-        print("[DEBUG] Tagged message:\n", tagged_message)
-        
+                
         payload = {
             "channelId": channel_id,
             "messageContent": tagged_message

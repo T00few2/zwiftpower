@@ -187,16 +187,12 @@ def generate_and_post_upgrades():
         commentator = ZwiftCommentator(api_key=OPENAI_KEY)
         comment = commentator.generate_upgrade_comment(upgrade_data)
 
-        print("[DEBUG] Upgrade comment generated:\n", comment)
-
         # Post comment to Discord
         discord_response = commentator.send_to_discord_api(
             channel_id=DISCORD_GOSSIP_ID,
             message=comment,
             api_url=DISCORD_BOT_URL
         )
-
-        print("[DEBUG] Discord response:", discord_response)
 
         if discord_response and discord_response.get("success"):
             return jsonify({"success": True, "message": comment})
