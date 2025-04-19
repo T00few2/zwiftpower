@@ -130,6 +130,8 @@ Kommentar:
                 # Store the mapping from ZwiftID to Discord ID
                 zwiftid_to_discord[user["zwiftID"]] = user["discordID"]
         
+        print("[DEBUG] ZwiftID to Discord mapping:\n", zwiftid_to_discord)
+        
         # Create a mapping of names to their ZwiftIDs from team_results
         name_to_zwiftid = {}
 
@@ -139,6 +141,8 @@ Kommentar:
         for rider in club_riders:
             if 'name' in rider and 'riderId' in rider:
                 name_to_zwiftid[rider['name']] = str(rider['riderId'])
+                
+        print("[DEBUG] Name to ZwiftID mapping:\n", name_to_zwiftid)
         
         # Replace names with Discord mentions in the message
         modified_message = message
@@ -172,11 +176,13 @@ Kommentar:
         """
         
         # Tag Discord users in the message
-        message = self.tag_discord_users(message)
+        tagged_message = self.tag_discord_users(message)
+        
+        print("[DEBUG] Tagged message:\n", tagged_message)
         
         payload = {
             "channelId": channel_id,
-            "messageContent": message
+            "messageContent": tagged_message
         }
 
         headers = {
