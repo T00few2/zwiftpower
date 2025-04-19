@@ -155,7 +155,7 @@ Kommentar:
                 
                 # Create a pattern to find the name in the message
                 # We use word boundaries to avoid partial matches
-                pattern = r'\b' + re.escape(name) + r'\b'
+                pattern = re.escape(name)
                 
                 # Replace with Discord mention format: <@DISCORD_ID>
                 modified_message = re.sub(pattern, f"<@{discord_id}>", modified_message, flags=re.IGNORECASE)
