@@ -40,6 +40,8 @@ class ZwiftCommentator:
 
     Kommentaren må meget gerne slutte med en kort konklusion og klubopbakning som fx:
     "DZR leverer – uge efter uge. Vi ses på rullerne!"
+    
+    Efter hvert navn du nævner skal du skrive (ZwiftID: <ZwiftID>)
 
 Databeskrivelse:
 
@@ -85,6 +87,8 @@ Kommentar:
     - Brug Trump-udtryk som “HUGE”, “tremendous”, “winning like never before”, “people are talking about it” etc.
     - Brug emojis og formatering (fede navne og kategorier)
     - Afslut med en punchline i Trump-stil, fx “DZR – making Zwift racing great again!”
+    
+    Efter hvert navn du nævner skal du skrive (ZwiftID: <ZwiftID>)
 
     Data:
 
@@ -119,10 +123,7 @@ Kommentar:
         """     
         # Get Discord users from Firebase
         discord_users = fb.get_collection("discord_users")
-        
-        # Get club riders from Firebase
-        club_riders = fb.get_latest_document("club_stats")[0]['data']['riders']
-        
+         
         # Create a lookup dictionary of ZwiftIDs to Discord IDs
         zwiftid_to_discord = {}
         for user in discord_users:
@@ -132,34 +133,18 @@ Kommentar:
         
         print("[DEBUG] ZwiftID to Discord mapping:\n", zwiftid_to_discord)
         
-        # Create a mapping of names to their ZwiftIDs from team_results
-        name_to_zwiftid = {}
-
-        # Extract name and ZwiftID from team_results
-        # The exact structure depends on your team_results format
-        # This is an example that may need adjustment
-        for rider in club_riders:
-            if 'name' in rider and 'riderId' in rider:
-                name_to_zwiftid[rider['name']] = str(rider['riderId'])
-                
-        print("[DEBUG] Name to ZwiftID mapping:\n", name_to_zwiftid)
-        
         # Replace names with Discord mentions in the message
         modified_message = message
         
         # Process each name from the team results
-        for name, zwiftid in name_to_zwiftid.items():
-            # Check if this ZwiftID has a corresponding Discord ID
-            if zwiftid in zwiftid_to_discord:
-                discord_id = zwiftid_to_discord[zwiftid]
-                
-                # Create a pattern to find the name in the message
-                # We use word boundaries to avoid partial matches
-                pattern = re.escape(name)
-                print("[DEBUG] Pattern:\n", pattern)
-                
-                # Replace with Discord mention format: <@DISCORD_ID>
-                modified_message = re.sub(pattern, f"<@{discord_id}>", modified_message, flags=re.IGNORECASE)
+        for zwiftid,discord_id in zwiftid_to_discord.items():
+            
+            # Create a pattern to find the name in the message
+            # We use word boundaries to avoid partial matches
+            pattern = '(ZwiftID: ' + zwiftid + ')'
+            
+            # Replace with Discord mention format: <@DISCORD_ID>
+            modified_message = re.sub(pattern, f"<@{discord_id}>", modified_message, flags=re.IGNORECASE)
         
         return modified_message
 
