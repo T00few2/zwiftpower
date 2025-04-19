@@ -105,7 +105,7 @@ Kommentar:
 
         return response.choices[0].message.content
     
-    def tag_discord_users(message):
+    def tag_discord_users(self, message: str) -> str:
         """
         Replace rider names in a message with Discord mentions based on their ZwiftIDs.
         
