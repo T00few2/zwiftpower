@@ -2,6 +2,8 @@ import openai
 import json
 import requests
 from openai import OpenAI
+import firebase as fb
+import re
 
 class ZwiftCommentator:
     def __init__(self, api_key: str, model: str = "gpt-4o"):
@@ -102,8 +104,76 @@ Kommentar:
         )
 
         return response.choices[0].message.content
+    
+    def tag_discord_users(message):
+        """
+        Replace rider names in a message with Discord mentions based on their ZwiftIDs.
+        
+        Args:
+            message (str): The original message text with rider names
+            club_riders (dict): Results from zp.analyze_team_results() containing names and ZwiftIDs
+            fb (FirebaseAPI, optional): Firebase API instance. Creates one if not provided.
+            
+        Returns:
+            str: Modified message with Discord mentions
+        """     
+        # Get Discord users from Firebase
+        discord_users = fb.get_collection("discord_users")
+        
+        # Get club riders from Firebase
+        club_riders = fb.get_latest_document("club_stats")[0]['data']['riders']
+        
+        # Create a lookup dictionary of ZwiftIDs to Discord IDs
+        zwiftid_to_discord = {}
+        for user in discord_users:
+            if "zwiftID" in user and "discordID" in user:
+                # Store the mapping from ZwiftID to Discord ID
+                zwiftid_to_discord[user["zwiftID"]] = user["discordID"]
+        
+        # Create a mapping of names to their ZwiftIDs from team_results
+        name_to_zwiftid = {}
+
+        # Extract name and ZwiftID from team_results
+        # The exact structure depends on your team_results format
+        # This is an example that may need adjustment
+        for rider in club_riders:
+            if 'name' in rider and 'riderId' in rider:
+                name_to_zwiftid[rider['name']] = str(rider['riderId'])
+        
+        # Replace names with Discord mentions in the message
+        modified_message = message
+        
+        # Process each name from the team results
+        for name, zwiftid in name_to_zwiftid.items():
+            # Check if this ZwiftID has a corresponding Discord ID
+            if zwiftid in zwiftid_to_discord:
+                discord_id = zwiftid_to_discord[zwiftid]
+                
+                # Create a pattern to find the name in the message
+                # We use word boundaries to avoid partial matches
+                pattern = r'\b' + re.escape(name) + r'\b'
+                
+                # Replace with Discord mention format: <@DISCORD_ID>
+                modified_message = re.sub(pattern, f"<@{discord_id}>", modified_message, flags=re.IGNORECASE)
+        
+        return modified_message
 
     def send_to_discord_api(self, channel_id: str, message: str, api_url: str):
+        """
+        Send a message to a Discord channel using the Discord API.
+        
+        Args:
+            channel_id (str): The ID of the Discord channel to send the message to
+            message (str): The message content to send
+            api_url (str): The URL of the Discord API
+            
+        Returns:
+            dict: The response from the Discord API
+        """
+        
+        # Tag Discord users in the message
+        message = self.tag_discord_users(message)
+        
         payload = {
             "channelId": channel_id,
             "messageContent": message

@@ -38,6 +38,19 @@ def get_collection(collection: str, limit: int = 100) -> List[Dict[str, Any]]:
     docs = db.collection(collection).limit(limit).stream()
     return [doc.to_dict() for doc in docs]
 
+def get_latest_document(collection: str) -> Optional[Dict[str, Any]]:
+        """
+        Fetch the latest document from a collection.
+        
+        Args:
+            collection: The collection name
+            
+        Returns:
+            The latest document as a dictionary, or None if no documents exist
+        """
+        docs = db.collection(collection).order_by('timestamp', direction=firestore.Query.DESCENDING).limit(1).stream()
+        return [doc.to_dict() for doc in docs]  
+
 def query_collection(
     collection: str, 
     field: str, 
