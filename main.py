@@ -6,6 +6,7 @@ from zwiftcommentator import ZwiftCommentator
 import requests
 from datetime import datetime, timedelta
 import firebase
+from discord_api import DiscordAPI
 
 app = Flask(__name__)
 
@@ -21,6 +22,8 @@ OPENAI_KEY = os.getenv("OPENAI_KEY", "your_openai_key")
 
 DISCORD_GOSSIP_ID = os.getenv("DISCORD_GOSSIP_ID", "your_discord_gossip_id")
 DISCORD_BOT_URL = os.getenv("DISCORD_BOT_URL", "your_discord_bot_url")
+DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN", "your_discord_bot_token")
+DISCORD_GUILD_ID = os.getenv("DISCORD_GUILD_ID", "your_discord_guild_id")
 
 def get_authenticated_session() -> requests.Session:
     """Return a cached, authenticated session if available and still valid; otherwise, log in."""
@@ -217,6 +220,38 @@ def get_discord_users():
         return jsonify({"users": users, "count": len(users)})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@app.route('/discord/members', methods=['GET'])
+def get_discord_members():
+    """Get all Discord members with their information"""
+    try:
+        # Initialize Discord API
+        discord_api = DiscordAPI(DISCORD_BOT_TOKEN, DISCORD_GUILD_ID)
+        
+        # Get parameter to determine if we want linked, unlinked, or all members
+        member_type = request.args.get('type', default='all')
+        
+        if member_type == 'linked':
+            # Only get members with ZwiftIDs
+            members = discord_api.find_linked_members()
+        elif member_type == 'unlinked':
+            # Only get members without ZwiftIDs
+            members = discord_api.find_unlinked_members()
+        else:
+            # Get all members with ZwiftIDs merged
+            members = discord_api.merge_with_zwift_ids()
+        
+        return jsonify({
+            "members": members,
+            "count": len(members),
+            "type": member_type
+        })
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 8080))
