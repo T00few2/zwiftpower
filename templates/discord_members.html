@@ -68,15 +68,14 @@
             font-size: 14px;
         }
         .assign-btn {
-            position: absolute;
-            top: 15px;
-            right: 15px;
             background-color: #5865F2;
             color: white;
             border: none;
             border-radius: 4px;
             padding: 8px 12px;
             cursor: pointer;
+            margin-top: 10px;
+            display: inline-block;
         }
         .assign-btn:hover {
             background-color: #4752C4;
@@ -188,6 +187,13 @@
                 <input type="text" id="member-search" class="member-search" placeholder="Search members...">
             </div>
 
+            <div class="filters" style="align-items: center;">
+                <label style="display: flex; align-items: center; white-space: nowrap;">
+                    <input type="checkbox" id="filter-member-role" checked>
+                    <span style="margin-left: 8px;">Only show members with "member" role</span>
+                </label>
+            </div>
+
             <div id="members-container">
                 {% for member in members %}
                 <div class="member-card {% if member.has_zwift_id %}has-zwift{% else %}no-zwift{% endif %}" 
@@ -262,34 +268,17 @@
             
             // Setup search functionality
             document.getElementById('member-search').addEventListener('input', function() {
-                const searchTerm = this.value.toLowerCase();
-                const filterType = document.getElementById('filter-type').value;
-                
-                Array.from(document.getElementsByClassName('member-card')).forEach(card => {
-                    const displayName = card.dataset.displayName.toLowerCase();
-                    const username = card.dataset.username.toLowerCase();
-                    const hasZwift = card.dataset.hasZwift;
-                    
-                    // Match search term
-                    const matchesSearch = displayName.includes(searchTerm) || 
-                                         username.includes(searchTerm);
-                    
-                    // Match filter type
-                    let matchesFilter = true;
-                    if (filterType === 'linked' && hasZwift !== 'true') {
-                        matchesFilter = false;
-                    } else if (filterType === 'unlinked' && hasZwift === 'true') {
-                        matchesFilter = false;
-                    }
-                    
-                    // Show or hide based on both conditions
-                    card.style.display = (matchesSearch && matchesFilter) ? 'block' : 'none';
-                });
+                applyFilters();
             });
             
             // Setup filter change event
             document.getElementById('filter-type').addEventListener('change', function() {
-                filterMembers(this.value);
+                applyFilters();
+            });
+            
+            // Setup member role filter checkbox
+            document.getElementById('filter-member-role').addEventListener('change', function() {
+                applyFilters();
             });
             
             // Setup Zwift rider search
@@ -302,15 +291,20 @@
                     option.style.display = text.includes(searchTerm) ? '' : 'none';
                 });
             });
+            
+            // Initial filter application
+            applyFilters();
         });
         
-        function filterMembers(type) {
+        function applyFilters() {
             const searchTerm = document.getElementById('member-search').value.toLowerCase();
+            const filterType = document.getElementById('filter-type').value;
+            const filterMemberRole = document.getElementById('filter-member-role').checked;
             
             Array.from(document.getElementsByClassName('member-card')).forEach(card => {
-                const hasZwift = card.dataset.hasZwift;
                 const displayName = card.dataset.displayName.toLowerCase();
                 const username = card.dataset.username.toLowerCase();
+                const hasZwift = card.dataset.hasZwift;
                 
                 // Match search term
                 const matchesSearch = displayName.includes(searchTerm) || 
@@ -318,15 +312,32 @@
                 
                 // Match filter type
                 let matchesFilter = true;
-                if (type === 'linked' && hasZwift !== 'true') {
+                if (filterType === 'linked' && hasZwift !== 'true') {
                     matchesFilter = false;
-                } else if (type === 'unlinked' && hasZwift === 'true') {
+                } else if (filterType === 'unlinked' && hasZwift === 'true') {
                     matchesFilter = false;
                 }
                 
-                // Show or hide based on both conditions
-                card.style.display = (matchesSearch && matchesFilter) ? 'block' : 'none';
+                // Match member role filter
+                let matchesMemberRole = true;
+                if (filterMemberRole) {
+                    const roleTags = card.querySelectorAll('.role-tag');
+                    const hasMemberRole = Array.from(roleTags).some(tag => 
+                        tag.textContent.trim().toLowerCase() === 'member');
+                    
+                    if (!hasMemberRole) {
+                        matchesMemberRole = false;
+                    }
+                }
+                
+                // Show or hide based on all conditions
+                card.style.display = (matchesSearch && matchesFilter && matchesMemberRole) ? 'block' : 'none';
             });
+        }
+        
+        function filterMembers(type) {
+            document.getElementById('filter-type').value = type;
+            applyFilters();
         }
         
         function selectMemberForAssignment(discordId) {
