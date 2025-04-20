@@ -1,6 +1,6 @@
 import os
 import time
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 from zwiftpower import ZwiftPower
 from zwiftcommentator import ZwiftCommentator
 import requests
@@ -225,6 +225,9 @@ def get_discord_users():
 def get_discord_members():
     """Get all Discord members with their information"""
     try:
+        # Check if the request accepts HTML
+        is_html_request = request.headers.get('Accept', '').find('text/html') >= 0
+        
         # Initialize Discord API
         discord_api = DiscordAPI(DISCORD_BOT_TOKEN, DISCORD_GUILD_ID)
         
@@ -241,7 +244,37 @@ def get_discord_members():
         else:
             # Get all members with ZwiftIDs merged
             members = discord_api.merge_with_zwift_ids(include_role_names=include_roles)
+            
+        # For HTML requests, render the template with data
+        if is_html_request:
+            # Get Zwift riders from club_riders collection
+            club_riders_data = firebase.get_latest_document('club_riders')
+            zwift_riders = []
+            
+            if club_riders_data and len(club_riders_data) > 0:
+                # The data comes back as a list with one item, get the first item
+                riders = club_riders_data[0].get('riders', [])
+                zwift_riders = [
+                    {"name": rider.get('name', ''), "riderId": rider.get('riderId')}
+                    for rider in riders
+                    if 'name' in rider and 'riderId' in rider
+                ]
+                
+                # Sort riders by name for easier selection
+                zwift_riders.sort(key=lambda x: x["name"])
+            
+            linked_count = len([m for m in members if m.get('has_zwift_id')])
+            unlinked_count = len(members) - linked_count
+            
+            return render_template(
+                'discord_members.html',
+                members=members,
+                zwift_riders=zwift_riders,
+                linked_count=linked_count,
+                unlinked_count=unlinked_count
+            )
         
+        # For API requests, return JSON
         return jsonify({
             "members": members,
             "count": len(members),
@@ -249,11 +282,42 @@ def get_discord_members():
             "include_roles": include_roles
         })
     except ValueError as e:
+        if is_html_request:
+            return f"<h1>Error</h1><p>{str(e)}</p>", 400
         return jsonify({"error": str(e)}), 400
     except Exception as e:
+        if is_html_request:
+            return f"<h1>Error</h1><p>{str(e)}</p>", 500
         return jsonify({"error": str(e)}), 500
 
-
+@app.route('/api/assign_zwift_id', methods=['POST'])
+def assign_zwift_id():
+    """Assign a ZwiftID to a Discord user"""
+    try:
+        data = request.json
+        if not data:
+            return jsonify({"status": "error", "message": "No data provided"}), 400
+            
+        discord_id = data.get('discord_id')
+        zwift_id = data.get('zwift_id')
+        
+        if not discord_id:
+            return jsonify({"status": "error", "message": "No Discord ID provided"}), 400
+            
+        if not zwift_id:
+            return jsonify({"status": "error", "message": "No Zwift ID provided"}), 400
+        
+        # Update the Discord user with the ZwiftID
+        result = firebase.update_discord_zwift_link(discord_id, zwift_id)
+        
+        return jsonify({
+            "status": "success", 
+            "discord_id": discord_id, 
+            "zwift_id": zwift_id,
+            "operation": result.get("status", "updated")
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 8080))

@@ -1,6 +1,7 @@
 import firebase_admin
 from firebase_admin import firestore
 from typing import List, Dict, Any, Optional
+from datetime import datetime
 
 # No credentials needed - uses Application Default Credentials
 app = firebase_admin.initialize_app()
@@ -92,4 +93,40 @@ def get_documents_by_field(
     Returns:
         List of document data as dictionaries
     """
-    return query_collection(collection, field, "==", value, limit) 
+    return query_collection(collection, field, "==", value, limit)
+
+def update_discord_zwift_link(discord_id: str, zwift_id: str) -> Dict[str, Any]:
+    """
+    Update or create a Discord user with a ZwiftID.
+    
+    Args:
+        discord_id: The Discord user ID
+        zwift_id: The Zwift rider ID to link
+        
+    Returns:
+        Dict with operation status
+    """
+    # Check if user exists
+    existing_docs = query_collection("discord_users", "discordID", "==", discord_id, limit=1)
+    
+    # Prepare data
+    now = datetime.now()
+    data = {
+        "zwiftID": zwift_id,
+        "linkedAt": now
+    }
+    
+    if existing_docs:
+        # Update existing document
+        # First get the document ID (different from discordID)
+        user_docs = db.collection("discord_users").where("discordID", "==", discord_id).limit(1).stream()
+        doc_id = next(user_docs).id
+        
+        # Update the document
+        db.collection("discord_users").document(doc_id).update(data)
+        return {"status": "updated", "discord_id": discord_id, "zwift_id": zwift_id}
+    else:
+        # Create new document
+        data["discordID"] = discord_id
+        db.collection("discord_users").add(data)
+        return {"status": "created", "discord_id": discord_id, "zwift_id": zwift_id} 

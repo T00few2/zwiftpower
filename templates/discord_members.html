@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Discord Members - Zwift ID Assignment</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .header {
+            background-color: #5865F2; /* Discord blue */
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .main {
+            display: flex;
+            gap: 20px;
+        }
+        .members-list {
+            flex: 1;
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .assignment-panel {
+            flex: 1;
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 20px;
+            height: fit-content;
+        }
+        .member-card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background-color: #fff;
+            position: relative;
+        }
+        .member-card.has-zwift {
+            border-left: 5px solid #57F287; /* Discord green */
+        }
+        .member-card.no-zwift {
+            border-left: 5px solid #ED4245; /* Discord red */
+        }
+        .member-name {
+            font-weight: bold;
+            font-size: 18px;
+        }
+        .member-info {
+            color: #777;
+            font-size: 14px;
+        }
+        .assign-btn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background-color: #5865F2;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 8px 12px;
+            cursor: pointer;
+        }
+        .assign-btn:hover {
+            background-color: #4752C4;
+        }
+        .assigned {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background-color: #57F287;
+            color: white;
+            border-radius: 4px;
+            padding: 8px 12px;
+        }
+        select, input, button {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #5865F2;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover {
+            background-color: #4752C4;
+        }
+        .filters {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .filters select, .filters input {
+            flex: 1;
+        }
+        .role-tag {
+            display: inline-block;
+            background: #ddd;
+            color: #333;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            margin-right: 5px;
+            margin-bottom: 5px;
+        }
+        .zwift-info {
+            background-color: #f0f0f0;
+            border-radius: 4px;
+            padding: 10px;
+            margin-top: 10px;
+        }
+        .assignment-form {
+            margin-top: 20px;
+        }
+        .member-search {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            box-sizing: border-box;
+        }
+        .success-message, .error-message {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            display: none;
+        }
+        .success-message {
+            background-color: #DFF2BF;
+            color: #4F8A10;
+        }
+        .error-message {
+            background-color: #FFBABA;
+            color: #D8000C;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Discord Members - Zwift ID Assignment</h1>
+        <div>
+            <span>Total members: {{ members|length }}</span>
+            <span>With Zwift IDs: {{ linked_count }}</span>
+            <span>Without Zwift IDs: {{ unlinked_count }}</span>
+        </div>
+    </div>
+
+    <div class="main">
+        <div class="members-list">
+            <div class="filters">
+                <select id="filter-type">
+                    <option value="all">All Members</option>
+                    <option value="unlinked" selected>Unlinked Members</option>
+                    <option value="linked">Linked Members</option>
+                </select>
+                <input type="text" id="member-search" class="member-search" placeholder="Search members...">
+            </div>
+
+            <div id="members-container">
+                {% for member in members %}
+                <div class="member-card {% if member.has_zwift_id %}has-zwift{% else %}no-zwift{% endif %}" 
+                     data-has-zwift="{{ member.has_zwift_id|lower }}"
+                     data-discord-id="{{ member.discordID }}"
+                     data-username="{{ member.username }}"
+                     data-display-name="{{ member.display_name }}">
+                    <div class="member-name">{{ member.display_name }}</div>
+                    <div class="member-info">@{{ member.username }} ({{ member.discordID }})</div>
+                    
+                    {% if member.roles %}
+                    <div class="member-roles">
+                        {% for role in member.roles %}
+                        <span class="role-tag" style="background-color: #{{ '%06x' % role.color if role.color > 0 else 'dddddd' }}">
+                            {{ role.name }}
+                        </span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    
+                    {% if member.has_zwift_id %}
+                    <div class="zwift-info">
+                        <strong>Zwift ID:</strong> {{ member.zwiftID }}
+                        <button class="assign-btn" onclick="selectMemberForAssignment('{{ member.discordID }}')">Reassign</button>
+                    </div>
+                    {% else %}
+                    <button class="assign-btn" onclick="selectMemberForAssignment('{{ member.discordID }}')">Assign Zwift ID</button>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="assignment-panel">
+            <h2>Assign Zwift ID</h2>
+            <div id="selected-member-info" class="hidden">
+                <p>Selected: <span id="selected-member-name"></span></p>
+                <p>Discord ID: <span id="selected-discord-id"></span></p>
+            </div>
+            
+            <div id="no-selection-message">
+                <p>Select a member from the list to assign a Zwift ID.</p>
+            </div>
+            
+            <div id="assignment-form" class="assignment-form hidden">
+                <label for="zwift-rider-select">Select Zwift Rider:</label>
+                <input type="text" id="zwift-search" placeholder="Search Zwift riders...">
+                <select id="zwift-rider-select" size="10" style="height: 200px;">
+                    {% for rider in zwift_riders %}
+                    <option value="{{ rider.riderId }}">{{ rider.name }} (ID: {{ rider.riderId }})</option>
+                    {% endfor %}
+                </select>
+                
+                <button id="assign-btn" onclick="assignZwiftID()">Assign Zwift ID</button>
+                <button id="cancel-btn" onclick="cancelAssignment()" style="background-color: #ED4245;">Cancel</button>
+                
+                <div id="success-message" class="success-message"></div>
+                <div id="error-message" class="error-message"></div>
+                <div id="loading" class="loading">Processing...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let selectedDiscordId = null;
+        
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set initial filter to unlinked members
+            filterMembers('unlinked');
+            
+            // Setup search functionality
+            document.getElementById('member-search').addEventListener('input', function() {
+                const searchTerm = this.value.toLowerCase();
+                const filterType = document.getElementById('filter-type').value;
+                
+                Array.from(document.getElementsByClassName('member-card')).forEach(card => {
+                    const displayName = card.dataset.displayName.toLowerCase();
+                    const username = card.dataset.username.toLowerCase();
+                    const hasZwift = card.dataset.hasZwift;
+                    
+                    // Match search term
+                    const matchesSearch = displayName.includes(searchTerm) || 
+                                         username.includes(searchTerm);
+                    
+                    // Match filter type
+                    let matchesFilter = true;
+                    if (filterType === 'linked' && hasZwift !== 'true') {
+                        matchesFilter = false;
+                    } else if (filterType === 'unlinked' && hasZwift === 'true') {
+                        matchesFilter = false;
+                    }
+                    
+                    // Show or hide based on both conditions
+                    card.style.display = (matchesSearch && matchesFilter) ? 'block' : 'none';
+                });
+            });
+            
+            // Setup filter change event
+            document.getElementById('filter-type').addEventListener('change', function() {
+                filterMembers(this.value);
+            });
+            
+            // Setup Zwift rider search
+            document.getElementById('zwift-search').addEventListener('input', function() {
+                const searchTerm = this.value.toLowerCase();
+                const select = document.getElementById('zwift-rider-select');
+                
+                Array.from(select.options).forEach(option => {
+                    const text = option.text.toLowerCase();
+                    option.style.display = text.includes(searchTerm) ? '' : 'none';
+                });
+            });
+        });
+        
+        function filterMembers(type) {
+            const searchTerm = document.getElementById('member-search').value.toLowerCase();
+            
+            Array.from(document.getElementsByClassName('member-card')).forEach(card => {
+                const hasZwift = card.dataset.hasZwift;
+                const displayName = card.dataset.displayName.toLowerCase();
+                const username = card.dataset.username.toLowerCase();
+                
+                // Match search term
+                const matchesSearch = displayName.includes(searchTerm) || 
+                                     username.includes(searchTerm);
+                
+                // Match filter type
+                let matchesFilter = true;
+                if (type === 'linked' && hasZwift !== 'true') {
+                    matchesFilter = false;
+                } else if (type === 'unlinked' && hasZwift === 'true') {
+                    matchesFilter = false;
+                }
+                
+                // Show or hide based on both conditions
+                card.style.display = (matchesSearch && matchesFilter) ? 'block' : 'none';
+            });
+        }
+        
+        function selectMemberForAssignment(discordId) {
+            // Store the selected Discord ID
+            selectedDiscordId = discordId;
+            
+            // Find the member card
+            const memberCard = document.querySelector(`[data-discord-id="${discordId}"]`);
+            const memberName = memberCard.querySelector('.member-name').textContent;
+            
+            // Update the assignment panel
+            document.getElementById('selected-member-name').textContent = memberName;
+            document.getElementById('selected-discord-id').textContent = discordId;
+            
+            // Show the assignment form and hide the no selection message
+            document.getElementById('selected-member-info').classList.remove('hidden');
+            document.getElementById('assignment-form').classList.remove('hidden');
+            document.getElementById('no-selection-message').classList.add('hidden');
+            
+            // Reset messages
+            document.getElementById('success-message').style.display = 'none';
+            document.getElementById('error-message').style.display = 'none';
+            
+            // Scroll to the assignment panel on mobile
+            if (window.innerWidth < 768) {
+                document.querySelector('.assignment-panel').scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+        
+        function cancelAssignment() {
+            // Reset the selected Discord ID
+            selectedDiscordId = null;
+            
+            // Hide the assignment form and show the no selection message
+            document.getElementById('selected-member-info').classList.add('hidden');
+            document.getElementById('assignment-form').classList.add('hidden');
+            document.getElementById('no-selection-message').classList.remove('hidden');
+        }
+        
+        function assignZwiftID() {
+            // Make sure a Discord member is selected
+            if (!selectedDiscordId) {
+                showError('No Discord member selected.');
+                return;
+            }
+            
+            // Get the selected Zwift ID
+            const select = document.getElementById('zwift-rider-select');
+            if (select.selectedIndex === -1) {
+                showError('Please select a Zwift rider.');
+                return;
+            }
+            
+            const zwiftId = select.value;
+            const zwiftName = select.options[select.selectedIndex].text.split(' (ID:')[0];
+            
+            // Show loading indicator
+            document.getElementById('loading').style.display = 'block';
+            
+            // Make API call to assign the Zwift ID
+            fetch('/api/assign_zwift_id', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    discord_id: selectedDiscordId,
+                    zwift_id: zwiftId
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Hide loading indicator
+                document.getElementById('loading').style.display = 'none';
+                
+                if (data.status === 'success') {
+                    showSuccess(`Successfully assigned Zwift ID ${zwiftId} (${zwiftName}) to Discord member.`);
+                    
+                    // Update the UI to reflect the change
+                    const memberCard = document.querySelector(`[data-discord-id="${selectedDiscordId}"]`);
+                    memberCard.classList.remove('no-zwift');
+                    memberCard.classList.add('has-zwift');
+                    memberCard.dataset.hasZwift = 'true';
+                    
+                    // Add Zwift info
+                    let zwiftInfo = memberCard.querySelector('.zwift-info');
+                    if (!zwiftInfo) {
+                        zwiftInfo = document.createElement('div');
+                        zwiftInfo.className = 'zwift-info';
+                        memberCard.appendChild(zwiftInfo);
+                    }
+                    
+                    zwiftInfo.innerHTML = `
+                        <strong>Zwift ID:</strong> ${zwiftId}
+                        <button class="assign-btn" onclick="selectMemberForAssignment('${selectedDiscordId}')">Reassign</button>
+                    `;
+                    
+                    // Remove the assign button if it exists
+                    const assignBtn = memberCard.querySelector('.assign-btn:not(.zwift-info .assign-btn)');
+                    if (assignBtn) {
+                        assignBtn.remove();
+                    }
+                    
+                    // Reset the form after a short delay to show the success message
+                    setTimeout(() => {
+                        // Check if we're viewing "unlinked" and if so, hide this member card
+                        if (document.getElementById('filter-type').value === 'unlinked') {
+                            memberCard.style.display = 'none';
+                        }
+                        
+                        cancelAssignment();
+                    }, 2000);
+                } else {
+                    showError(data.message || 'Failed to assign Zwift ID.');
+                }
+            })
+            .catch(error => {
+                document.getElementById('loading').style.display = 'none';
+                showError('Error: ' + error.message);
+                console.error('Error:', error);
+            });
+        }
+        
+        function showSuccess(message) {
+            const successEl = document.getElementById('success-message');
+            successEl.textContent = message;
+            successEl.style.display = 'block';
+            document.getElementById('error-message').style.display = 'none';
+        }
+        
+        function showError(message) {
+            const errorEl = document.getElementById('error-message');
+            errorEl.textContent = message;
+            errorEl.style.display = 'block';
+            document.getElementById('success-message').style.display = 'none';
+        }
+    </script>
+</body>
+</html> 
