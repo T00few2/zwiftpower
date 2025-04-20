@@ -248,7 +248,7 @@ def get_discord_members():
         # For HTML requests, render the template with data
         if is_html_request:
             # Get Zwift riders from club_riders collection
-            club_riders_data = firebase.get_latest_document('club_riders')
+            club_riders_data = firebase.get_latest_document('club_stats')
             zwift_riders = []
             
             if club_riders_data and len(club_riders_data) > 0:
