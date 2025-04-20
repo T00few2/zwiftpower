@@ -31,19 +31,66 @@ class DiscordAPI:
             "Authorization": f"Bot {self.bot_token}",
             "Content-Type": "application/json"
         }
+        
+        # Cache for role data
+        self._roles_cache = None
     
-    def get_all_members(self, limit: int = 1000) -> List[Dict[str, Any]]:
+    def get_guild_roles(self) -> Dict[str, Dict[str, Any]]:
+        """
+        Get all roles in the guild.
+        
+        Returns:
+            Dict[str, Dict[str, Any]]: Dictionary mapping role IDs to role data
+        """
+        # Return cached roles if available
+        if self._roles_cache:
+            return self._roles_cache
+            
+        try:
+            response = requests.get(
+                f"{self.api_base_url}/guilds/{self.guild_id}/roles",
+                headers=self.headers
+            )
+            response.raise_for_status()
+            
+            roles = response.json()
+            # Create a lookup dictionary of role ID to role data
+            role_lookup = {}
+            for role in roles:
+                role_lookup[role["id"]] = {
+                    "id": role["id"],
+                    "name": role["name"],
+                    "color": role["color"],
+                    "position": role["position"],
+                    "permissions": role["permissions"],
+                    "managed": role["managed"],
+                    "mentionable": role["mentionable"]
+                }
+            
+            # Cache the roles
+            self._roles_cache = role_lookup
+            return role_lookup
+            
+        except requests.RequestException as e:
+            print(f"Error fetching guild roles: {e}")
+            return {}
+    
+    def get_all_members(self, limit: int = 1000, include_role_names: bool = True) -> List[Dict[str, Any]]:
         """
         Get all members from the Discord guild.
         
         Args:
             limit (int, optional): Maximum number of members to retrieve. Defaults to 1000.
+            include_role_names (bool, optional): Whether to include role names along with IDs. Defaults to True.
             
         Returns:
             List[Dict[str, Any]]: List of member data including display names, usernames, and IDs
         """
         members = []
         after = None  # Used for pagination
+        
+        # Get role data if we need to include role names
+        role_lookup = self.get_guild_roles() if include_role_names else {}
         
         # Discord returns up to 1000 members per request, so we may need multiple requests
         while True:
@@ -62,6 +109,8 @@ class DiscordAPI:
                 for member in batch:
                     # Extract relevant member info
                     user = member.get("user", {})
+                    role_ids = member.get("roles", [])
+                    
                     member_data = {
                         "discordID": user.get("id"),
                         "username": user.get("username"),
@@ -69,8 +118,26 @@ class DiscordAPI:
                         "display_name": member.get("nick") or user.get("global_name") or user.get("username"),
                         "avatar": user.get("avatar"),
                         "joined_at": member.get("joined_at"),
-                        "roles": member.get("roles", [])
+                        "role_ids": role_ids
                     }
+                    
+                    # Include role names if requested
+                    if include_role_names and role_lookup:
+                        # Get role info for each role ID
+                        roles_info = []
+                        for role_id in role_ids:
+                            if role_id in role_lookup:
+                                roles_info.append({
+                                    "id": role_id,
+                                    "name": role_lookup[role_id]["name"],
+                                    "color": role_lookup[role_id]["color"],
+                                    "position": role_lookup[role_id]["position"]
+                                })
+                        
+                        # Sort roles by position (higher position roles first)
+                        roles_info.sort(key=lambda r: r["position"], reverse=True)
+                        member_data["roles"] = roles_info
+                    
                     members.append(member_data)
                 
                 # If we've reached the requested limit or fewer than 1000 members were returned, we're done
@@ -86,15 +153,18 @@ class DiscordAPI:
         
         return members[:limit]  # Ensure we don't return more than the limit
     
-    def merge_with_zwift_ids(self) -> List[Dict[str, Any]]:
+    def merge_with_zwift_ids(self, include_role_names: bool = True) -> List[Dict[str, Any]]:
         """
         Merge Discord member data with ZwiftIDs from Firebase.
         
+        Args:
+            include_role_names (bool, optional): Whether to include role names along with IDs. Defaults to True.
+            
         Returns:
             List[Dict[str, Any]]: List of merged data with Discord member info and ZwiftIDs when available
         """
         # Get all Discord members
-        discord_members = self.get_all_members()
+        discord_members = self.get_all_members(include_role_names=include_role_names)
         
         # Get all discord_users from Firebase that have ZwiftIDs
         firebase_users = firebase.get_collection("discord_users")
@@ -121,37 +191,47 @@ class DiscordAPI:
         
         return merged_data
     
-    def find_unlinked_members(self) -> List[Dict[str, Any]]:
+    def find_unlinked_members(self, include_role_names: bool = True) -> List[Dict[str, Any]]:
         """
         Find Discord members that don't have a linked ZwiftID.
         
+        Args:
+            include_role_names (bool, optional): Whether to include role names along with IDs. Defaults to True.
+            
         Returns:
             List[Dict[str, Any]]: List of members without ZwiftIDs
         """
-        merged_data = self.merge_with_zwift_ids()
+        merged_data = self.merge_with_zwift_ids(include_role_names=include_role_names)
         return [member for member in merged_data if not member["has_zwift_id"]]
     
-    def find_linked_members(self) -> List[Dict[str, Any]]:
+    def find_linked_members(self, include_role_names: bool = True) -> List[Dict[str, Any]]:
         """
         Find Discord members that have a linked ZwiftID.
         
+        Args:
+            include_role_names (bool, optional): Whether to include role names along with IDs. Defaults to True.
+            
         Returns:
             List[Dict[str, Any]]: List of members with ZwiftIDs
         """
-        merged_data = self.merge_with_zwift_ids()
+        merged_data = self.merge_with_zwift_ids(include_role_names=include_role_names)
         return [member for member in merged_data if member["has_zwift_id"]]
     
-    def get_member_by_discord_id(self, discord_id: str) -> Optional[Dict[str, Any]]:
+    def get_member_by_discord_id(self, discord_id: str, include_role_names: bool = True) -> Optional[Dict[str, Any]]:
         """
         Get a specific member by Discord ID, including ZwiftID if available.
         
         Args:
             discord_id (str): Discord user ID
+            include_role_names (bool, optional): Whether to include role names along with IDs. Defaults to True.
             
         Returns:
             Optional[Dict[str, Any]]: Member data or None if not found
         """
         try:
+            # Get role data if we need to include role names
+            role_lookup = self.get_guild_roles() if include_role_names else {}
+            
             # Get the member from Discord API
             response = requests.get(
                 f"{self.api_base_url}/guilds/{self.guild_id}/members/{discord_id}", 
@@ -161,6 +241,7 @@ class DiscordAPI:
             
             member = response.json()
             user = member.get("user", {})
+            role_ids = member.get("roles", [])
             
             member_data = {
                 "discordID": user.get("id"),
@@ -169,8 +250,25 @@ class DiscordAPI:
                 "display_name": member.get("nick") or user.get("global_name") or user.get("username"),
                 "avatar": user.get("avatar"),
                 "joined_at": member.get("joined_at"),
-                "roles": member.get("roles", [])
+                "role_ids": role_ids
             }
+            
+            # Include role names if requested
+            if include_role_names and role_lookup:
+                # Get role info for each role ID
+                roles_info = []
+                for role_id in role_ids:
+                    if role_id in role_lookup:
+                        roles_info.append({
+                            "id": role_id,
+                            "name": role_lookup[role_id]["name"],
+                            "color": role_lookup[role_id]["color"],
+                            "position": role_lookup[role_id]["position"]
+                        })
+                
+                # Sort roles by position (higher position roles first)
+                roles_info.sort(key=lambda r: r["position"], reverse=True)
+                member_data["roles"] = roles_info
             
             # Check if there's a ZwiftID in Firebase
             firebase_users = firebase.get_documents_by_field("discord_users", "discordID", discord_id)

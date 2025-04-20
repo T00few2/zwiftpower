@@ -228,23 +228,25 @@ def get_discord_members():
         # Initialize Discord API
         discord_api = DiscordAPI(DISCORD_BOT_TOKEN, DISCORD_GUILD_ID)
         
-        # Get parameter to determine if we want linked, unlinked, or all members
+        # Get parameters
         member_type = request.args.get('type', default='all')
+        include_roles = request.args.get('include_roles', default='true').lower() == 'true'
         
         if member_type == 'linked':
             # Only get members with ZwiftIDs
-            members = discord_api.find_linked_members()
+            members = discord_api.find_linked_members(include_role_names=include_roles)
         elif member_type == 'unlinked':
             # Only get members without ZwiftIDs
-            members = discord_api.find_unlinked_members()
+            members = discord_api.find_unlinked_members(include_role_names=include_roles)
         else:
             # Get all members with ZwiftIDs merged
-            members = discord_api.merge_with_zwift_ids()
+            members = discord_api.merge_with_zwift_ids(include_role_names=include_roles)
         
         return jsonify({
             "members": members,
             "count": len(members),
-            "type": member_type
+            "type": member_type,
+            "include_roles": include_roles
         })
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
