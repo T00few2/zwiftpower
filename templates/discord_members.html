@@ -231,6 +231,7 @@
             <h2>Assign Zwift ID</h2>
             <div id="selected-member-info" class="hidden">
                 <p>Selected: <span id="selected-member-name"></span></p>
+                <p>Username: <span id="selected-member-username"></span></p>
                 <p>Discord ID: <span id="selected-discord-id"></span></p>
             </div>
             
@@ -347,9 +348,11 @@
             // Find the member card
             const memberCard = document.querySelector(`[data-discord-id="${discordId}"]`);
             const memberName = memberCard.querySelector('.member-name').textContent;
+            const memberUsername = memberCard.dataset.username;
             
             // Update the assignment panel
             document.getElementById('selected-member-name').textContent = memberName;
+            document.getElementById('selected-member-username').textContent = memberUsername;
             document.getElementById('selected-discord-id').textContent = discordId;
             
             // Show the assignment form and hide the no selection message
@@ -452,6 +455,13 @@
                         if (document.getElementById('filter-type').value === 'unlinked') {
                             memberCard.style.display = 'none';
                         }
+                        
+                        // Clear search fields
+                        document.getElementById('zwift-search').value = '';
+                        document.getElementById('member-search').value = '';
+                        
+                        // Reset filter display (optional)
+                        applyFilters();
                         
                         cancelAssignment();
                     }, 2000);
