@@ -237,7 +237,7 @@
                 <input type="text" id="zwift-search" placeholder="Search Zwift riders...">
                 <select id="zwift-rider-select" size="10" style="height: 200px;">
                     {% for rider in zwift_riders %}
-                    <option value="{{ rider.riderId }}">{{ rider.name }} (ID: {{ rider.riderId }})</option>
+                    <option value="{{ rider.riderId|string }}">{{ rider.name }} (ID: {{ rider.riderId }})</option>
                     {% endfor %}
                 </select>
                 

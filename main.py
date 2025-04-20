@@ -254,14 +254,27 @@ def get_discord_members():
             if club_riders_data and len(club_riders_data) > 0:
                 # The data comes back as a list with one item, get the first item
                 riders = club_riders_data[0]['data'].get('riders', [])
+                
+                # Debug the structure
+                print(f"Found {len(riders)} riders in club_riders data")
+                if riders:
+                    print(f"Sample rider data: {riders[0].keys()}")
+                    print(f"Sample rider name: {riders[0].get('name', 'NO_NAME')}")
+                    print(f"Sample rider ID: {riders[0].get('riderId', 'NO_ID')}")
+                
                 zwift_riders = [
-                    {"name": rider.get('name', ''), "riderId": rider.get('riderId')}
+                    {"name": rider.get('name', ''), "riderId": str(rider.get('riderId', ''))}
                     for rider in riders
                     if 'name' in rider and 'riderId' in rider
                 ]
                 
                 # Sort riders by name for easier selection
                 zwift_riders.sort(key=lambda x: x["name"])
+                
+                # Debug the processed riders
+                print(f"Processed {len(zwift_riders)} riders for dropdown")
+            else:
+                print("No club_riders data found or data is empty")
             
             linked_count = len([m for m in members if m.get('has_zwift_id')])
             unlinked_count = len(members) - linked_count
