@@ -253,7 +253,7 @@ def get_discord_members():
             
             if club_riders_data and len(club_riders_data) > 0:
                 # The data comes back as a list with one item, get the first item
-                riders = club_riders_data[0].get('riders', [])
+                riders = club_riders_data[0]['data'].get('riders', [])
                 zwift_riders = [
                     {"name": rider.get('name', ''), "riderId": rider.get('riderId')}
                     for rider in riders
