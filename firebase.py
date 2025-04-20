@@ -95,13 +95,14 @@ def get_documents_by_field(
     """
     return query_collection(collection, field, "==", value, limit)
 
-def update_discord_zwift_link(discord_id: str, zwift_id: str) -> Dict[str, Any]:
+def update_discord_zwift_link(discord_id: str, zwift_id: str, username: str = None) -> Dict[str, Any]:
     """
     Update or create a Discord user with a ZwiftID.
     
     Args:
         discord_id: The Discord user ID
         zwift_id: The Zwift rider ID to link
+        username: The Discord username
         
     Returns:
         Dict with operation status
@@ -112,21 +113,23 @@ def update_discord_zwift_link(discord_id: str, zwift_id: str) -> Dict[str, Any]:
     # Prepare data
     now = datetime.now()
     data = {
+        "discordID": discord_id,
         "zwiftID": zwift_id,
         "linkedAt": now
     }
     
+    # Add username if provided
+    if username:
+        data["username"] = username
+    
+    # Use the discord_id as the document ID
+    doc_ref = db.collection("discord_users").document(discord_id)
+    
     if existing_docs:
         # Update existing document
-        # First get the document ID (different from discordID)
-        user_docs = db.collection("discord_users").where("discordID", "==", discord_id).limit(1).stream()
-        doc_id = next(user_docs).id
-        
-        # Update the document
-        db.collection("discord_users").document(doc_id).update(data)
+        doc_ref.update(data)
         return {"status": "updated", "discord_id": discord_id, "zwift_id": zwift_id}
     else:
-        # Create new document
-        data["discordID"] = discord_id
-        db.collection("discord_users").add(data)
+        # Create new document with discord_id as document ID
+        doc_ref.set(data)
         return {"status": "created", "discord_id": discord_id, "zwift_id": zwift_id} 

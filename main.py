@@ -313,6 +313,7 @@ def assign_zwift_id():
             
         discord_id = data.get('discord_id')
         zwift_id = data.get('zwift_id')
+        username = data.get('username')
         
         if not discord_id:
             return jsonify({"status": "error", "message": "No Discord ID provided"}), 400
@@ -321,12 +322,13 @@ def assign_zwift_id():
             return jsonify({"status": "error", "message": "No Zwift ID provided"}), 400
         
         # Update the Discord user with the ZwiftID
-        result = firebase.update_discord_zwift_link(discord_id, zwift_id)
+        result = firebase.update_discord_zwift_link(discord_id, zwift_id, username)
         
         return jsonify({
             "status": "success", 
             "discord_id": discord_id, 
             "zwift_id": zwift_id,
+            "username": username,
             "operation": result.get("status", "updated")
         })
     except Exception as e:
