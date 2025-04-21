@@ -673,11 +673,11 @@ def update_club_stats_from_queue():
     """Update club_stats with all processed racing scores from the queue"""
     try:
         # Get the latest club_stats
-        club_stats = firebase.get_latest_document("club_stats")
+        club_stats_docs = firebase.get_latest_document("club_stats")
         
-        if not club_stats or len(club_stats) == 0:
+        if not club_stats_docs or len(club_stats_docs) == 0:
             return jsonify({"status": "error", "message": "No club_stats data found"}), 404
-            
+        
         # Get the queue document
         queue_doc_ref = firebase.db.collection("rider_queues").document("current")
         queue_doc = queue_doc_ref.get()
@@ -700,8 +700,25 @@ def update_club_stats_from_queue():
         # Create a mapping of rider IDs to racing scores
         completed_dict = {str(rider["riderId"]): rider["racingScore"] for rider in completed_riders}
         
-        # Update the club_stats with all processed scores
-        stats = club_stats[0]
+        # Get the original document
+        stats = club_stats_docs[0]
+        
+        # Get the document ID of the latest club_stats
+        # This assumes get_latest_document returns documents ordered by timestamp
+        # and includes document IDs in the result
+        latest_doc_ref = None
+        latest_stats = None
+        
+        # Get the actual document reference to update
+        club_stats_query = firebase.db.collection("club_stats").order_by("timestamp", direction=firebase.firestore.Query.DESCENDING).limit(1)
+        latest_docs = list(club_stats_query.stream())
+        if latest_docs:
+            latest_doc_ref = latest_docs[0].reference
+            latest_stats = latest_docs[0].to_dict()
+        else:
+            return jsonify({"status": "error", "message": "Could not find club_stats document to update"}), 500
+        
+        # Update the stats object with racing scores
         updated_count = 0
         
         for rider in stats["data"]["riders"]:
@@ -713,23 +730,14 @@ def update_club_stats_from_queue():
                 rider["racingScore"] = completed_dict[rider_id_str]
                 updated_count += 1
         
-        # Create a new document with updated data
-        timestamp = stats.get("timestamp", datetime.now().isoformat())
-        club_id = stats.get("clubId", "unknown")
-        
-        updated_doc = {
-            "clubId": club_id,
-            "timestamp": timestamp,
+        # Update the existing document with the new data
+        update_data = {
             "data": stats["data"]
+            # Keep other fields as they are
         }
         
-        # If there was an expiresAt field, keep it
-        if "expiresAt" in stats:
-            updated_doc["expiresAt"] = stats["expiresAt"]
-        
-        # Add the updated document to club_stats collection
-        db_ref = firebase.db.collection("club_stats").document()
-        db_ref.set(updated_doc)
+        # Update the document
+        latest_doc_ref.update(update_data)
         
         # Clear the queue if requested
         should_clear_queue = request.json.get('clear_queue', True) if request.json else True
