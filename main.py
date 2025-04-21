@@ -480,14 +480,13 @@ def initialize_rider_queue():
         stats = club_stats[0]
         riders = stats["data"]["riders"]
         
-        # Clear existing queue
-        queue_collection = firebase.db.collection("rider_score_queue")
-        existing_docs = queue_collection.limit(500).stream()
-        for doc in existing_docs:
-            doc.reference.delete()
+        # Create or update the single queue document
+        queue_doc_ref = firebase.db.collection("rider_queues").document("current")
         
-        # Add riders without racing scores to queue
-        queued_count = 0
+        # Create lists for each status
+        pending_riders = []
+        
+        # Add riders without racing scores to pending list
         for rider in riders:
             if "riderId" not in rider:
                 continue
@@ -497,22 +496,32 @@ def initialize_rider_queue():
                 rider_id = rider["riderId"]
                 rider_name = rider.get("name", "Unknown")
                 
-                # Add to queue with status "pending"
-                queue_collection.add({
+                # Add to pending list
+                pending_riders.append({
                     "riderId": rider_id,
                     "name": rider_name,
-                    "status": "pending",
-                    "addedAt": datetime.now(),
-                    "processedAt": None,
-                    "racingScore": None
+                    "addedAt": datetime.now()
                 })
-                queued_count += 1
+        
+        # Create the queue document
+        queue_doc_ref.set({
+            "created": datetime.now(),
+            "pendingRiders": pending_riders,
+            "completedRiders": [],
+            "failedRiders": [],
+            "stats": {
+                "total": len(pending_riders),
+                "pending": len(pending_riders),
+                "completed": 0,
+                "failed": 0
+            }
+        })
         
         return jsonify({
             "status": "success",
-            "message": f"Initialized queue with {queued_count} riders",
+            "message": f"Initialized queue with {len(pending_riders)} riders",
             "total_riders": len(riders),
-            "queued_riders": queued_count
+            "queued_riders": len(pending_riders)
         })
         
     except Exception as e:
@@ -524,19 +533,27 @@ def process_rider_queue():
     """Process a batch of riders from the queue"""
     try:
         # Get parameters
-        batch_size = request.json.get('batch_size', 3) if request.json else 3  # Process 3 riders per call by default
+        batch_size = request.json.get('batch_size', 3) if request.json else 3
         
-        # Get pending riders from queue
-        queue_ref = firebase.db.collection("rider_score_queue")
-        pending_riders_query = queue_ref.where("status", "==", "pending").limit(batch_size)
-        pending_docs = list(pending_riders_query.stream())
+        # Get the queue document
+        queue_doc_ref = firebase.db.collection("rider_queues").document("current")
+        queue_doc = queue_doc_ref.get()
         
-        if not pending_docs:
+        if not queue_doc.exists:
+            return jsonify({
+                "status": "error",
+                "message": "Queue not initialized. Call initialize_rider_queue first."
+            }), 404
+        
+        queue_data = queue_doc.to_dict()
+        pending_riders = queue_data.get("pendingRiders", [])
+        completed_riders = queue_data.get("completedRiders", [])
+        failed_riders = queue_data.get("failedRiders", [])
+        
+        # Check if there are any pending riders
+        if not pending_riders:
             # No more pending riders, check if we should update club_stats
-            completed_riders = queue_ref.where("status", "==", "completed").stream()
-            completed_list = list(completed_riders)
-            
-            if completed_list:
+            if completed_riders:
                 # Update the main club_stats with all processed scores
                 return update_club_stats_from_queue()
             else:
@@ -544,6 +561,10 @@ def process_rider_queue():
                     "status": "success",
                     "message": "No riders in queue to process"
                 })
+        
+        # Determine batch to process (up to batch_size riders)
+        batch_to_process = pending_riders[:batch_size]
+        remaining_pending = pending_riders[batch_size:]
         
         # Initialize Zwift API client
         zwift_api = ZwiftAPI(ZWIFT_USERNAME, ZWIFT_PASSWORD)
@@ -553,12 +574,9 @@ def process_rider_queue():
         success_count = 0
         
         # Process each rider
-        for doc in pending_docs:
-            doc_id = doc.id  # Get the document ID directly
-            rider_data = doc.to_dict()
-            
-            rider_id = rider_data.get("riderId")
-            rider_name = rider_data.get("name", "Unknown")
+        for rider in batch_to_process:
+            rider_id = rider.get("riderId")
+            rider_name = rider.get("name", "Unknown")
             
             if not rider_id:
                 continue
@@ -570,44 +588,47 @@ def process_rider_queue():
                 # Get the rider's profile
                 profile = zwift_api.get_profile(rider_id)
                 
-                # Update the queue document
-                queue_item_ref = queue_ref.document(doc_id)
-                
                 # Add racing score if available
                 if profile and "competitionMetrics" in profile and "racingScore" in profile["competitionMetrics"]:
                     racing_score = profile["competitionMetrics"]["racingScore"]
                     
-                    queue_item_ref.update({
-                        "status": "completed",
-                        "processedAt": datetime.now(),
-                        "racingScore": racing_score
-                    })
+                    # Add to completed list
+                    rider["processedAt"] = datetime.now()
+                    rider["racingScore"] = racing_score
+                    completed_riders.append(rider)
                     
                     success_count += 1
                     print(f"Added racing score {racing_score} to rider {rider_name}")
                 else:
-                    queue_item_ref.update({
-                        "status": "failed",
-                        "processedAt": datetime.now(),
-                        "error": "Racing score not found in profile"
-                    })
+                    # Add to failed list
+                    rider["processedAt"] = datetime.now()
+                    rider["error"] = "Racing score not found in profile"
+                    failed_riders.append(rider)
+                    
                     print(f"Could not find racing score for rider {rider_name}")
             except Exception as rider_error:
-                # Update status to failed
-                queue_ref.document(doc_id).update({
-                    "status": "failed",
-                    "processedAt": datetime.now(),
-                    "error": str(rider_error)
-                })
+                # Add to failed list with error
+                rider["processedAt"] = datetime.now()
+                rider["error"] = str(rider_error)
+                failed_riders.append(rider)
+                
                 print(f"Error processing rider {rider_name}: {str(rider_error)}")
             
             # Add delay between riders
             time.sleep(3)
         
-        # Get queue statistics
-        pending_count = len(list(queue_ref.where("status", "==", "pending").stream()))
-        completed_count = len(list(queue_ref.where("status", "==", "completed").stream()))
-        failed_count = len(list(queue_ref.where("status", "==", "failed").stream()))
+        # Update the queue document with new lists
+        queue_doc_ref.update({
+            "pendingRiders": remaining_pending,
+            "completedRiders": completed_riders,
+            "failedRiders": failed_riders,
+            "stats": {
+                "total": len(remaining_pending) + len(completed_riders) + len(failed_riders),
+                "pending": len(remaining_pending),
+                "completed": len(completed_riders),
+                "failed": len(failed_riders)
+            }
+        })
         
         return jsonify({
             "status": "success",
@@ -615,11 +636,11 @@ def process_rider_queue():
             "stats": {
                 "processed_this_batch": processed_count,
                 "successful_this_batch": success_count,
-                "pending": pending_count,
-                "completed": completed_count,
-                "failed": failed_count
+                "pending": len(remaining_pending),
+                "completed": len(completed_riders),
+                "failed": len(failed_riders)
             },
-            "queue_empty": pending_count == 0
+            "queue_empty": len(remaining_pending) == 0
         })
         
     except Exception as e:
@@ -635,16 +656,27 @@ def update_club_stats_from_queue():
         if not club_stats or len(club_stats) == 0:
             return jsonify({"status": "error", "message": "No club_stats data found"}), 404
             
-        # Get completed riders from queue
-        queue_ref = firebase.db.collection("rider_score_queue")
-        completed_riders = queue_ref.where("status", "==", "completed").stream()
-        completed_dict = {str(doc.to_dict()["riderId"]): doc.to_dict()["racingScore"] for doc in completed_riders}
+        # Get the queue document
+        queue_doc_ref = firebase.db.collection("rider_queues").document("current")
+        queue_doc = queue_doc_ref.get()
         
-        if not completed_dict:
+        if not queue_doc.exists:
+            return jsonify({
+                "status": "error",
+                "message": "Queue not found"
+            }), 404
+            
+        queue_data = queue_doc.to_dict()
+        completed_riders = queue_data.get("completedRiders", [])
+        
+        if not completed_riders:
             return jsonify({
                 "status": "success",
                 "message": "No completed riders in queue to update club_stats with"
             })
+        
+        # Create a mapping of rider IDs to racing scores
+        completed_dict = {str(rider["riderId"]): rider["racingScore"] for rider in completed_riders}
         
         # Update the club_stats with all processed scores
         stats = club_stats[0]
@@ -678,13 +710,9 @@ def update_club_stats_from_queue():
         db_ref.set(updated_doc)
         
         # Clear the queue if requested
-        should_clear_queue = request.json.get('clear_queue', True)
+        should_clear_queue = request.json.get('clear_queue', True) if request.json else True
         if should_clear_queue:
-            batch = firebase.db.batch()
-            docs = queue_ref.limit(500).stream()
-            for doc in docs:
-                batch.delete(doc.reference)
-            batch.commit()
+            queue_doc_ref.delete()
         
         return jsonify({
             "status": "success",
@@ -700,28 +728,36 @@ def update_club_stats_from_queue():
 def get_queue_status():
     """Get the current status of the rider queue"""
     try:
-        queue_ref = firebase.db.collection("rider_score_queue")
+        queue_doc_ref = firebase.db.collection("rider_queues").document("current")
+        queue_doc = queue_doc_ref.get()
         
-        # Get counts for each status
-        pending_count = len(list(queue_ref.where("status", "==", "pending").stream()))
-        completed_count = len(list(queue_ref.where("status", "==", "completed").stream()))
-        failed_count = len(list(queue_ref.where("status", "==", "failed").stream()))
-        total_count = pending_count + completed_count + failed_count
+        if not queue_doc.exists:
+            return jsonify({
+                "status": "success",
+                "message": "No queue exists",
+                "exists": False
+            })
+            
+        queue_data = queue_doc.to_dict()
+        stats = queue_data.get("stats", {})
+        pending_riders = queue_data.get("pendingRiders", [])
         
-        # Get a sample of recent items
-        recent_items = [doc.to_dict() for doc in queue_ref.order_by("processedAt", direction=firebase.firestore.Query.DESCENDING).limit(5).stream()]
+        # Get first few pending and recently completed riders for preview
+        preview_pending = pending_riders[:5]
+        completed_preview = queue_data.get("completedRiders", [])[-5:]
+        failed_preview = queue_data.get("failedRiders", [])[-5:]
         
         return jsonify({
             "status": "success",
-            "queue_stats": {
-                "total": total_count,
-                "pending": pending_count,
-                "completed": completed_count,
-                "failed": failed_count,
-                "percent_complete": (completed_count / total_count * 100) if total_count > 0 else 0
+            "exists": True,
+            "queue_stats": stats,
+            "preview": {
+                "pending": preview_pending,
+                "completed": completed_preview,
+                "failed": failed_preview
             },
-            "recent_items": recent_items,
-            "queue_empty": pending_count == 0
+            "queue_empty": len(pending_riders) == 0,
+            "created": queue_data.get("created")
         })
         
     except Exception as e:
