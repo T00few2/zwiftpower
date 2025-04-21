@@ -637,7 +637,7 @@ def process_rider_queue():
                 print(f"Error processing rider {rider_name}: {str(rider_error)}")
             
             # Add delay between riders
-            time.sleep(3)
+            time.sleep(5)
         
         # Update the queue document with new lists
         queue_doc_ref.update({
