@@ -7,6 +7,7 @@ import requests
 from datetime import datetime, timedelta
 import firebase
 from discord_api import DiscordAPI
+from zwift import ZwiftAPI
 
 app = Flask(__name__)
 
@@ -332,6 +333,88 @@ def assign_zwift_id():
             "operation": result.get("status", "updated")
         })
     except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/enrich_club_stats', methods=['POST'])
+def enrich_club_stats():
+    """Enrich club_stats with racing scores from Zwift profiles and update in Firebase"""
+    try:
+        # Get the latest club_stats from Firebase
+        club_stats = firebase.get_latest_document("club_stats")
+        
+        if not club_stats or len(club_stats) == 0:
+            return jsonify({"status": "error", "message": "No club_stats data found"}), 404
+            
+        # Initialize Zwift API client
+        zwift_api = ZwiftAPI(ZWIFT_USERNAME, ZWIFT_PASSWORD)
+        zwift_api.authenticate()
+        
+        # Track stats
+        stats = club_stats[0]
+        total_riders = len(stats["data"]["riders"])
+        processed_riders = 0
+        riders_with_scores = 0
+        
+        print(f"Starting to enrich {total_riders} riders with racing scores")
+        
+        # Process each rider
+        for rider in stats["data"]["riders"]:
+            if "riderId" not in rider:
+                continue
+                
+            rider_id = rider["riderId"]
+            rider_name = rider.get("name", "Unknown")
+            processed_riders += 1
+            
+            print(f"Processing rider {processed_riders}/{total_riders}: {rider_name} (ID: {rider_id})")
+            
+            # Get the rider's profile from Zwift API
+            profile = zwift_api.get_profile(rider_id)
+            
+            # Add racing score if available
+            if profile and "competitionMetrics" in profile and "racingScore" in profile["competitionMetrics"]:
+                racing_score = profile["competitionMetrics"]["racingScore"]
+                rider["racingScore"] = racing_score
+                riders_with_scores += 1
+                print(f"Added racing score {racing_score} to rider {rider_name}")
+            else:
+                print(f"Could not get racing score for rider {rider_name}")
+                
+            # Add a small delay to avoid rate limiting
+            time.sleep(10)
+        
+        print(f"Enrichment complete. Added racing scores to {riders_with_scores}/{total_riders} riders")
+        
+        # Update the club_stats document in Firebase
+        # Use the timestamp from the original document
+        timestamp = stats.get("timestamp", datetime.now().isoformat())
+        club_id = stats.get("clubId", "unknown")
+        
+        # Create a new document to replace the old one
+        updated_doc = {
+            "clubId": club_id,
+            "timestamp": timestamp,
+            "data": stats["data"]
+        }
+        
+        # If there was an expiresAt field, keep it
+        if "expiresAt" in stats:
+            updated_doc["expiresAt"] = stats["expiresAt"]
+        
+        # Add the updated document to club_stats collection
+        db_ref = firebase.db.collection("club_stats").document()
+        db_ref.set(updated_doc)
+        
+        return jsonify({
+            "status": "success", 
+            "message": f"Updated club_stats with racing scores for {riders_with_scores} riders",
+            "processed": processed_riders,
+            "with_scores": riders_with_scores,
+            "total": total_riders
+        })
+        
+    except Exception as e:
+        print(f"Error enriching club_stats: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == '__main__':
