@@ -524,19 +524,17 @@ def process_rider_queue():
     """Process a batch of riders from the queue"""
     try:
         # Get parameters
-        batch_size = request.json.get('batch_size', 3)  # Process 3 riders per call by default
+        batch_size = request.json.get('batch_size', 3) if request.json else 3  # Process 3 riders per call by default
         
         # Get pending riders from queue
         queue_ref = firebase.db.collection("rider_score_queue")
-        pending_riders = queue_ref.where("status", "==", "pending").limit(batch_size).stream()
+        pending_riders_query = queue_ref.where("status", "==", "pending").limit(batch_size)
+        pending_docs = list(pending_riders_query.stream())
         
-        # Convert to list to check if empty
-        pending_list = [doc.to_dict() for doc in pending_riders]
-        
-        if not pending_list:
+        if not pending_docs:
             # No more pending riders, check if we should update club_stats
             completed_riders = queue_ref.where("status", "==", "completed").stream()
-            completed_list = [doc for doc in completed_riders]
+            completed_list = list(completed_riders)
             
             if completed_list:
                 # Update the main club_stats with all processed scores
@@ -555,12 +553,14 @@ def process_rider_queue():
         success_count = 0
         
         # Process each rider
-        for rider_doc in pending_list:
-            doc_id = rider_doc["id"] if "id" in rider_doc else None
-            rider_id = rider_doc.get("riderId")
-            rider_name = rider_doc.get("name", "Unknown")
+        for doc in pending_docs:
+            doc_id = doc.id  # Get the document ID directly
+            rider_data = doc.to_dict()
             
-            if not doc_id or not rider_id:
+            rider_id = rider_data.get("riderId")
+            rider_name = rider_data.get("name", "Unknown")
+            
+            if not rider_id:
                 continue
                 
             processed_count += 1
