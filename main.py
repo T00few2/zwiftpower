@@ -11,9 +11,11 @@ from zwift import ZwiftAPI
 
 app = Flask(__name__)
 
-# Global variable to cache an authenticated session.
+# Global variables to cache authenticated sessions
 cached_session = None
 cached_session_timestamp = None 
+cached_zwift_api = None
+cached_zwift_api_timestamp = None
 SESSION_VALIDITY = 3600  # seconds (how long the session is expected to be valid)
 
 ZWIFT_USERNAME = os.getenv("ZWIFT_USERNAME", "your_username")
@@ -53,6 +55,28 @@ def get_authenticated_session() -> requests.Session:
     cached_session = new_session
     cached_session_timestamp = now
     return new_session
+
+def get_authenticated_zwift_api() -> ZwiftAPI:
+    """Return a cached, authenticated ZwiftAPI if available and still valid; otherwise, create a new one."""
+    global cached_zwift_api, cached_zwift_api_timestamp
+    now = time.time()
+    
+    # If we have a valid cached API instance, reuse it
+    if cached_zwift_api and cached_zwift_api_timestamp and (now - cached_zwift_api_timestamp < SESSION_VALIDITY):
+        print("Using cached authenticated ZwiftAPI (container is warm).")
+        # Ensure token is still valid
+        cached_zwift_api.ensure_valid_token()
+        return cached_zwift_api
+
+    # Otherwise, create a new API instance and authenticate
+    print("No valid ZwiftAPI found. Creating and authenticating new instance.")
+    new_zwift_api = ZwiftAPI(ZWIFT_USERNAME, ZWIFT_PASSWORD)
+    new_zwift_api.authenticate()
+    
+    # Update the cache
+    cached_zwift_api = new_zwift_api
+    cached_zwift_api_timestamp = now
+    return new_zwift_api
 
 @app.route('/rider_zrs', methods=['GET'])
 def rider_zrs_bulk():
@@ -350,8 +374,7 @@ def enrich_club_stats():
             return jsonify({"status": "error", "message": "No club_stats data found"}), 404
             
         # Initialize Zwift API client
-        zwift_api = ZwiftAPI(ZWIFT_USERNAME, ZWIFT_PASSWORD)
-        zwift_api.authenticate()
+        zwift_api = get_authenticated_zwift_api()
         
         # Track stats
         stats = club_stats[0]
@@ -566,9 +589,8 @@ def process_rider_queue():
         batch_to_process = pending_riders[:batch_size]
         remaining_pending = pending_riders[batch_size:]
         
-        # Initialize Zwift API client
-        zwift_api = ZwiftAPI(ZWIFT_USERNAME, ZWIFT_PASSWORD)
-        zwift_api.authenticate()
+        # Get cached ZwiftAPI instance
+        zwift_api = get_authenticated_zwift_api()
         
         processed_count = 0
         success_count = 0
