@@ -339,6 +339,10 @@ def assign_zwift_id():
 def enrich_club_stats():
     """Enrich club_stats with racing scores from Zwift profiles and update in Firebase"""
     try:
+        # Get parameters
+        batch_size = request.json.get('batch_size', 5)  # Process 5 riders per call by default
+        start_index = request.json.get('start_index', 0)  # Start from the beginning by default
+        
         # Get the latest club_stats from Firebase
         club_stats = firebase.get_latest_document("club_stats")
         
@@ -355,10 +359,14 @@ def enrich_club_stats():
         processed_riders = 0
         riders_with_scores = 0
         
-        print(f"Starting to enrich {total_riders} riders with racing scores")
+        # Calculate end index (don't go beyond total riders)
+        end_index = min(start_index + batch_size, total_riders)
         
-        # Process each rider
-        for rider in stats["data"]["riders"]:
+        print(f"Processing batch of riders {start_index+1} to {end_index} of {total_riders}")
+        
+        # Process only the specified batch of riders
+        for i in range(start_index, end_index):
+            rider = stats["data"]["riders"][i]
             if "riderId" not in rider:
                 continue
                 
@@ -366,7 +374,7 @@ def enrich_club_stats():
             rider_name = rider.get("name", "Unknown")
             processed_riders += 1
             
-            print(f"Processing rider {processed_riders}/{total_riders}: {rider_name} (ID: {rider_id})")
+            print(f"Processing rider {i+1}/{total_riders}: {rider_name} (ID: {rider_id})")
             
             # Get the rider's profile from Zwift API
             profile = zwift_api.get_profile(rider_id)
@@ -380,10 +388,10 @@ def enrich_club_stats():
             else:
                 print(f"Could not get racing score for rider {rider_name}")
                 
-            # Add a small delay to avoid rate limiting
-            time.sleep(10)
+            # Add a delay to avoid rate limiting
+            time.sleep(3)  # Reduced delay to fit within function timeouts
         
-        print(f"Enrichment complete. Added racing scores to {riders_with_scores}/{total_riders} riders")
+        print(f"Batch complete. Added racing scores to {riders_with_scores}/{processed_riders} riders")
         
         # Update the club_stats document in Firebase
         # Use the timestamp from the original document
@@ -405,16 +413,319 @@ def enrich_club_stats():
         db_ref = firebase.db.collection("club_stats").document()
         db_ref.set(updated_doc)
         
+        # Calculate if we have more riders to process
+        next_index = end_index
+        has_more = next_index < total_riders
+        
         return jsonify({
             "status": "success", 
             "message": f"Updated club_stats with racing scores for {riders_with_scores} riders",
             "processed": processed_riders,
             "with_scores": riders_with_scores,
-            "total": total_riders
+            "total_riders": total_riders,
+            "current_batch": {
+                "start": start_index,
+                "end": end_index,
+            },
+            "has_more": has_more,
+            "next_index": next_index if has_more else None
         })
         
     except Exception as e:
         print(f"Error enriching club_stats: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/enrich_all_riders', methods=['POST'])
+def start_enrich_process():
+    """Start the enrichment process for all riders by calling the batch API endpoint"""
+    try:
+        # Get the latest club_stats to determine how many riders to process
+        club_stats = firebase.get_latest_document("club_stats")
+        
+        if not club_stats or len(club_stats) == 0:
+            return jsonify({"status": "error", "message": "No club_stats data found"}), 404
+            
+        # Count riders
+        total_riders = len(club_stats[0]["data"]["riders"])
+        batch_size = request.json.get('batch_size', 5)
+        
+        # Calculate number of batches needed
+        batches_needed = (total_riders + batch_size - 1) // batch_size  # Ceiling division
+        
+        # Create a Cloud Task or return instructions for client-side processing
+        return jsonify({
+            "status": "success",
+            "message": f"To process all {total_riders} riders, make {batches_needed} separate API calls",
+            "total_riders": total_riders,
+            "batch_size": batch_size,
+            "batches_needed": batches_needed,
+            "instructions": "Call /api/enrich_club_stats with 'start_index' parameter, incrementing by batch_size each time"
+        })
+        
+    except Exception as e:
+        print(f"Error starting enrichment process: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/initialize_rider_queue', methods=['POST'])
+def initialize_rider_queue():
+    """Initialize a queue of riders that need racing scores"""
+    try:
+        # Get the latest club_stats
+        club_stats = firebase.get_latest_document("club_stats")
+        
+        if not club_stats or len(club_stats) == 0:
+            return jsonify({"status": "error", "message": "No club_stats data found"}), 404
+            
+        # Get list of riders
+        stats = club_stats[0]
+        riders = stats["data"]["riders"]
+        
+        # Clear existing queue
+        queue_collection = firebase.db.collection("rider_score_queue")
+        existing_docs = queue_collection.limit(500).stream()
+        for doc in existing_docs:
+            doc.reference.delete()
+        
+        # Add riders without racing scores to queue
+        queued_count = 0
+        for rider in riders:
+            if "riderId" not in rider:
+                continue
+                
+            # Only queue riders without racing scores
+            if "racingScore" not in rider:
+                rider_id = rider["riderId"]
+                rider_name = rider.get("name", "Unknown")
+                
+                # Add to queue with status "pending"
+                queue_collection.add({
+                    "riderId": rider_id,
+                    "name": rider_name,
+                    "status": "pending",
+                    "addedAt": datetime.now(),
+                    "processedAt": None,
+                    "racingScore": None
+                })
+                queued_count += 1
+        
+        return jsonify({
+            "status": "success",
+            "message": f"Initialized queue with {queued_count} riders",
+            "total_riders": len(riders),
+            "queued_riders": queued_count
+        })
+        
+    except Exception as e:
+        print(f"Error initializing rider queue: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/process_rider_queue', methods=['POST'])
+def process_rider_queue():
+    """Process a batch of riders from the queue"""
+    try:
+        # Get parameters
+        batch_size = request.json.get('batch_size', 3)  # Process 3 riders per call by default
+        
+        # Get pending riders from queue
+        queue_ref = firebase.db.collection("rider_score_queue")
+        pending_riders = queue_ref.where("status", "==", "pending").limit(batch_size).stream()
+        
+        # Convert to list to check if empty
+        pending_list = [doc.to_dict() for doc in pending_riders]
+        
+        if not pending_list:
+            # No more pending riders, check if we should update club_stats
+            completed_riders = queue_ref.where("status", "==", "completed").stream()
+            completed_list = [doc for doc in completed_riders]
+            
+            if completed_list:
+                # Update the main club_stats with all processed scores
+                return update_club_stats_from_queue()
+            else:
+                return jsonify({
+                    "status": "success",
+                    "message": "No riders in queue to process"
+                })
+        
+        # Initialize Zwift API client
+        zwift_api = ZwiftAPI(ZWIFT_USERNAME, ZWIFT_PASSWORD)
+        zwift_api.authenticate()
+        
+        processed_count = 0
+        success_count = 0
+        
+        # Process each rider
+        for rider_doc in pending_list:
+            doc_id = rider_doc["id"] if "id" in rider_doc else None
+            rider_id = rider_doc.get("riderId")
+            rider_name = rider_doc.get("name", "Unknown")
+            
+            if not doc_id or not rider_id:
+                continue
+                
+            processed_count += 1
+            print(f"Processing rider {rider_name} (ID: {rider_id})")
+            
+            try:
+                # Get the rider's profile
+                profile = zwift_api.get_profile(rider_id)
+                
+                # Update the queue document
+                queue_item_ref = queue_ref.document(doc_id)
+                
+                # Add racing score if available
+                if profile and "competitionMetrics" in profile and "racingScore" in profile["competitionMetrics"]:
+                    racing_score = profile["competitionMetrics"]["racingScore"]
+                    
+                    queue_item_ref.update({
+                        "status": "completed",
+                        "processedAt": datetime.now(),
+                        "racingScore": racing_score
+                    })
+                    
+                    success_count += 1
+                    print(f"Added racing score {racing_score} to rider {rider_name}")
+                else:
+                    queue_item_ref.update({
+                        "status": "failed",
+                        "processedAt": datetime.now(),
+                        "error": "Racing score not found in profile"
+                    })
+                    print(f"Could not find racing score for rider {rider_name}")
+            except Exception as rider_error:
+                # Update status to failed
+                queue_ref.document(doc_id).update({
+                    "status": "failed",
+                    "processedAt": datetime.now(),
+                    "error": str(rider_error)
+                })
+                print(f"Error processing rider {rider_name}: {str(rider_error)}")
+            
+            # Add delay between riders
+            time.sleep(3)
+        
+        # Get queue statistics
+        pending_count = len(list(queue_ref.where("status", "==", "pending").stream()))
+        completed_count = len(list(queue_ref.where("status", "==", "completed").stream()))
+        failed_count = len(list(queue_ref.where("status", "==", "failed").stream()))
+        
+        return jsonify({
+            "status": "success",
+            "message": f"Processed {processed_count} riders, {success_count} successful",
+            "stats": {
+                "processed_this_batch": processed_count,
+                "successful_this_batch": success_count,
+                "pending": pending_count,
+                "completed": completed_count,
+                "failed": failed_count
+            },
+            "queue_empty": pending_count == 0
+        })
+        
+    except Exception as e:
+        print(f"Error processing rider queue: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+def update_club_stats_from_queue():
+    """Update club_stats with all processed racing scores from the queue"""
+    try:
+        # Get the latest club_stats
+        club_stats = firebase.get_latest_document("club_stats")
+        
+        if not club_stats or len(club_stats) == 0:
+            return jsonify({"status": "error", "message": "No club_stats data found"}), 404
+            
+        # Get completed riders from queue
+        queue_ref = firebase.db.collection("rider_score_queue")
+        completed_riders = queue_ref.where("status", "==", "completed").stream()
+        completed_dict = {str(doc.to_dict()["riderId"]): doc.to_dict()["racingScore"] for doc in completed_riders}
+        
+        if not completed_dict:
+            return jsonify({
+                "status": "success",
+                "message": "No completed riders in queue to update club_stats with"
+            })
+        
+        # Update the club_stats with all processed scores
+        stats = club_stats[0]
+        updated_count = 0
+        
+        for rider in stats["data"]["riders"]:
+            if "riderId" not in rider:
+                continue
+                
+            rider_id_str = str(rider["riderId"])
+            if rider_id_str in completed_dict:
+                rider["racingScore"] = completed_dict[rider_id_str]
+                updated_count += 1
+        
+        # Create a new document with updated data
+        timestamp = stats.get("timestamp", datetime.now().isoformat())
+        club_id = stats.get("clubId", "unknown")
+        
+        updated_doc = {
+            "clubId": club_id,
+            "timestamp": timestamp,
+            "data": stats["data"]
+        }
+        
+        # If there was an expiresAt field, keep it
+        if "expiresAt" in stats:
+            updated_doc["expiresAt"] = stats["expiresAt"]
+        
+        # Add the updated document to club_stats collection
+        db_ref = firebase.db.collection("club_stats").document()
+        db_ref.set(updated_doc)
+        
+        # Clear the queue if requested
+        should_clear_queue = request.json.get('clear_queue', True)
+        if should_clear_queue:
+            batch = firebase.db.batch()
+            docs = queue_ref.limit(500).stream()
+            for doc in docs:
+                batch.delete(doc.reference)
+            batch.commit()
+        
+        return jsonify({
+            "status": "success",
+            "message": f"Updated club_stats with {updated_count} racing scores from queue",
+            "queue_cleared": should_clear_queue
+        })
+        
+    except Exception as e:
+        print(f"Error updating club_stats from queue: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/queue_status', methods=['GET'])
+def get_queue_status():
+    """Get the current status of the rider queue"""
+    try:
+        queue_ref = firebase.db.collection("rider_score_queue")
+        
+        # Get counts for each status
+        pending_count = len(list(queue_ref.where("status", "==", "pending").stream()))
+        completed_count = len(list(queue_ref.where("status", "==", "completed").stream()))
+        failed_count = len(list(queue_ref.where("status", "==", "failed").stream()))
+        total_count = pending_count + completed_count + failed_count
+        
+        # Get a sample of recent items
+        recent_items = [doc.to_dict() for doc in queue_ref.order_by("processedAt", direction=firebase.firestore.Query.DESCENDING).limit(5).stream()]
+        
+        return jsonify({
+            "status": "success",
+            "queue_stats": {
+                "total": total_count,
+                "pending": pending_count,
+                "completed": completed_count,
+                "failed": failed_count,
+                "percent_complete": (completed_count / total_count * 100) if total_count > 0 else 0
+            },
+            "recent_items": recent_items,
+            "queue_empty": pending_count == 0
+        })
+        
+    except Exception as e:
+        print(f"Error getting queue status: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == '__main__':
