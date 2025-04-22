@@ -564,9 +564,11 @@ def process_rider_queue():
         
         if not queue_doc.exists:
             return jsonify({
-                "status": "error",
-                "message": "Queue not initialized. Call initialize_rider_queue first."
-            }), 404
+                "status": "success",
+                "message": "No queue exists. Call initialize_rider_queue first.",
+                "queue_empty": True,
+                "queue_exists": False
+            })
         
         queue_data = queue_doc.to_dict()
         pending_riders = queue_data.get("pendingRiders", [])
