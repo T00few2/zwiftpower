@@ -36,7 +36,7 @@ class ZwiftCommentator:
 
         Brug gerne emojis og korte afsnit for at gøre det læsevenligt.
 
-        Fremhæv navne og præstationer med fede eller kursiverede formuleringer, fx: “Philip Melchiors [DZR] fløj til sejr!”
+        Fremhæv navne og præstationer med fede eller kursiverede formuleringer, fx: "Philip Melchiors [DZR] fløj til sejr!"
 
     Kommentaren må meget gerne slutte med en kort konklusion og klubopbakning som fx:
     "DZR leverer – uge efter uge. Vi ses på rullerne!"
@@ -75,23 +75,25 @@ Kommentar:
     
     def generate_upgrade_comment(self, data: dict) -> str:
         prompt = f"""
-    Du er Jørgen Leth – cykelkommentator, poet og filmskaber.
+    Du er Jørgen Leth – cykelkommentator, poet og filmskaber.
 
 Opgave  
-Skriv en kort, eftertænksom, let ironisk og poetisk kommentar til Discord om dagens Zwift‑opgraderinger i Danish Zwift Racers (DZR).
+Skriv en kort, eftertænksom, let ironisk og poetisk kommentar til Discord om dagens Zwift‑opgraderinger i Danish Zwift Racers (DZR).
 
 Datafelter  
-- “upgradedZPCategory”: ryttere der har forbedret deres Zwift Pace Group  
-- “upgradedZwiftRacingCategory”: ryttere der har forbedret deres Zwift Racing vELO‑kategori  
+- "upgradedZPCategory": ryttere der har forbedret deres Zwift Pace Group  
+- "upgradedZwiftRacingCategory": ryttere der har forbedret deres Zwift Racing vELO‑kategori  
+- "upgradedZRSCategory": ryttere der har forbedret deres Racing Score kategori (ZRS)
+
 
 Stil  
 - Rolig, observerende, sanselig; brug rytmiske, filmiske billeder  
 - Korte sætninger. Små pauser. Et blik ind i rytterens bevægelse.  
 - Underspillet begejstring. Subtil humor.  
-- Brug em‑dashes til refleksion (“—”), og indskud som “jeg ser det for mig”.  
+- Brug em‑dashes til refleksion ("—"), og indskud som "jeg ser det for mig".  
 - Få, velvalgte emojis (🚴‍♂️✨) – højst 2‑3 i alt.  
-- Efter hvert navn: “(ZwiftID: <ZwiftID>)” i parentes.  
-- Afslut med en stille punchline i Leth‑stil, fx: “DZR — fordi vi altid leder efter den næste lille bevægelse fremad.”
+- Efter hvert navn: "(ZwiftID: <ZwiftID>)" i parentes.  
+- Afslut med en stille punchline i Leth‑stil, fx: "DZR — fordi vi altid leder efter den næste lille bevægelse fremad."
 
     Data:
 
@@ -103,7 +105,7 @@ Stil
         response = self.client.chat.completions.create(
             model=self.model,
             messages=[
-                {"role": "system", "content": "Du er Jørgen Leth. Du kommenterer DZR‑opgraderinger med hans rolige, poetiske "
+                {"role": "system", "content": "Du er Jørgen Leth. Du kommenterer DZR‑opgraderinger med hans rolige, poetiske "
                     "fortællestemme og underspillede humor."},
                 {"role": "user", "content": prompt}
             ],

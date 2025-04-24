@@ -195,20 +195,11 @@ def generate_and_post_upgrades():
         today = datetime.now().strftime("%y%m%d")
         yesterday = (datetime.now() - timedelta(days=1)).strftime("%y%m%d")
 
+        # Use firebase.compare_rider_categories instead of external API
+        print(f"[DEBUG] Comparing rider categories between {today} and {yesterday}")
+        upgrade_data = firebase.compare_rider_categories(today, yesterday)
 
-        if not today or not yesterday:
-            return jsonify({"error": "Missing 'today' or 'yesterday' in request body"}), 400
-
-        # Build the compare endpoint URL
-        compare_url = f"https://www.dzrracingseries.com/api/zr/compare?today={today}&yesterday={yesterday}"
-
-        # Fetch the upgrade data
-        print(f"[DEBUG] Fetching upgrade data from {compare_url}")
-        response = requests.get(compare_url)
-        response.raise_for_status()
-        upgrade_data = response.json()
-
-        if not upgrade_data.get("upgradedZPCategory") and not upgrade_data.get("upgradedZwiftRacingCategory"):
+        if not upgrade_data.get("upgradedZPCategory") and not upgrade_data.get("upgradedZwiftRacingCategory") and not upgrade_data.get("upgradedZRSCategory"):
             return jsonify({"message": "No upgrades today."}), 200
 
         # Generate upgrade comment
