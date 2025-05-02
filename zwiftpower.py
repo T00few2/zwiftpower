@@ -97,6 +97,128 @@ class ZwiftPower:
         resp.raise_for_status()
         return resp.json()
 
+    def _format_timestamp(self, timestamp):
+        """
+        Convert Unix timestamp to YYYY-MM-DD HH:MM format in CEST/CET timezone
+        
+        Args:
+            timestamp: Unix timestamp (seconds since Jan 1, 1970)
+            
+        Returns:
+            String with formatted date and time
+        """
+        from datetime import datetime
+        import pytz
+        
+        # Convert timestamp to datetime in UTC
+        utc_dt = datetime.fromtimestamp(timestamp, tz=pytz.UTC)
+        
+        # Convert to Europe/Copenhagen timezone (CEST/CET)
+        copenhagen_tz = pytz.timezone('Europe/Copenhagen')
+        local_dt = utc_dt.astimezone(copenhagen_tz)
+        
+        # Format the date and time
+        return local_dt.strftime('%Y-%m-%d %H:%M')
+
+    def _format_time(self, seconds_float):
+        """
+        Convert seconds.milliseconds to hh:mm:ss.ms format
+        
+        Args:
+            seconds_float: Time in seconds with milliseconds (e.g., 3661.234)
+            
+        Returns:
+            String in format "hh:mm:ss.ms"
+        """
+        if seconds_float is None:
+            return "N/A"
+            
+        # Split into seconds and milliseconds
+        seconds = int(seconds_float)
+        milliseconds = int((seconds_float - seconds) * 1000)
+        
+        # Calculate hours, minutes, and remaining seconds
+        hours = seconds // 3600
+        minutes = (seconds % 3600) // 60
+        remaining_seconds = seconds % 60
+        
+        # Format with leading zeros and milliseconds
+        return f"{hours:02d}:{minutes:02d}:{remaining_seconds:02d}.{milliseconds:03d}"
+
+    def filter_events_by_title(self, club_id: int, search_string: str) -> dict:
+        """
+        Filter team results to only include events whose titles match the given pattern.
+        Includes detailed rider data and formatted timestamps.
+        
+        Args:
+            club_id (int): The team/club ID to fetch results for
+            search_string (str): The pattern to match in event titles (case-insensitive)
+            
+        Returns:
+            dict: A dictionary containing filtered events with their details and rider data:
+                {
+                    zid: {
+                        "event_info": {
+                            "title": str,
+                            "date": str (formatted YYYY-MM-DD HH:MM in CEST/CET)
+                        },
+                        "riders": [
+                            {
+                                "name": str,
+                                "category": str,
+                                "time": str (formatted hh:mm:ss.ms),
+                                "position_in_cat": int,
+                                "20m wkg": str,
+                                "5m wkg": str,
+                                "1m wkg": str
+                            },
+                            ...
+                        ]
+                    },
+                    ...
+                }
+        """
+        # Get all team results
+        team_results = self.get_team_results(club_id)
+        events = team_results["events"]
+        rows = team_results["data"]
+        filtered_results = {}
+        
+        # First find matching events by title
+        for zid, event_info in events.items():
+            title = event_info.get("title", "")
+            if search_string.lower() in title.lower():
+                # Initialize event data with simplified event info
+                filtered_results[zid] = {
+                    "event_info": {
+                        "title": event_info.get("title", ""),
+                        "date": self._format_timestamp(event_info.get("date", 0))
+                    },
+                    "riders": []
+                }
+        
+        # Now collect rider data for each matching event
+        for row in rows:
+            zid = row.get("zid")
+            if zid in filtered_results:
+                # Clean up rider name
+                rider_name = html.unescape(row.get("name", ""))
+                
+                # Create rider data dictionary
+                rider_data = {
+                    "name": rider_name,
+                    "category": row.get("category"),
+                    "time": self._format_time(row.get("time", [None])[0]),
+                    "position_in_cat": row.get("position_in_cat"),
+                    "20m wkg": row.get("wkg1200", [None])[0],  # 20-min power
+                    "5m wkg": row.get("wkg300", [None])[0],    # 5-min power
+                    "1m wkg": row.get("wkg60", [None])[0]      # 1-min power
+                }
+                
+                filtered_results[zid]["riders"].append(rider_data)
+        
+        return filtered_results
+
     def get_rider_data_json(self, rider_id: int) -> dict:
         """
         Fetch the rider's JSON from the "cache3/profile" endpoint,

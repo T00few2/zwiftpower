@@ -135,6 +135,46 @@ def team_results(club_id: int):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/filter_events/<int:club_id>', methods=['GET'])
+def filter_events(club_id: int):
+    """
+    Filter team events by title pattern.
+    
+    Query Parameters:
+        title (str): The pattern to match in event titles (case-insensitive)
+        
+    Example:
+        /filter_events/11939?title=Tour%20de%20Zwift
+    """
+    try:
+        # Get the title pattern from query parameters
+        title_pattern = request.args.get('title')
+        if not title_pattern:
+            return jsonify({"error": "Missing 'title' query parameter"}), 400
+
+        # Get authenticated session and create ZwiftPower instance
+        session = get_authenticated_session()
+        zp = ZwiftPower(ZWIFT_USERNAME, ZWIFT_PASSWORD)
+        zp.session = session
+
+        # Filter events by title
+        filtered_data = zp.filter_events_by_title(club_id, title_pattern)
+        
+        # If no events found, return appropriate message
+        if not filtered_data:
+            return jsonify({
+                "message": f"No events found matching pattern '{title_pattern}'",
+                "filtered_events": {}
+            })
+
+        return jsonify({
+            "message": f"Found {len(filtered_data)} events matching pattern '{title_pattern}'",
+            "filtered_events": filtered_data
+        })
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/rider_data/<int:rider_id>', methods=['GET'])
 def rider_data(rider_id: int):
     try:
