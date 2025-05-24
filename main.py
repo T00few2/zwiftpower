@@ -105,6 +105,7 @@ def team_riders(club_id: int):
 
 @app.route('/team_results/<int:club_id>', methods=['GET'])
 def team_results(club_id: int):
+    """Get ZwiftPower weekly team results for a given club ID"""
     try:
         session = get_authenticated_session()
         zp = ZwiftPower(ZWIFT_USERNAME, ZWIFT_PASSWORD)
@@ -260,7 +261,7 @@ def get_discord_users():
 
 @app.route('/discord/members', methods=['GET'])
 def get_discord_members():
-    """Get all Discord members with their information"""
+    """Webapplication to assign ZwiftIDs to Discord users"""
     try:
         # Check if the request accepts HTML
         is_html_request = request.headers.get('Accept', '').find('text/html') >= 0
