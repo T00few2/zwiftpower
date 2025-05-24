@@ -879,6 +879,133 @@ def manage_scheduled_messages():
             
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+@app.route('/api/messages/welcome-messages/<message_id>', methods=['DELETE'])
+def delete_welcome_message(message_id):
+    """Delete a welcome message"""
+    if not verify_api_key():
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        # Delete the document from Firebase
+        doc_ref = firebase.db.collection('welcome_messages').document(message_id)
+        doc = doc_ref.get()
+        
+        if not doc.exists:
+            return jsonify({"error": "Message not found"}), 404
+        
+        doc_ref.delete()
+        
+        return jsonify({"status": "success", "message": "Welcome message deleted"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/messages/welcome-messages/<message_id>', methods=['PUT'])
+def update_welcome_message(message_id):
+    """Update a welcome message"""
+    if not verify_api_key():
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        data = request.json
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+        
+        # Get the document reference
+        doc_ref = firebase.db.collection('welcome_messages').document(message_id)
+        doc = doc_ref.get()
+        
+        if not doc.exists:
+            return jsonify({"error": "Message not found"}), 404
+        
+        # Add update metadata
+        from datetime import datetime, timezone
+        update_data = {
+            **data,
+            "updated_at": datetime.now(timezone.utc),
+            "updated_by": "admin"
+        }
+        
+        # Update the document
+        doc_ref.update(update_data)
+        
+        # Return updated document
+        updated_doc = doc_ref.get().to_dict()
+        updated_doc["id"] = message_id
+        
+        return jsonify({"status": "success", "message": updated_doc})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/schedules/<schedule_id>', methods=['DELETE'])
+def delete_scheduled_message(schedule_id):
+    """Delete a scheduled message"""
+    if not verify_api_key():
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        # Delete the document from Firebase
+        doc_ref = firebase.db.collection('scheduled_messages').document(schedule_id)
+        doc = doc_ref.get()
+        
+        if not doc.exists:
+            return jsonify({"error": "Schedule not found"}), 404
+        
+        doc_ref.delete()
+        
+        return jsonify({"status": "success", "message": "Scheduled message deleted"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/schedules/<schedule_id>', methods=['PUT'])
+def update_scheduled_message(schedule_id):
+    """Update a scheduled message"""
+    if not verify_api_key():
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        data = request.json
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+        
+        # Get the document reference
+        doc_ref = firebase.db.collection('scheduled_messages').document(schedule_id)
+        doc = doc_ref.get()
+        
+        if not doc.exists:
+            return jsonify({"error": "Schedule not found"}), 404
+        
+        # Recalculate next_run time if schedule changed
+        from datetime import datetime, timezone, timedelta
+        schedule_config = data.get('schedule', {})
+        if schedule_config:
+            schedule_type = schedule_config.get('type', 'weekly')
+            current_time = datetime.now(timezone.utc)
+            
+            if schedule_type == 'daily':
+                data['next_run'] = current_time + timedelta(days=1)
+            elif schedule_type == 'weekly':
+                data['next_run'] = current_time + timedelta(weeks=1)
+            elif schedule_type == 'monthly':
+                data['next_run'] = current_time + timedelta(days=30)
+        
+        # Add update metadata
+        update_data = {
+            **data,
+            "updated_at": datetime.now(timezone.utc),
+            "updated_by": "admin"
+        }
+        
+        # Update the document
+        doc_ref.update(update_data)
+        
+        # Return updated document
+        updated_doc = doc_ref.get().to_dict()
+        updated_doc["id"] = schedule_id
+        
+        return jsonify({"status": "success", "schedule": updated_doc})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/', methods=['GET'])
 def index():
