@@ -1,5 +1,6 @@
 import os
 import time
+import inspect
 from flask import Flask, request, jsonify, render_template
 from zwiftpower import ZwiftPower
 from zwiftcommentator import ZwiftCommentator
@@ -826,6 +827,58 @@ def get_queue_status():
     except Exception as e:
         print(f"Error getting queue status: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/', methods=['GET'])
+def index():
+    """
+    API Endpoint Overview - Lists all available endpoints in this service
+    """
+    output = []
+    for rule in app.url_map.iter_rules():
+        # Skip static file routes and the index route itself
+        if rule.endpoint in ['static', 'index']:
+            continue
+
+        view_func = app.view_functions[rule.endpoint]
+        doc = inspect.getdoc(view_func) or "No description available"
+        
+        # Get first line of docstring for description, clean it up
+        description = doc.split("\n")[0].strip()
+        
+        # Clean up the path - remove angle brackets for better readability in examples
+        example_path = rule.rule
+        methods = sorted(rule.methods - {'OPTIONS', 'HEAD'})
+        
+        # Add some example parameter values for paths with variables
+        if '<int:club_id>' in example_path:
+            example_path = example_path.replace('<int:club_id>', '11939')
+        if '<int:rider_id>' in example_path:
+            example_path = example_path.replace('<int:rider_id>', '15690')
+        if '<club_id>' in example_path:
+            example_path = example_path.replace('<club_id>', '11939')
+        if '<rider_id>' in example_path:
+            example_path = example_path.replace('<rider_id>', '15690')
+
+        output.append({
+            "endpoint": rule.rule,
+            "methods": methods,
+            "description": description,
+            "example": example_path
+        })
+
+    # Sort by endpoint path for better organization
+    output.sort(key=lambda x: x['endpoint'])
+    
+    # Check if request wants HTML (browser) or JSON (API client)
+    if request.args.get('format') == 'json' or request.headers.get('Accept', '').find('text/html') < 0:
+        return jsonify({
+            "service": "Zwift Power API", 
+            "version": "1.0",
+            "total_endpoints": len(output),
+            "endpoints": output
+        })
+    else:
+        return render_template('api_overview.html', endpoints=output)
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 8080))
