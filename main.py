@@ -740,7 +740,9 @@ def get_due_scheduled_messages():
         schedules = firebase.get_collection('scheduled_messages', limit=100)
         
         due_messages = []
-        current_time = datetime.now()
+        # Get current time as datetime
+        from datetime import datetime, timezone
+        current_time = datetime.now(timezone.utc)
         
         for schedule in schedules:
             if not schedule.get('active', False):
@@ -748,11 +750,27 @@ def get_due_scheduled_messages():
                 
             # Check if message is due
             next_run = schedule.get('next_run')
-            if next_run and isinstance(next_run, datetime) and next_run <= current_time:
-                due_messages.append(schedule)
+            if next_run:
+                # Handle Firebase timestamp
+                if hasattr(next_run, 'seconds'):
+                    # It's a Firebase Timestamp - convert to datetime
+                    next_run_datetime = datetime.fromtimestamp(next_run.seconds, tz=timezone.utc)
+                elif isinstance(next_run, datetime):
+                    # Already a datetime
+                    next_run_datetime = next_run
+                    if next_run_datetime.tzinfo is None:
+                        next_run_datetime = next_run_datetime.replace(tzinfo=timezone.utc)
+                else:
+                    # Skip if we can't parse it
+                    continue
+                
+                # Check if it's due (current time >= scheduled time)
+                if current_time >= next_run_datetime:
+                    due_messages.append(schedule)
         
         return jsonify(due_messages)
     except Exception as e:
+        print(f"Error in get_due_scheduled_messages: {str(e)}")  # For debugging
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/schedules/<schedule_id>/sent', methods=['POST'])
@@ -773,7 +791,8 @@ def mark_scheduled_message_sent(schedule_id):
         schedule_config = schedule_data.get('schedule', {})
         
         # Calculate next run time based on schedule type
-        current_time = datetime.now()
+        from datetime import datetime, timezone, timedelta
+        current_time = datetime.now(timezone.utc)
         next_run = None
         
         schedule_type = schedule_config.get('type', 'weekly')
@@ -785,16 +804,25 @@ def mark_scheduled_message_sent(schedule_id):
         elif schedule_type == 'monthly':
             next_run = current_time + timedelta(days=30)
         
+        # Convert to Firebase timestamp
+        import firebase_admin
+        next_run_timestamp = firebase_admin.firestore.firestore.Timestamp.from_datetime(next_run)
+        current_timestamp = firebase_admin.firestore.firestore.Timestamp.from_datetime(current_time)
+        
         # Update the document
         update_data = {
-            'last_sent': current_time,
-            'next_run': next_run
+            'last_sent': current_timestamp,
+            'next_run': next_run_timestamp
         }
         
         doc_ref.update(update_data)
         
-        return jsonify({"status": "success", "next_run": next_run.isoformat() if next_run else None})
+        return jsonify({
+            "status": "success", 
+            "next_run": next_run.isoformat() if next_run else None
+        })
     except Exception as e:
+        print(f"Error in mark_scheduled_message_sent: {str(e)}")  # For debugging
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/schedules', methods=['GET', 'POST'])
@@ -818,22 +846,30 @@ def manage_scheduled_messages():
             next_run = None
             
             if schedule_config:
+                from datetime import datetime, timezone, timedelta
+                import firebase_admin
+                
                 schedule_type = schedule_config.get('type', 'weekly')
+                current_time = datetime.now(timezone.utc)
                 
                 if schedule_type == 'daily':
-                    next_run = datetime.now() + timedelta(days=1)
+                    next_run = current_time + timedelta(days=1)
                 elif schedule_type == 'weekly':
-                    next_run = datetime.now() + timedelta(weeks=1)
+                    next_run = current_time + timedelta(weeks=1)
                 elif schedule_type == 'monthly':
-                    next_run = datetime.now() + timedelta(days=30)
-            
+                    next_run = current_time + timedelta(days=30)
+                
+                # Convert to Firebase timestamp
+                next_run_timestamp = firebase_admin.firestore.firestore.Timestamp.from_datetime(next_run)
+                current_timestamp = firebase_admin.firestore.firestore.Timestamp.from_datetime(current_time)
+
             # Add metadata
             schedule_data = {
                 **data,
-                "created_at": datetime.now(),
+                "created_at": current_timestamp,  # Firebase timestamp
                 "created_by": "admin",
                 "active": data.get("active", True),
-                "next_run": next_run,
+                "next_run": next_run_timestamp,  # Firebase timestamp
                 "last_sent": None
             }
             
