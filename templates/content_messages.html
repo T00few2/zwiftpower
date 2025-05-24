@@ -403,6 +403,14 @@
                 });
                 if (welcomeResponse.ok) {
                     welcomeMessages = await welcomeResponse.json();
+                    console.log('Welcome messages loaded:', welcomeMessages);
+                    // Ensure each message has an ID
+                    welcomeMessages = welcomeMessages.map(msg => {
+                        if (!msg.id && msg.document_id) {
+                            msg.id = msg.document_id;
+                        }
+                        return msg;
+                    });
                 }
                 
                 // Load scheduled messages
@@ -413,6 +421,14 @@
                 });
                 if (scheduledResponse.ok) {
                     scheduledMessages = await scheduledResponse.json();
+                    console.log('Scheduled messages loaded:', scheduledMessages);
+                    // Ensure each message has an ID
+                    scheduledMessages = scheduledMessages.map(msg => {
+                        if (!msg.id && msg.document_id) {
+                            msg.id = msg.document_id;
+                        }
+                        return msg;
+                    });
                 }
                 
                 updateDisplay();
@@ -434,6 +450,13 @@
             list.innerHTML = '';
             
             welcomeMessages.forEach(message => {
+                console.log('Rendering welcome message:', message);
+                const messageId = message.id || message.document_id || 'no-id';
+                
+                if (messageId === 'no-id') {
+                    console.error('Message without ID:', message);
+                }
+                
                 const item = document.createElement('div');
                 item.className = 'message-item';
                 
@@ -449,8 +472,8 @@
                         ${message.active ? 'Active' : 'Inactive'}
                     </span>
                     <div class="message-actions">
-                        <button class="button" onclick="editMessage('welcome', '${message.id}')">Edit</button>
-                        <button class="button danger" onclick="deleteMessage('welcome', '${message.id}')">Delete</button>
+                        <button class="button" onclick="editMessage('welcome', '${messageId}')">Edit</button>
+                        <button class="button danger" onclick="deleteMessage('welcome', '${messageId}')">Delete</button>
                     </div>
                 `;
                 
@@ -464,6 +487,13 @@
             list.innerHTML = '';
             
             scheduledMessages.forEach(message => {
+                console.log('Rendering scheduled message:', message);
+                const messageId = message.id || message.document_id || 'no-id';
+                
+                if (messageId === 'no-id') {
+                    console.error('Message without ID:', message);
+                }
+                
                 const item = document.createElement('div');
                 item.className = 'message-item';
                 
@@ -482,8 +512,8 @@
                         ${message.active ? 'Active' : 'Inactive'}
                     </span>
                     <div class="message-actions">
-                        <button class="button" onclick="editMessage('scheduled', '${message.id}')">Edit</button>
-                        <button class="button danger" onclick="deleteMessage('scheduled', '${message.id}')">Delete</button>
+                        <button class="button" onclick="editMessage('scheduled', '${messageId}')">Edit</button>
+                        <button class="button danger" onclick="deleteMessage('scheduled', '${messageId}')">Delete</button>
                     </div>
                 `;
                 
@@ -619,16 +649,19 @@
 
         // Edit message function
         function editMessage(type, id) {
+            console.log('Editing message:', type, id);
             editingMessage = id;
             editingType = type;
             
             // Find the message in the current data
             let message;
             if (type === 'welcome') {
-                message = welcomeMessages.find(m => m.id === id);
+                message = welcomeMessages.find(m => (m.id || m.document_id) === id);
             } else {
-                message = scheduledMessages.find(m => m.id === id);
+                message = scheduledMessages.find(m => (m.id || m.document_id) === id);
             }
+            
+            console.log('Found message for editing:', message);
             
             if (!message) {
                 showNotification('Message not found', 'error');
@@ -750,6 +783,13 @@
 
         // Delete function
         async function deleteMessage(type, id) {
+            console.log('Deleting message:', type, id);
+            
+            if (!id || id === 'no-id') {
+                showNotification('Invalid message ID', 'error');
+                return;
+            }
+            
             if (!confirm('Are you sure you want to delete this message?')) {
                 return;
             }

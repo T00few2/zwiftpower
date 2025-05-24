@@ -27,19 +27,26 @@ def get_document(collection: str, doc_id: str) -> Optional[Dict[str, Any]]:
         return doc.to_dict()
     return None
 
-def get_collection(collection: str, limit: int = 100) -> List[Dict[str, Any]]:
+def get_collection(collection: str, limit: int = 100, include_id: bool = False) -> List[Dict[str, Any]]:
     """
     Fetch all documents from a collection with optional limit.
     
     Args:
         collection: The collection name
         limit: Maximum number of documents to retrieve (default: 100)
+        include_id: Whether to include document IDs in the returned data (default: False)
         
     Returns:
-        List of document data as dictionaries
+        List of document data as dictionaries, optionally with document IDs included
     """
     docs = db.collection(collection).limit(limit).stream()
-    return [doc.to_dict() for doc in docs]
+    result = []
+    for doc in docs:
+        doc_data = doc.to_dict()
+        if include_id:
+            doc_data['id'] = doc.id  # Add the document ID only when requested
+        result.append(doc_data)
+    return result
 
 def get_latest_document(collection: str) -> Optional[Dict[str, Any]]:
         """

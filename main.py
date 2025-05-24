@@ -667,8 +667,8 @@ def content_messages():
             return render_template('content_messages.html', api_key=CONTENT_API_KEY)
         else:
             # For API requests, return summary data
-            welcome_messages = firebase.get_collection('welcome_messages', limit=100)
-            scheduled_messages = firebase.get_collection('scheduled_messages', limit=100)
+            welcome_messages = firebase.get_collection('welcome_messages', limit=100, include_id=True)
+            scheduled_messages = firebase.get_collection('scheduled_messages', limit=100, include_id=True)
             
             return jsonify({
                 "welcome_messages": welcome_messages,
@@ -692,8 +692,8 @@ def get_welcome_messages():
         return jsonify({"error": "Unauthorized"}), 401
     
     try:
-        # Get welcome messages from Firebase
-        messages = firebase.get_collection('welcome_messages', limit=100)
+        # Get welcome messages from Firebase with document IDs
+        messages = firebase.get_collection('welcome_messages', limit=100, include_id=True)
         
         # Filter only active messages
         active_messages = [msg for msg in messages if msg.get('active', False)]
@@ -736,8 +736,8 @@ def get_due_scheduled_messages():
         return jsonify({"error": "Unauthorized"}), 401
     
     try:
-        # Get all active schedules
-        schedules = firebase.get_collection('scheduled_messages', limit=100)
+        # Get all active schedules with document IDs
+        schedules = firebase.get_collection('scheduled_messages', limit=100, include_id=True)
         
         due_messages = []
         # Get current time as datetime
@@ -836,7 +836,7 @@ def manage_scheduled_messages():
     
     try:
         if request.method == 'GET':
-            schedules = firebase.get_collection('scheduled_messages', limit=100)
+            schedules = firebase.get_collection('scheduled_messages', limit=100, include_id=True)
             return jsonify(schedules)
             
         elif request.method == 'POST':
