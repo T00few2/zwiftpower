@@ -3,6 +3,7 @@ import time
 import inspect
 import logging
 from flask import Flask, request, jsonify, render_template
+from dotenv import load_dotenv
 from zwiftpower import ZwiftPower
 from zwiftcommentator import ZwiftCommentator
 import requests
@@ -10,6 +11,9 @@ from datetime import datetime, timedelta
 import firebase
 from discord_api import DiscordAPI
 from zwift import ZwiftAPI
+
+# Load environment variables from .env file
+load_dotenv()
 
 app = Flask(__name__)
 
@@ -40,6 +44,17 @@ DISCORD_GOSSIP_ID = os.getenv("DISCORD_GOSSIP_ID", "your_discord_gossip_id")
 DISCORD_BOT_URL = os.getenv("DISCORD_BOT_URL", "your_discord_bot_url")
 DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN", "your_discord_bot_token")
 DISCORD_GUILD_ID = os.getenv("DISCORD_GUILD_ID", "your_discord_guild_id")
+
+CONTENT_API_KEY = os.getenv("CONTENT_API_KEY", "your_content_api_key")
+
+def verify_api_key():
+    """Verify API key from Authorization header"""
+    auth_header = request.headers.get('Authorization', '')
+    if not auth_header.startswith('Bearer '):
+        return False
+    
+    token = auth_header.replace('Bearer ', '')
+    return token == CONTENT_API_KEY
 
 def get_authenticated_session() -> requests.Session:
     """Return a cached, authenticated session if available and still valid; otherwise, log in."""
@@ -639,6 +654,167 @@ def update_club_stats_from_queue():
     except Exception as e:
         print(f"Error updating club_stats from queue: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/messages/welcome-messages', methods=['GET'])
+def get_welcome_messages():
+    """Get all active welcome messages for the Discord bot"""
+    if not verify_api_key():
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        # Get welcome messages from Firebase
+        messages = firebase.get_collection('welcome_messages', limit=100)
+        
+        # Filter only active messages
+        active_messages = [msg for msg in messages if msg.get('active', False)]
+        
+        return jsonify(active_messages)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/messages/welcome-messages', methods=['POST'])
+def create_welcome_message():
+    """Create a new welcome message"""
+    if not verify_api_key():
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        data = request.json
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+        
+        # Add metadata
+        message_data = {
+            **data,
+            "created_at": datetime.now(),
+            "created_by": "admin",
+            "active": data.get("active", True)
+        }
+        
+        # Save to Firebase
+        doc_ref = firebase.db.collection('welcome_messages').add(message_data)
+        message_data["id"] = doc_ref[1].id
+        
+        return jsonify({"status": "success", "message": message_data})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/schedules/due', methods=['GET'])
+def get_due_scheduled_messages():
+    """Get scheduled messages that are due to be sent"""
+    if not verify_api_key():
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        # Get all active schedules
+        schedules = firebase.get_collection('scheduled_messages', limit=100)
+        
+        due_messages = []
+        current_time = datetime.now()
+        
+        for schedule in schedules:
+            if not schedule.get('active', False):
+                continue
+                
+            # Check if message is due
+            next_run = schedule.get('next_run')
+            if next_run and isinstance(next_run, datetime) and next_run <= current_time:
+                due_messages.append(schedule)
+        
+        return jsonify(due_messages)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/schedules/<schedule_id>/sent', methods=['POST'])
+def mark_scheduled_message_sent(schedule_id):
+    """Mark a scheduled message as sent and calculate next run time"""
+    if not verify_api_key():
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        # Get the schedule document
+        doc_ref = firebase.db.collection('scheduled_messages').document(schedule_id)
+        doc = doc_ref.get()
+        
+        if not doc.exists:
+            return jsonify({"error": "Schedule not found"}), 404
+        
+        schedule_data = doc.to_dict()
+        schedule_config = schedule_data.get('schedule', {})
+        
+        # Calculate next run time based on schedule type
+        current_time = datetime.now()
+        next_run = None
+        
+        schedule_type = schedule_config.get('type', 'weekly')
+        
+        if schedule_type == 'daily':
+            next_run = current_time + timedelta(days=1)
+        elif schedule_type == 'weekly':
+            next_run = current_time + timedelta(weeks=1)
+        elif schedule_type == 'monthly':
+            next_run = current_time + timedelta(days=30)
+        
+        # Update the document
+        update_data = {
+            'last_sent': current_time,
+            'next_run': next_run
+        }
+        
+        doc_ref.update(update_data)
+        
+        return jsonify({"status": "success", "next_run": next_run.isoformat() if next_run else None})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/schedules', methods=['GET', 'POST'])
+def manage_scheduled_messages():
+    """Get all scheduled messages or create a new one"""
+    if not verify_api_key():
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        if request.method == 'GET':
+            schedules = firebase.get_collection('scheduled_messages', limit=100)
+            return jsonify(schedules)
+            
+        elif request.method == 'POST':
+            data = request.json
+            if not data:
+                return jsonify({"error": "No data provided"}), 400
+            
+            # Calculate initial next_run time
+            schedule_config = data.get('schedule', {})
+            next_run = None
+            
+            if schedule_config:
+                schedule_type = schedule_config.get('type', 'weekly')
+                
+                if schedule_type == 'daily':
+                    next_run = datetime.now() + timedelta(days=1)
+                elif schedule_type == 'weekly':
+                    next_run = datetime.now() + timedelta(weeks=1)
+                elif schedule_type == 'monthly':
+                    next_run = datetime.now() + timedelta(days=30)
+            
+            # Add metadata
+            schedule_data = {
+                **data,
+                "created_at": datetime.now(),
+                "created_by": "admin",
+                "active": data.get("active", True),
+                "next_run": next_run,
+                "last_sent": None
+            }
+            
+            # Save to Firebase
+            doc_ref = firebase.db.collection('scheduled_messages').add(schedule_data)
+            schedule_data["id"] = doc_ref[1].id
+            
+            return jsonify({"status": "success", "schedule": schedule_data})
+            
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/', methods=['GET'])
 def index():
