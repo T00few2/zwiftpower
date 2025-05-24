@@ -1,6 +1,7 @@
 import os
 import time
 import inspect
+import logging
 from flask import Flask, request, jsonify, render_template
 from zwiftpower import ZwiftPower
 from zwiftcommentator import ZwiftCommentator
@@ -11,6 +12,17 @@ from discord_api import DiscordAPI
 from zwift import ZwiftAPI
 
 app = Flask(__name__)
+
+@app.before_request
+def log_request_path():
+    logging.info({
+        "endpoint": request.path,
+        "method": request.method,
+        "query": request.args.to_dict(),
+        "user_agent": request.headers.get('User-Agent', ''),
+        "remote_addr": request.remote_addr,
+        "timestamp": time.time()
+    })
 
 # Global variables to cache authenticated sessions
 cached_session = None
