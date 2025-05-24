@@ -664,7 +664,7 @@ def content_messages():
         
         if is_html_request:
             # For HTML requests, render the management interface
-            return render_template('content_messages.html')
+            return render_template('content_messages.html', api_key=CONTENT_API_KEY)
         else:
             # For API requests, return summary data
             welcome_messages = firebase.get_collection('welcome_messages', limit=100)
