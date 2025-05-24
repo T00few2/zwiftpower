@@ -335,6 +335,10 @@
         let welcomeMessages = [];
         let scheduledMessages = [];
 
+        // Global variables for editing
+        let editingMessage = null;
+        let editingType = null;
+
         // Tab switching
         function switchTab(tabName) {
             document.querySelectorAll('.tab-content').forEach(tab => {
@@ -445,6 +449,7 @@
                         ${message.active ? 'Active' : 'Inactive'}
                     </span>
                     <div class="message-actions">
+                        <button class="button" onclick="editMessage('welcome', '${message.id}')">Edit</button>
                         <button class="button danger" onclick="deleteMessage('welcome', '${message.id}')">Delete</button>
                     </div>
                 `;
@@ -477,6 +482,7 @@
                         ${message.active ? 'Active' : 'Inactive'}
                     </span>
                     <div class="message-actions">
+                        <button class="button" onclick="editMessage('scheduled', '${message.id}')">Edit</button>
                         <button class="button danger" onclick="deleteMessage('scheduled', '${message.id}')">Delete</button>
                     </div>
                 `;
@@ -523,8 +529,15 @@
             }
             
             try {
-                const response = await fetch('/api/messages/welcome-messages', {
-                    method: 'POST',
+                // Determine if we're editing or creating
+                const isEditing = editingMessage && editingType === 'welcome';
+                const endpoint = isEditing ? 
+                    `/api/messages/welcome-messages/${editingMessage}` : 
+                    '/api/messages/welcome-messages';
+                const method = isEditing ? 'PUT' : 'POST';
+                
+                const response = await fetch(endpoint, {
+                    method: method,
                     headers: {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${API_KEY}`
@@ -535,14 +548,16 @@
                 const result = await response.json();
                 
                 if (response.ok) {
-                    showNotification('Welcome message created successfully!');
+                    const actionText = isEditing ? 'updated' : 'created';
+                    showNotification(`Welcome message ${actionText} successfully!`);
                     clearForm('welcome');
+                    cancelEdit(); // Reset edit state
                     loadData();
                 } else {
                     showNotification('Error: ' + result.error, 'error');
                 }
             } catch (error) {
-                showNotification('Error creating message: ' + error.message, 'error');
+                showNotification('Error saving message: ' + error.message, 'error');
             }
         });
 
@@ -570,8 +585,15 @@
             };
             
             try {
-                const response = await fetch('/api/schedules', {
-                    method: 'POST',
+                // Determine if we're editing or creating
+                const isEditing = editingMessage && editingType === 'scheduled';
+                const endpoint = isEditing ? 
+                    `/api/schedules/${editingMessage}` : 
+                    '/api/schedules';
+                const method = isEditing ? 'PUT' : 'POST';
+                
+                const response = await fetch(endpoint, {
+                    method: method,
                     headers: {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${API_KEY}`
@@ -582,16 +604,149 @@
                 const result = await response.json();
                 
                 if (response.ok) {
-                    showNotification('Scheduled message created successfully!');
+                    const actionText = isEditing ? 'updated' : 'created';
+                    showNotification(`Scheduled message ${actionText} successfully!`);
                     clearForm('scheduled');
+                    cancelEdit(); // Reset edit state
                     loadData();
                 } else {
                     showNotification('Error: ' + result.error, 'error');
                 }
             } catch (error) {
-                showNotification('Error creating message: ' + error.message, 'error');
+                showNotification('Error saving message: ' + error.message, 'error');
             }
         });
+
+        // Edit message function
+        function editMessage(type, id) {
+            editingMessage = id;
+            editingType = type;
+            
+            // Find the message in the current data
+            let message;
+            if (type === 'welcome') {
+                message = welcomeMessages.find(m => m.id === id);
+            } else {
+                message = scheduledMessages.find(m => m.id === id);
+            }
+            
+            if (!message) {
+                showNotification('Message not found', 'error');
+                return;
+            }
+            
+            // Switch to the appropriate tab
+            if (type === 'welcome') {
+                switchTab('welcome');
+                
+                // Pre-fill the welcome form
+                document.getElementById('welcome-title').value = message.title || '';
+                document.getElementById('welcome-content').value = message.content || '';
+                document.getElementById('welcome-active').checked = message.active || false;
+                
+                // Handle embeds
+                if (message.embed) {
+                    document.getElementById('welcome-has-embed').checked = true;
+                    toggleEmbedFields();
+                    document.getElementById('embed-title').value = message.embed.title || '';
+                    document.getElementById('embed-description').value = message.embed.description || '';
+                    
+                    // Convert color int to hex
+                    const colorHex = '#' + (message.embed.color || 0x0099FF).toString(16).padStart(6, '0');
+                    document.getElementById('embed-color').value = colorHex;
+                    document.getElementById('embed-footer').value = message.embed.footer || '';
+                    document.getElementById('embed-thumbnail').checked = message.embed.thumbnail || false;
+                } else {
+                    document.getElementById('welcome-has-embed').checked = false;
+                    toggleEmbedFields();
+                }
+                
+                // Change button text
+                const submitBtn = document.querySelector('#welcome-form button[type="submit"]');
+                submitBtn.textContent = 'Update Welcome Message';
+                submitBtn.style.backgroundColor = '#ff9500';
+                
+            } else {
+                switchTab('scheduled');
+                
+                // Pre-fill the scheduled form
+                document.getElementById('scheduled-title').value = message.title || '';
+                document.getElementById('scheduled-content').value = message.content || '';
+                document.getElementById('channel-id').value = message.channel_id || '';
+                document.getElementById('scheduled-active').checked = message.active || false;
+                
+                // Handle schedule
+                if (message.schedule) {
+                    document.getElementById('schedule-type').value = message.schedule.type || 'weekly';
+                    updateScheduleFields();
+                    
+                    if (message.schedule.day) {
+                        document.getElementById('schedule-day').value = message.schedule.day;
+                    }
+                    if (message.schedule.time) {
+                        document.getElementById('schedule-time').value = message.schedule.time;
+                    }
+                }
+                
+                // Change button text
+                const submitBtn = document.querySelector('#scheduled-form button[type="submit"]');
+                submitBtn.textContent = 'Update Scheduled Message';
+                submitBtn.style.backgroundColor = '#ff9500';
+            }
+            
+            // Show cancel button
+            showCancelEditButton(type);
+        }
+
+        // Cancel edit function
+        function cancelEdit() {
+            editingMessage = null;
+            editingType = null;
+            
+            // Reset forms
+            clearForm('welcome');
+            clearForm('scheduled');
+            
+            // Reset button texts and colors
+            const welcomeBtn = document.querySelector('#welcome-form button[type="submit"]');
+            welcomeBtn.textContent = 'Create Welcome Message';
+            welcomeBtn.style.backgroundColor = '#667eea';
+            
+            const scheduledBtn = document.querySelector('#scheduled-form button[type="submit"]');
+            scheduledBtn.textContent = 'Create Scheduled Message';
+            scheduledBtn.style.backgroundColor = '#667eea';
+            
+            // Hide cancel buttons
+            hideCancelEditButton('welcome');
+            hideCancelEditButton('scheduled');
+        }
+
+        // Show cancel edit button
+        function showCancelEditButton(formType) {
+            let cancelBtn = document.getElementById(`cancel-edit-btn-${formType}`);
+            if (!cancelBtn) {
+                cancelBtn = document.createElement('button');
+                cancelBtn.id = `cancel-edit-btn-${formType}`;
+                cancelBtn.type = 'button';
+                cancelBtn.textContent = 'Cancel Edit';
+                cancelBtn.className = 'button';
+                cancelBtn.style.backgroundColor = '#6c757d';
+                cancelBtn.onclick = cancelEdit;
+                
+                const form = document.getElementById(`${formType}-form`);
+                const submitBtn = form.querySelector('button[type="submit"]');
+                submitBtn.parentNode.insertBefore(cancelBtn, submitBtn.nextSibling);
+            }
+            cancelBtn.style.display = 'inline-block';
+        }
+
+        // Hide cancel edit button
+        function hideCancelEditButton(formType) {
+            const cancelBtn = document.getElementById(`cancel-edit-btn-${formType}`);
+            if (cancelBtn) {
+                cancelBtn.style.display = 'none';
+            }
+        }
 
         // Delete function
         async function deleteMessage(type, id) {
