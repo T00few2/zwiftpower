@@ -93,6 +93,7 @@ def get_authenticated_zwift_api() -> ZwiftAPI:
 
 @app.route('/team_riders/<int:club_id>', methods=['GET'])
 def team_riders(club_id: int):
+    """Get ZwiftPower registered team riders for a given club ID"""
     try:
         session = get_authenticated_session()
         zp = ZwiftPower(ZWIFT_USERNAME, ZWIFT_PASSWORD)
@@ -155,6 +156,7 @@ def filter_events(club_id: int):
 
 @app.route('/rider_data/<int:rider_id>', methods=['GET'])
 def rider_data(rider_id: int):
+    """Get ZwiftPowerrider data for a given rider ID"""
     try:
         session = get_authenticated_session()
         zp = ZwiftPower(ZWIFT_USERNAME, ZWIFT_PASSWORD)
@@ -166,6 +168,7 @@ def rider_data(rider_id: int):
     
 @app.route('/generate_and_post_commentary/<int:club_id>', methods=['POST'])
 def generate_and_post_commentary(club_id):
+    """Generate weekly commentary on team results and post to Discord"""
     try:
         print(f"[DEBUG] Starting commentary generation for club ID: {club_id}")
 
@@ -206,7 +209,7 @@ def generate_and_post_commentary(club_id):
     
 @app.route('/generate_and_post_upgrades', methods=['POST'])
 def generate_and_post_upgrades():
-   
+    """Generate commentary on upgrades and post to Discord"""
     try:
         print("[DEBUG] Starting upgrade comment generation...")
 
@@ -433,7 +436,7 @@ def initialize_rider_queue():
 
 @app.route('/api/process_rider_queue', methods=['POST'])
 def process_rider_queue():
-    """Process a batch of riders from the queue"""
+    """Process a batch of riders from the rider queue"""
     try:
         # Get parameters
         batch_size = request.json.get('batch_size', 3) if request.json else 3
