@@ -654,6 +654,36 @@ def update_club_stats_from_queue():
     except Exception as e:
         print(f"Error updating club_stats from queue: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
+    
+@app.route('/content/messages', methods=['GET'])
+def content_messages():
+    """Web interface for managing Discord bot messages"""
+    try:
+        # Check if the request accepts HTML
+        is_html_request = request.headers.get('Accept', '').find('text/html') >= 0
+        
+        if is_html_request:
+            # For HTML requests, render the management interface
+            return render_template('content_messages.html')
+        else:
+            # For API requests, return summary data
+            welcome_messages = firebase.get_collection('welcome_messages', limit=100)
+            scheduled_messages = firebase.get_collection('scheduled_messages', limit=100)
+            
+            return jsonify({
+                "welcome_messages": welcome_messages,
+                "scheduled_messages": scheduled_messages,
+                "stats": {
+                    "total_welcome": len(welcome_messages),
+                    "total_scheduled": len(scheduled_messages),
+                    "active_welcome": len([m for m in welcome_messages if m.get('active', False)]),
+                    "active_scheduled": len([m for m in scheduled_messages if m.get('active', False)])
+                }
+            })
+    except Exception as e:
+        if is_html_request:
+            return f"<h1>Error</h1><p>{str(e)}</p>", 500
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/messages/welcome-messages', methods=['GET'])
 def get_welcome_messages():

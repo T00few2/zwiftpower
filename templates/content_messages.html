@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Discord Bot Content Management</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 10px 20px;
+            background-color: #e0e0e0;
+            border: none;
+            cursor: pointer;
+            margin-right: 5px;
+            border-radius: 5px 5px 0 0;
+        }
+        .tab.active {
+            background-color: #667eea;
+            color: white;
+        }
+        .tab-content {
+            display: none;
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group input, .form-group textarea, .form-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .form-group textarea {
+            height: 100px;
+            resize: vertical;
+        }
+        .button {
+            background-color: #667eea;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        .button:hover {
+            background-color: #5a67d8;
+        }
+        .button.danger {
+            background-color: #e53e3e;
+        }
+        .button.danger:hover {
+            background-color: #c53030;
+        }
+        .message-list {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .message-item {
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .message-item:last-child {
+            border-bottom: none;
+        }
+        .message-content {
+            flex-grow: 1;
+        }
+        .message-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .message-preview {
+            color: #666;
+            font-size: 0.9em;
+        }
+        .message-status {
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            margin-left: 10px;
+        }
+        .status-active {
+            background-color: #c6f6d5;
+            color: #2f855a;
+        }
+        .status-inactive {
+            background-color: #fed7d7;
+            color: #c53030;
+        }
+        .message-actions {
+            display: flex;
+            gap: 10px;
+        }
+        .embed-fields {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+        .schedule-fields {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+        .notification {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            display: none;
+        }
+        .notification.success {
+            background-color: #c6f6d5;
+            color: #2f855a;
+            border: 1px solid #9ae6b4;
+        }
+        .notification.error {
+            background-color: #fed7d7;
+            color: #c53030;
+            border: 1px solid #feb2b2;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .checkbox-group input[type="checkbox"] {
+            width: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🤖 Discord Bot Content Management</h1>
+        <p>Manage welcome messages and scheduled content for your Discord server</p>
+    </div>
+
+    <div class="stats">
+        <div class="stat-card">
+            <div class="stat-number" id="welcome-count">0</div>
+            <div>Welcome Messages</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number" id="scheduled-count">0</div>
+            <div>Scheduled Messages</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number" id="active-count">0</div>
+            <div>Active Messages</div>
+        </div>
+    </div>
+
+    <div class="notification" id="notification"></div>
+
+    <div class="tabs">
+        <button class="tab active" onclick="switchTab('welcome')">Welcome Messages</button>
+        <button class="tab" onclick="switchTab('scheduled')">Scheduled Messages</button>
+    </div>
+
+    <!-- Welcome Messages Tab -->
+    <div id="welcome-tab" class="tab-content active">
+        <h2>Welcome Messages</h2>
+        
+        <form id="welcome-form">
+            <div class="form-group">
+                <label for="welcome-title">Title:</label>
+                <input type="text" id="welcome-title" name="title" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="welcome-content">Message Content:</label>
+                <textarea id="welcome-content" name="content" placeholder="Welcome {username} to {server_name}! Use variables like {username}, {mention}, {server_name}, {member_count}" required></textarea>
+            </div>
+            
+            <div class="checkbox-group">
+                <input type="checkbox" id="welcome-active" name="active" checked>
+                <label for="welcome-active">Active</label>
+            </div>
+            
+            <div class="checkbox-group">
+                <input type="checkbox" id="welcome-has-embed" onchange="toggleEmbedFields()">
+                <label for="welcome-has-embed">Include Embed</label>
+            </div>
+            
+            <div id="welcome-embed-fields" class="embed-fields" style="display: none;">
+                <div class="form-group">
+                    <label for="embed-title">Embed Title:</label>
+                    <input type="text" id="embed-title" name="embed_title">
+                </div>
+                <div class="form-group">
+                    <label for="embed-description">Embed Description:</label>
+                    <textarea id="embed-description" name="embed_description"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="embed-color">Embed Color (hex):</label>
+                    <input type="color" id="embed-color" name="embed_color" value="#0099ff">
+                </div>
+                <div class="form-group">
+                    <label for="embed-footer">Embed Footer:</label>
+                    <input type="text" id="embed-footer" name="embed_footer">
+                </div>
+                <div class="checkbox-group">
+                    <input type="checkbox" id="embed-thumbnail">
+                    <label for="embed-thumbnail">Show user avatar as thumbnail</label>
+                </div>
+            </div>
+            
+            <button type="submit" class="button">Create Welcome Message</button>
+            <button type="button" class="button" onclick="clearForm('welcome')">Clear</button>
+        </form>
+        
+        <h3>Existing Welcome Messages</h3>
+        <div id="welcome-list" class="message-list"></div>
+    </div>
+
+    <!-- Scheduled Messages Tab -->
+    <div id="scheduled-tab" class="tab-content">
+        <h2>Scheduled Messages</h2>
+        
+        <form id="scheduled-form">
+            <div class="form-group">
+                <label for="scheduled-title">Title:</label>
+                <input type="text" id="scheduled-title" name="title" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="scheduled-content">Message Content:</label>
+                <textarea id="scheduled-content" name="content" placeholder="Don't forget about tonight's race! Use variables like {server_name}, {date}, {time}" required></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="channel-id">Discord Channel ID:</label>
+                <input type="text" id="channel-id" name="channel_id" required placeholder="123456789012345678">
+            </div>
+            
+            <div class="schedule-fields">
+                <h4>Schedule Settings</h4>
+                <div class="form-group">
+                    <label for="schedule-type">Schedule Type:</label>
+                    <select id="schedule-type" name="schedule_type" onchange="updateScheduleFields()">
+                        <option value="daily">Daily</option>
+                        <option value="weekly">Weekly</option>
+                        <option value="monthly">Monthly</option>
+                    </select>
+                </div>
+                
+                <div class="form-group" id="day-field" style="display: none;">
+                    <label for="schedule-day">Day of Week:</label>
+                    <select id="schedule-day" name="schedule_day">
+                        <option value="monday">Monday</option>
+                        <option value="tuesday">Tuesday</option>
+                        <option value="wednesday">Wednesday</option>
+                        <option value="thursday">Thursday</option>
+                        <option value="friday">Friday</option>
+                        <option value="saturday">Saturday</option>
+                        <option value="sunday">Sunday</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="schedule-time">Time (24h format):</label>
+                    <input type="time" id="schedule-time" name="schedule_time" value="18:00">
+                </div>
+            </div>
+            
+            <div class="checkbox-group">
+                <input type="checkbox" id="scheduled-active" name="active" checked>
+                <label for="scheduled-active">Active</label>
+            </div>
+            
+            <button type="submit" class="button">Create Scheduled Message</button>
+            <button type="button" class="button" onclick="clearForm('scheduled')">Clear</button>
+        </form>
+        
+        <h3>Existing Scheduled Messages</h3>
+        <div id="scheduled-list" class="message-list"></div>
+    </div>
+
+    <script>
+        const API_KEY = 'your-api-key-here'; // Replace with your actual API key
+        let welcomeMessages = [];
+        let scheduledMessages = [];
+
+        // Tab switching
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            document.getElementById(tabName + '-tab').classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        // Toggle embed fields for welcome messages
+        function toggleEmbedFields() {
+            const embedFields = document.getElementById('welcome-embed-fields');
+            const checkbox = document.getElementById('welcome-has-embed');
+            embedFields.style.display = checkbox.checked ? 'block' : 'none';
+        }
+
+        // Update schedule fields based on type
+        function updateScheduleFields() {
+            const scheduleType = document.getElementById('schedule-type').value;
+            const dayField = document.getElementById('day-field');
+            
+            if (scheduleType === 'weekly') {
+                dayField.style.display = 'block';
+            } else {
+                dayField.style.display = 'none';
+            }
+        }
+
+        // Show notification
+        function showNotification(message, type = 'success') {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `notification ${type}`;
+            notification.style.display = 'block';
+            
+            setTimeout(() => {
+                notification.style.display = 'none';
+            }, 5000);
+        }
+
+        // Clear form
+        function clearForm(formType) {
+            document.getElementById(formType + '-form').reset();
+            if (formType === 'welcome') {
+                document.getElementById('welcome-embed-fields').style.display = 'none';
+                document.getElementById('welcome-has-embed').checked = false;
+            }
+        }
+
+        // Load data from server
+        async function loadData() {
+            try {
+                // Load welcome messages
+                const welcomeResponse = await fetch('/api/messages/welcome-messages', {
+                    headers: {
+                        'Authorization': `Bearer ${API_KEY}`
+                    }
+                });
+                if (welcomeResponse.ok) {
+                    welcomeMessages = await welcomeResponse.json();
+                }
+                
+                // Load scheduled messages
+                const scheduledResponse = await fetch('/api/schedules', {
+                    headers: {
+                        'Authorization': `Bearer ${API_KEY}`
+                    }
+                });
+                if (scheduledResponse.ok) {
+                    scheduledMessages = await scheduledResponse.json();
+                }
+                
+                updateDisplay();
+                updateStats();
+            } catch (error) {
+                showNotification('Error loading data: ' + error.message, 'error');
+            }
+        }
+
+        // Update display
+        function updateDisplay() {
+            updateWelcomeList();
+            updateScheduledList();
+        }
+
+        // Update welcome messages list
+        function updateWelcomeList() {
+            const list = document.getElementById('welcome-list');
+            list.innerHTML = '';
+            
+            welcomeMessages.forEach(message => {
+                const item = document.createElement('div');
+                item.className = 'message-item';
+                
+                const preview = message.content.length > 100 ? 
+                    message.content.substring(0, 100) + '...' : message.content;
+                
+                item.innerHTML = `
+                    <div class="message-content">
+                        <div class="message-title">${message.title}</div>
+                        <div class="message-preview">${preview}</div>
+                    </div>
+                    <span class="message-status ${message.active ? 'status-active' : 'status-inactive'}">
+                        ${message.active ? 'Active' : 'Inactive'}
+                    </span>
+                    <div class="message-actions">
+                        <button class="button danger" onclick="deleteMessage('welcome', '${message.id}')">Delete</button>
+                    </div>
+                `;
+                
+                list.appendChild(item);
+            });
+        }
+
+        // Update scheduled messages list
+        function updateScheduledList() {
+            const list = document.getElementById('scheduled-list');
+            list.innerHTML = '';
+            
+            scheduledMessages.forEach(message => {
+                const item = document.createElement('div');
+                item.className = 'message-item';
+                
+                const preview = message.content.length > 100 ? 
+                    message.content.substring(0, 100) + '...' : message.content;
+                
+                const nextRun = message.next_run ? new Date(message.next_run).toLocaleString() : 'Not scheduled';
+                
+                item.innerHTML = `
+                    <div class="message-content">
+                        <div class="message-title">${message.title}</div>
+                        <div class="message-preview">${preview}</div>
+                        <div class="message-preview">Next run: ${nextRun}</div>
+                    </div>
+                    <span class="message-status ${message.active ? 'status-active' : 'status-inactive'}">
+                        ${message.active ? 'Active' : 'Inactive'}
+                    </span>
+                    <div class="message-actions">
+                        <button class="button danger" onclick="deleteMessage('scheduled', '${message.id}')">Delete</button>
+                    </div>
+                `;
+                
+                list.appendChild(item);
+            });
+        }
+
+        // Update statistics
+        function updateStats() {
+            const welcomeCount = welcomeMessages.length;
+            const scheduledCount = scheduledMessages.length;
+            const activeCount = welcomeMessages.filter(m => m.active).length + 
+                              scheduledMessages.filter(m => m.active).length;
+            
+            document.getElementById('welcome-count').textContent = welcomeCount;
+            document.getElementById('scheduled-count').textContent = scheduledCount;
+            document.getElementById('active-count').textContent = activeCount;
+        }
+
+        // Form submission handlers
+        document.getElementById('welcome-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData(e.target);
+            const data = {
+                title: formData.get('title'),
+                content: formData.get('content'),
+                active: document.getElementById('welcome-active').checked
+            };
+            
+            // Add embed if enabled
+            if (document.getElementById('welcome-has-embed').checked) {
+                const colorHex = document.getElementById('embed-color').value;
+                const colorInt = parseInt(colorHex.replace('#', ''), 16);
+                
+                data.embed = {
+                    title: formData.get('embed_title') || '',
+                    description: formData.get('embed_description') || '',
+                    color: colorInt,
+                    footer: formData.get('embed_footer') || '',
+                    thumbnail: document.getElementById('embed-thumbnail').checked
+                };
+            }
+            
+            try {
+                const response = await fetch('/api/messages/welcome-messages', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${API_KEY}`
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showNotification('Welcome message created successfully!');
+                    clearForm('welcome');
+                    loadData();
+                } else {
+                    showNotification('Error: ' + result.error, 'error');
+                }
+            } catch (error) {
+                showNotification('Error creating message: ' + error.message, 'error');
+            }
+        });
+
+        document.getElementById('scheduled-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData(e.target);
+            const scheduleType = formData.get('schedule_type');
+            
+            const schedule = {
+                type: scheduleType,
+                time: formData.get('schedule_time')
+            };
+            
+            if (scheduleType === 'weekly') {
+                schedule.day = formData.get('schedule_day');
+            }
+            
+            const data = {
+                title: formData.get('title'),
+                content: formData.get('content'),
+                channel_id: formData.get('channel_id'),
+                schedule: schedule,
+                active: document.getElementById('scheduled-active').checked
+            };
+            
+            try {
+                const response = await fetch('/api/schedules', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${API_KEY}`
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showNotification('Scheduled message created successfully!');
+                    clearForm('scheduled');
+                    loadData();
+                } else {
+                    showNotification('Error: ' + result.error, 'error');
+                }
+            } catch (error) {
+                showNotification('Error creating message: ' + error.message, 'error');
+            }
+        });
+
+        // Delete function
+        async function deleteMessage(type, id) {
+            if (!confirm('Are you sure you want to delete this message?')) {
+                return;
+            }
+            
+            const endpoint = type === 'welcome' ? 
+                `/api/messages/welcome-messages/${id}` : 
+                `/api/schedules/${id}`;
+            
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${API_KEY}`
+                    }
+                });
+                
+                if (response.ok) {
+                    showNotification('Message deleted successfully!');
+                    loadData();
+                } else {
+                    showNotification('Error deleting message', 'error');
+                }
+            } catch (error) {
+                showNotification('Error: ' + error.message, 'error');
+            }
+        }
+
+        // Initialize
+        updateScheduleFields();
+        loadData();
+    </script>
+</body>
+</html>
