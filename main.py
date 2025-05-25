@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 import firebase
 from discord_api import DiscordAPI
 from zwift import ZwiftAPI
+import pytz
 
 # Load environment variables from .env file
 load_dotenv()
@@ -742,7 +743,11 @@ def get_due_scheduled_messages():
         due_messages = []
         # Get current time as datetime
         from datetime import datetime, timezone
-        current_time = datetime.now(timezone.utc)
+        import pytz
+        
+        # Use Central European Time for consistency
+        cet = pytz.timezone('Europe/Berlin')
+        current_time = datetime.now(cet)
         
         for schedule in schedules:
             if not schedule.get('active', False):
@@ -753,17 +758,22 @@ def get_due_scheduled_messages():
             if next_run:
                 # Convert Firebase timestamp to datetime for comparison
                 if hasattr(next_run, 'seconds'):
-                    # It's a Firebase Timestamp
-                    next_run_datetime = datetime.fromtimestamp(next_run.seconds, tz=timezone.utc)
+                    # It's a Firebase Timestamp - convert to CET
+                    next_run_datetime = datetime.fromtimestamp(next_run.seconds, tz=cet)
                 elif isinstance(next_run, datetime):
-                    # Already a datetime
-                    next_run_datetime = next_run
-                    if next_run_datetime.tzinfo is None:
-                        next_run_datetime = next_run_datetime.replace(tzinfo=timezone.utc)
+                    # Already a datetime - ensure it's in CET
+                    if next_run.tzinfo is None:
+                        next_run_datetime = cet.localize(next_run)
+                    else:
+                        next_run_datetime = next_run.astimezone(cet)
                 else:
-                    # Try converting to datetime
+                    # Try converting to datetime and set to CET
                     try:
-                        next_run_datetime = datetime.fromisoformat(str(next_run)).replace(tzinfo=timezone.utc)
+                        next_run_datetime = datetime.fromisoformat(str(next_run))
+                        if next_run_datetime.tzinfo is None:
+                            next_run_datetime = cet.localize(next_run_datetime)
+                        else:
+                            next_run_datetime = next_run_datetime.astimezone(cet)
                     except:
                         continue
                 
@@ -795,17 +805,51 @@ def mark_scheduled_message_sent(schedule_id):
         
         # Calculate next run time based on schedule type
         from datetime import datetime, timezone, timedelta
-        current_time = datetime.now(timezone.utc)
+        import calendar
+        import pytz
+        
+        # Use Central European Time
+        cet = pytz.timezone('Europe/Berlin')  # CET/CEST timezone
+        current_time = datetime.now(cet)
         next_run = None
         
         schedule_type = schedule_config.get('type', 'weekly')
+        schedule_time = schedule_config.get('time', '18:00')
+        
+        # Parse the schedule time (format: "HH:MM")
+        try:
+            time_parts = schedule_time.split(':')
+            schedule_hour = int(time_parts[0])
+            schedule_minute = int(time_parts[1])
+        except (ValueError, IndexError):
+            schedule_hour = 18
+            schedule_minute = 0
         
         if schedule_type == 'daily':
-            next_run = current_time + timedelta(days=1)
+            # Calculate next daily occurrence (tomorrow at the scheduled time)
+            next_run = current_time.replace(hour=schedule_hour, minute=schedule_minute, second=0, microsecond=0) + timedelta(days=1)
+            
         elif schedule_type == 'weekly':
-            next_run = current_time + timedelta(weeks=1)
+            # Calculate next weekly occurrence (same day next week)
+            next_run = current_time.replace(hour=schedule_hour, minute=schedule_minute, second=0, microsecond=0) + timedelta(weeks=1)
+            
         elif schedule_type == 'monthly':
-            next_run = current_time + timedelta(days=30)
+            # Calculate next monthly occurrence
+            next_run = current_time.replace(hour=schedule_hour, minute=schedule_minute, second=0, microsecond=0)
+            
+            # Handle month rollover
+            if current_time.month == 12:
+                next_run = next_run.replace(year=current_time.year + 1, month=1)
+            else:
+                next_run = next_run.replace(month=current_time.month + 1)
+                
+            # Handle day overflow (e.g., Jan 31 -> Feb 28)
+            try:
+                next_run = next_run.replace(day=current_time.day)
+            except ValueError:
+                # Day doesn't exist in target month, use last day of month
+                last_day = calendar.monthrange(next_run.year, next_run.month)[1]
+                next_run = next_run.replace(day=last_day)
         
         # Convert to Firebase timestamp
         import firebase_admin
@@ -850,16 +894,74 @@ def manage_scheduled_messages():
             
             if schedule_config:
                 from datetime import datetime, timezone, timedelta
+                import calendar
+                
+                # Use Central European Time
+                cet = pytz.timezone('Europe/Berlin')  # CET/CEST timezone
+                current_time = datetime.now(cet)
                 
                 schedule_type = schedule_config.get('type', 'weekly')
-                current_time = datetime.now(timezone.utc)
+                schedule_time = schedule_config.get('time', '18:00')  # Default to 6 PM
+                
+                # Parse the schedule time (format: "HH:MM")
+                try:
+                    time_parts = schedule_time.split(':')
+                    schedule_hour = int(time_parts[0])
+                    schedule_minute = int(time_parts[1])
+                except (ValueError, IndexError):
+                    schedule_hour = 18
+                    schedule_minute = 0
                 
                 if schedule_type == 'daily':
-                    next_run = current_time + timedelta(days=1)
+                    # Calculate next daily occurrence
+                    next_run = current_time.replace(hour=schedule_hour, minute=schedule_minute, second=0, microsecond=0)
+                    # If the time has already passed today, schedule for tomorrow
+                    if next_run <= current_time:
+                        next_run += timedelta(days=1)
+                        
                 elif schedule_type == 'weekly':
-                    next_run = current_time + timedelta(weeks=1)
+                    schedule_day = schedule_config.get('day', 'monday').lower()
+                    
+                    # Map day names to weekday numbers (Monday = 0)
+                    day_map = {
+                        'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3,
+                        'friday': 4, 'saturday': 5, 'sunday': 6
+                    }
+                    target_weekday = day_map.get(schedule_day, 0)
+                    
+                    # Calculate next weekly occurrence
+                    current_weekday = current_time.weekday()
+                    days_ahead = target_weekday - current_weekday
+                    
+                    if days_ahead < 0:  # Target day already happened this week
+                        days_ahead += 7
+                    elif days_ahead == 0:  # Target day is today
+                        # Check if the time has already passed
+                        today_at_time = current_time.replace(hour=schedule_hour, minute=schedule_minute, second=0, microsecond=0)
+                        if today_at_time <= current_time:
+                            days_ahead = 7  # Schedule for next week
+                    
+                    next_run = current_time.replace(hour=schedule_hour, minute=schedule_minute, second=0, microsecond=0) + timedelta(days=days_ahead)
+                    
                 elif schedule_type == 'monthly':
-                    next_run = current_time + timedelta(days=30)
+                    # Calculate next monthly occurrence (same day of month)
+                    next_run = current_time.replace(hour=schedule_hour, minute=schedule_minute, second=0, microsecond=0)
+                    
+                    # If the time has already passed today, schedule for next month
+                    if next_run <= current_time:
+                        # Handle month rollover
+                        if current_time.month == 12:
+                            next_run = next_run.replace(year=current_time.year + 1, month=1)
+                        else:
+                            next_run = next_run.replace(month=current_time.month + 1)
+                            
+                        # Handle day overflow (e.g., Jan 31 -> Feb 28)
+                        try:
+                            next_run = next_run.replace(day=current_time.day)
+                        except ValueError:
+                            # Day doesn't exist in target month, use last day of month
+                            last_day = calendar.monthrange(next_run.year, next_run.month)[1]
+                            next_run = next_run.replace(day=last_day)
             
             # Add metadata - use datetime objects directly
             schedule_data = {
@@ -977,17 +1079,81 @@ def update_scheduled_message(schedule_id):
         
         # Recalculate next_run time if schedule changed
         from datetime import datetime, timezone, timedelta
+        import calendar
+        import pytz
+        
         schedule_config = data.get('schedule', {})
         if schedule_config:
+            # Use Central European Time
+            cet = pytz.timezone('Europe/Berlin')
+            current_time = datetime.now(cet)
+            
             schedule_type = schedule_config.get('type', 'weekly')
-            current_time = datetime.now(timezone.utc)
+            schedule_time = schedule_config.get('time', '18:00')
+            
+            # Parse the schedule time (format: "HH:MM")
+            try:
+                time_parts = schedule_time.split(':')
+                schedule_hour = int(time_parts[0])
+                schedule_minute = int(time_parts[1])
+            except (ValueError, IndexError):
+                schedule_hour = 18
+                schedule_minute = 0
             
             if schedule_type == 'daily':
-                data['next_run'] = current_time + timedelta(days=1)
+                # Calculate next daily occurrence
+                next_run = current_time.replace(hour=schedule_hour, minute=schedule_minute, second=0, microsecond=0)
+                # If the time has already passed today, schedule for tomorrow
+                if next_run <= current_time:
+                    next_run += timedelta(days=1)
+                data['next_run'] = next_run
+                    
             elif schedule_type == 'weekly':
-                data['next_run'] = current_time + timedelta(weeks=1)
+                schedule_day = schedule_config.get('day', 'monday').lower()
+                
+                # Map day names to weekday numbers (Monday = 0)
+                day_map = {
+                    'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3,
+                    'friday': 4, 'saturday': 5, 'sunday': 6
+                }
+                target_weekday = day_map.get(schedule_day, 0)
+                
+                # Calculate next weekly occurrence
+                current_weekday = current_time.weekday()
+                days_ahead = target_weekday - current_weekday
+                
+                if days_ahead < 0:  # Target day already happened this week
+                    days_ahead += 7
+                elif days_ahead == 0:  # Target day is today
+                    # Check if the time has already passed
+                    today_at_time = current_time.replace(hour=schedule_hour, minute=schedule_minute, second=0, microsecond=0)
+                    if today_at_time <= current_time:
+                        days_ahead = 7  # Schedule for next week
+                
+                next_run = current_time.replace(hour=schedule_hour, minute=schedule_minute, second=0, microsecond=0) + timedelta(days=days_ahead)
+                data['next_run'] = next_run
+                
             elif schedule_type == 'monthly':
-                data['next_run'] = current_time + timedelta(days=30)
+                # Calculate next monthly occurrence (same day of month)
+                next_run = current_time.replace(hour=schedule_hour, minute=schedule_minute, second=0, microsecond=0)
+                
+                # If the time has already passed today, schedule for next month
+                if next_run <= current_time:
+                    # Handle month rollover
+                    if current_time.month == 12:
+                        next_run = next_run.replace(year=current_time.year + 1, month=1)
+                    else:
+                        next_run = next_run.replace(month=current_time.month + 1)
+                        
+                    # Handle day overflow (e.g., Jan 31 -> Feb 28)
+                    try:
+                        next_run = next_run.replace(day=current_time.day)
+                    except ValueError:
+                        # Day doesn't exist in target month, use last day of month
+                        last_day = calendar.monthrange(next_run.year, next_run.month)[1]
+                        next_run = next_run.replace(day=last_day)
+                
+                data['next_run'] = next_run
         
         # Add update metadata
         update_data = {
