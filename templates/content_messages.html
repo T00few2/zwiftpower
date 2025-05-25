@@ -327,56 +327,61 @@
             </div>
             
             <div class="variables-help">
-                <h4>📝 Available Variables</h4>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 10px;">
-                    <div>
-                        <p><strong>👤 User Variables:</strong></p>
-                        <p><code>{username}</code> - User's Discord username</p>
-                        <p><code>{mention}</code> - Mentions the user (@username)</p>
-                        <p><code>{display_name}</code> - Server nickname or username</p>
-                        <p><code>{user_id}</code> - Discord user ID</p>
+                <h4 onclick="toggleVariables('welcome')" style="cursor: pointer; user-select: none; display: flex; align-items: center; justify-content: space-between;">
+                    📝 Available Variables 
+                    <span id="welcome-variables-arrow" style="transition: transform 0.3s;">▼</span>
+                </h4>
+                <div id="welcome-variables-content" style="display: none;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 10px;">
+                        <div>
+                            <p><strong>👤 User Variables:</strong></p>
+                            <p><code>{username}</code> - User's Discord username</p>
+                            <p><code>{mention}</code> - Mentions the user (@username)</p>
+                            <p><code>{display_name}</code> - Server nickname or username</p>
+                            <p><code>{user_id}</code> - Discord user ID</p>
+                        </div>
+                        <div>
+                            <p><strong>🏠 Server Variables:</strong></p>
+                            <p><code>{server_name}</code> - Discord server name</p>
+                            <p><code>{member_count}</code> - Total server members</p>
+                            <p><code>{channel_name}</code> - Current channel name</p>
+                        </div>
                     </div>
-                    <div>
-                        <p><strong>🏠 Server Variables:</strong></p>
-                        <p><code>{server_name}</code> - Discord server name</p>
-                        <p><code>{member_count}</code> - Total server members</p>
-                        <p><code>{channel_name}</code> - Current channel name</p>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 10px;">
+                        <div>
+                            <p><strong>📅 Date/Time Variables:</strong></p>
+                            <p><code>{date}</code> - Current date (YYYY-MM-DD)</p>
+                            <p><code>{time}</code> - Current time (HH:MM)</p>
+                            <p><code>{datetime}</code> - Full date and time</p>
+                            <p><code>{timestamp}</code> - Unix timestamp</p>
+                        </div>
+                        <div>
+                            <p><strong>🚴 Zwift Variables:</strong></p>
+                            <p><code>{zwift_id}</code> - User's Zwift ID</p>
+                            <p><code>{zwift_name}</code> - Zwift display name</p>
+                            <p><code>{racing_score}</code> - Zwift racing score</p>
+                        </div>
                     </div>
-                </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 10px;">
-                    <div>
-                        <p><strong>📅 Date/Time Variables:</strong></p>
-                        <p><code>{date}</code> - Current date (YYYY-MM-DD)</p>
-                        <p><code>{time}</code> - Current time (HH:MM)</p>
-                        <p><code>{datetime}</code> - Full date and time</p>
-                        <p><code>{timestamp}</code> - Unix timestamp</p>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                        <div>
+                            <p><strong>✨ Special Variables:</strong></p>
+                            <p><code>{random_emoji}</code> - Random emoji</p>
+                            <p><code>{role_mention}</code> - Mention a role</p>
+                            <p><code>{join_position}</code> - Member join order</p>
+                        </div>
+                        <div>
+                            <p><strong>📢 Channel Mentions:</strong></p>
+                            <p><code>&lt;#CHANNEL_ID&gt;</code> - Link to channel</p>
+                            <p><em>Example:</em> <code>&lt;#123456789012345678&gt;</code></p>
+                            <p><em>Note:</em> Use actual channel ID, not name</p>
+                        </div>
                     </div>
-                    <div>
-                        <p><strong>🚴 Zwift Variables:</strong></p>
-                        <p><code>{zwift_id}</code> - User's Zwift ID</p>
-                        <p><code>{zwift_name}</code> - Zwift display name</p>
-                        <p><code>{racing_score}</code> - Zwift racing score</p>
+                    <div style="background: #f0f8ff; padding: 10px; border-radius: 5px; margin-top: 10px;">
+                        <p><strong>💡 Usage Examples:</strong></p>
+                        <p>• <code>Welcome {mention} to {server_name}!</code></p>
+                        <p>• <code>Check out &lt;#123456789012345678&gt; for updates</code></p>
+                        <p>• <code>Today is {date} and we have {member_count} members!</code></p>
                     </div>
-                </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                    <div>
-                        <p><strong>✨ Special Variables:</strong></p>
-                        <p><code>{random_emoji}</code> - Random emoji</p>
-                        <p><code>{role_mention}</code> - Mention a role</p>
-                        <p><code>{join_position}</code> - Member join order</p>
-                    </div>
-                    <div>
-                        <p><strong>📢 Channel Mentions:</strong></p>
-                        <p><code>&lt;#CHANNEL_ID&gt;</code> - Link to channel</p>
-                        <p><em>Example:</em> <code>&lt;#123456789012345678&gt;</code></p>
-                        <p><em>Note:</em> Use actual channel ID, not name</p>
-                    </div>
-                </div>
-                <div style="background: #f0f8ff; padding: 10px; border-radius: 5px; margin-top: 10px;">
-                    <p><strong>💡 Usage Examples:</strong></p>
-                    <p>• <code>Welcome {mention} to {server_name}!</code></p>
-                    <p>• <code>Check out &lt;#123456789012345678&gt; for updates</code></p>
-                    <p>• <code>Today is {date} and we have {member_count} members!</code></p>
                 </div>
             </div>
             
@@ -437,57 +442,62 @@
             </div>
             
             <div class="variables-help">
-                <h4>📝 Available Variables</h4>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 10px;">
-                    <div>
-                        <p><strong>👤 User Variables:</strong></p>
-                        <p><code>{username}</code> - User's Discord username</p>
-                        <p><code>{mention}</code> - Mentions the user (@username)</p>
-                        <p><code>{display_name}</code> - Server nickname or username</p>
-                        <p><code>{user_id}</code> - Discord user ID</p>
+                <h4 onclick="toggleVariables('scheduled')" style="cursor: pointer; user-select: none; display: flex; align-items: center; justify-content: space-between;">
+                    📝 Available Variables 
+                    <span id="scheduled-variables-arrow" style="transition: transform 0.3s;">▼</span>
+                </h4>
+                <div id="scheduled-variables-content" style="display: none;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 10px;">
+                        <div>
+                            <p><strong>👤 User Variables:</strong></p>
+                            <p><code>{username}</code> - User's Discord username</p>
+                            <p><code>{mention}</code> - Mentions the user (@username)</p>
+                            <p><code>{display_name}</code> - Server nickname or username</p>
+                            <p><code>{user_id}</code> - Discord user ID</p>
+                        </div>
+                        <div>
+                            <p><strong>🏠 Server Variables:</strong></p>
+                            <p><code>{server_name}</code> - Discord server name</p>
+                            <p><code>{member_count}</code> - Total server members</p>
+                            <p><code>{channel_name}</code> - Current channel name</p>
+                        </div>
                     </div>
-                    <div>
-                        <p><strong>🏠 Server Variables:</strong></p>
-                        <p><code>{server_name}</code> - Discord server name</p>
-                        <p><code>{member_count}</code> - Total server members</p>
-                        <p><code>{channel_name}</code> - Current channel name</p>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 10px;">
+                        <div>
+                            <p><strong>📅 Date/Time Variables:</strong></p>
+                            <p><code>{date}</code> - Current date (YYYY-MM-DD)</p>
+                            <p><code>{time}</code> - Current time (HH:MM)</p>
+                            <p><code>{datetime}</code> - Full date and time</p>
+                            <p><code>{timestamp}</code> - Unix timestamp</p>
+                        </div>
+                        <div>
+                            <p><strong>🚴 Zwift Variables:</strong></p>
+                            <p><code>{zwift_id}</code> - User's Zwift ID</p>
+                            <p><code>{zwift_name}</code> - Zwift display name</p>
+                            <p><code>{racing_score}</code> - Zwift racing score</p>
+                        </div>
                     </div>
-                </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 10px;">
-                    <div>
-                        <p><strong>📅 Date/Time Variables:</strong></p>
-                        <p><code>{date}</code> - Current date (YYYY-MM-DD)</p>
-                        <p><code>{time}</code> - Current time (HH:MM)</p>
-                        <p><code>{datetime}</code> - Full date and time</p>
-                        <p><code>{timestamp}</code> - Unix timestamp</p>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                        <div>
+                            <p><strong>✨ Special Variables:</strong></p>
+                            <p><code>{random_emoji}</code> - Random emoji</p>
+                            <p><code>{role_mention}</code> - Mention a role</p>
+                            <p><code>{join_position}</code> - Member join order</p>
+                        </div>
+                        <div>
+                            <p><strong>📢 Channel Mentions:</strong></p>
+                            <p><code>&lt;#CHANNEL_ID&gt;</code> - Link to channel</p>
+                            <p><em>Example:</em> <code>&lt;#123456789012345678&gt;</code></p>
+                            <p><em>Note:</em> Use actual channel ID, not name</p>
+                        </div>
                     </div>
-                    <div>
-                        <p><strong>🚴 Zwift Variables:</strong></p>
-                        <p><code>{zwift_id}</code> - User's Zwift ID</p>
-                        <p><code>{zwift_name}</code> - Zwift display name</p>
-                        <p><code>{racing_score}</code> - Zwift racing score</p>
+                    <div style="background: #f0f8ff; padding: 10px; border-radius: 5px; margin-top: 10px;">
+                        <p><strong>💡 Usage Examples:</strong></p>
+                        <p>• <code>🏁 Race reminder! Join us at {time} today</code></p>
+                        <p>• <code>📢 Weekly update for {server_name} - {date}</code></p>
+                        <p>• <code>Check the race schedule in &lt;#123456789012345678&gt;</code></p>
+                        <p>• <code>We now have {member_count} members! 🎉</code></p>
                     </div>
-                </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                    <div>
-                        <p><strong>✨ Special Variables:</strong></p>
-                        <p><code>{random_emoji}</code> - Random emoji</p>
-                        <p><code>{role_mention}</code> - Mention a role</p>
-                        <p><code>{join_position}</code> - Member join order</p>
-                    </div>
-                    <div>
-                        <p><strong>📢 Channel Mentions:</strong></p>
-                        <p><code>&lt;#CHANNEL_ID&gt;</code> - Link to channel</p>
-                        <p><em>Example:</em> <code>&lt;#123456789012345678&gt;</code></p>
-                        <p><em>Note:</em> Use actual channel ID, not name</p>
-                    </div>
-                </div>
-                <div style="background: #f0f8ff; padding: 10px; border-radius: 5px; margin-top: 10px;">
-                    <p><strong>💡 Usage Examples:</strong></p>
-                    <p>• <code>🏁 Race reminder! Join us at {time} today</code></p>
-                    <p>• <code>📢 Weekly update for {server_name} - {date}</code></p>
-                    <p>• <code>Check the race schedule in &lt;#123456789012345678&gt;</code></p>
-                    <p>• <code>We now have {member_count} members! 🎉</code></p>
                 </div>
             </div>
             
@@ -566,6 +576,20 @@
             const embedFields = document.getElementById('welcome-embed-fields');
             const checkbox = document.getElementById('welcome-has-embed');
             embedFields.style.display = checkbox.checked ? 'block' : 'none';
+        }
+
+        // Toggle variables section
+        function toggleVariables(type) {
+            const content = document.getElementById(`${type}-variables-content`);
+            const arrow = document.getElementById(`${type}-variables-arrow`);
+            
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+                arrow.style.transform = 'rotate(180deg)';
+            } else {
+                content.style.display = 'none';
+                arrow.style.transform = 'rotate(0deg)';
+            }
         }
 
         // Update schedule fields based on type
