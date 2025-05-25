@@ -749,12 +749,18 @@ def get_due_scheduled_messages():
         cet = pytz.timezone('Europe/Berlin')
         current_time = datetime.now(cet)
         
+        print(f"[DEBUG] Checking for due messages at {current_time}")
+        
         for schedule in schedules:
             if not schedule.get('active', False):
                 continue
                 
             # Check if message is due
             next_run = schedule.get('next_run')
+            last_sent = schedule.get('last_sent')
+            
+            print(f"[DEBUG] Schedule {schedule.get('id', 'unknown')}: next_run={next_run}, last_sent={last_sent}")
+            
             if next_run:
                 # Convert Firebase timestamp to datetime for comparison
                 if hasattr(next_run, 'seconds'):
@@ -777,10 +783,16 @@ def get_due_scheduled_messages():
                     except:
                         continue
                 
+                print(f"[DEBUG] Schedule {schedule.get('id', 'unknown')}: next_run_datetime={next_run_datetime}, current_time={current_time}")
+                
                 # Check if it's due
                 if current_time >= next_run_datetime:
+                    print(f"[DEBUG] Schedule {schedule.get('id', 'unknown')} is DUE!")
                     due_messages.append(schedule)
+                else:
+                    print(f"[DEBUG] Schedule {schedule.get('id', 'unknown')} is not due yet")
         
+        print(f"[DEBUG] Found {len(due_messages)} due messages")
         return jsonify(due_messages)
     except Exception as e:
         print(f"Error in get_due_scheduled_messages: {str(e)}")
@@ -793,15 +805,20 @@ def mark_scheduled_message_sent(schedule_id):
         return jsonify({"error": "Unauthorized"}), 401
     
     try:
+        print(f"[DEBUG] Marking schedule {schedule_id} as sent")
+        
         # Get the schedule document
         doc_ref = firebase.db.collection('scheduled_messages').document(schedule_id)
         doc = doc_ref.get()
         
         if not doc.exists:
+            print(f"[DEBUG] Schedule {schedule_id} not found")
             return jsonify({"error": "Schedule not found"}), 404
         
         schedule_data = doc.to_dict()
         schedule_config = schedule_data.get('schedule', {})
+        
+        print(f"[DEBUG] Schedule {schedule_id} config: {schedule_config}")
         
         # Calculate next run time based on schedule type
         from datetime import datetime, timezone, timedelta
@@ -815,6 +832,8 @@ def mark_scheduled_message_sent(schedule_id):
         
         schedule_type = schedule_config.get('type', 'weekly')
         schedule_time = schedule_config.get('time', '18:00')
+        
+        print(f"[DEBUG] Schedule {schedule_id}: type={schedule_type}, time={schedule_time}")
         
         # Parse the schedule time (format: "HH:MM")
         try:
@@ -851,6 +870,8 @@ def mark_scheduled_message_sent(schedule_id):
                 last_day = calendar.monthrange(next_run.year, next_run.month)[1]
                 next_run = next_run.replace(day=last_day)
         
+        print(f"[DEBUG] Schedule {schedule_id}: calculated next_run={next_run}")
+        
         # Convert to Firebase timestamp
         import firebase_admin
         next_run_timestamp = firebase_admin.firestore.firestore.Timestamp.from_datetime(next_run)
@@ -862,7 +883,11 @@ def mark_scheduled_message_sent(schedule_id):
             'next_run': next_run_timestamp
         }
         
+        print(f"[DEBUG] Schedule {schedule_id}: updating with last_sent={current_time}, next_run={next_run}")
+        
         doc_ref.update(update_data)
+        
+        print(f"[DEBUG] Schedule {schedule_id}: successfully updated")
         
         return jsonify({
             "status": "success", 
@@ -1170,6 +1195,77 @@ def update_scheduled_message(schedule_id):
         updated_doc["id"] = schedule_id
         
         return jsonify({"status": "success", "schedule": updated_doc})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/schedules/debug', methods=['GET'])
+def debug_scheduled_messages():
+    """Debug endpoint to check the current status of all scheduled messages"""
+    if not verify_api_key():
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        # Get all schedules with document IDs
+        schedules = firebase.get_collection('scheduled_messages', limit=100, include_id=True)
+        
+        from datetime import datetime
+        import pytz
+        
+        # Use Central European Time for consistency
+        cet = pytz.timezone('Europe/Berlin')
+        current_time = datetime.now(cet)
+        
+        debug_info = {
+            "current_time": current_time.isoformat(),
+            "total_schedules": len(schedules),
+            "schedules": []
+        }
+        
+        for schedule in schedules:
+            next_run = schedule.get('next_run')
+            last_sent = schedule.get('last_sent')
+            
+            # Convert timestamps to readable format
+            next_run_str = None
+            last_sent_str = None
+            
+            if next_run:
+                if hasattr(next_run, 'seconds'):
+                    next_run_datetime = datetime.fromtimestamp(next_run.seconds, tz=cet)
+                    next_run_str = next_run_datetime.isoformat()
+                elif isinstance(next_run, datetime):
+                    if next_run.tzinfo is None:
+                        next_run_datetime = cet.localize(next_run)
+                    else:
+                        next_run_datetime = next_run.astimezone(cet)
+                    next_run_str = next_run_datetime.isoformat()
+            
+            if last_sent:
+                if hasattr(last_sent, 'seconds'):
+                    last_sent_datetime = datetime.fromtimestamp(last_sent.seconds, tz=cet)
+                    last_sent_str = last_sent_datetime.isoformat()
+                elif isinstance(last_sent, datetime):
+                    if last_sent.tzinfo is None:
+                        last_sent_datetime = cet.localize(last_sent)
+                    else:
+                        last_sent_datetime = last_sent.astimezone(cet)
+                    last_sent_str = last_sent_datetime.isoformat()
+            
+            schedule_debug = {
+                "id": schedule.get('id'),
+                "title": schedule.get('title', 'No title'),
+                "active": schedule.get('active', False),
+                "schedule_type": schedule.get('schedule', {}).get('type'),
+                "schedule_time": schedule.get('schedule', {}).get('time'),
+                "schedule_day": schedule.get('schedule', {}).get('day'),
+                "next_run": next_run_str,
+                "last_sent": last_sent_str,
+                "is_due": next_run_str and current_time.isoformat() >= next_run_str if next_run_str else False
+            }
+            
+            debug_info["schedules"].append(schedule_debug)
+        
+        return jsonify(debug_info)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
