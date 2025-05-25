@@ -263,6 +263,24 @@
             white-space: pre-wrap;
             word-wrap: break-word;
         }
+        .variables-help {
+            margin-bottom: 15px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            border-left: 4px solid #667eea;
+        }
+        .variables-help h4 {
+            margin: 0 0 10px 0;
+            color: #667eea;
+        }
+        .variables-help p {
+            margin: 5px 0;
+            font-size: 0.9em;
+        }
+        .variables-help p strong {
+            color: #495057;
+        }
     </style>
 </head>
 <body data-api-key="{{ api_key }}">
@@ -306,6 +324,17 @@
             <div class="form-group">
                 <label for="welcome-content">Message Content:</label>
                 <textarea id="welcome-content" name="content" placeholder="Welcome {username} to {server_name}! Use variables like {username}, {mention}, {server_name}, {member_count}" required></textarea>
+            </div>
+            
+            <div class="variables-help">
+                <h4>📝 Available Variables</h4>
+                <p><strong>User:</strong> username, mention, display_name, user_id</p>
+                <p><strong>Server:</strong> server_name, member_count, channel_name</p>
+                <p><strong>Date/Time:</strong> date, time, datetime, timestamp</p>
+                <p><strong>Zwift:</strong> zwift_id, zwift_name, racing_score</p>
+                <p><strong>Special:</strong> random_emoji, role_mention, join_position</p>
+                <p><strong>Channels:</strong> #general, #announcements, #racing, #zwift-chat, #results, #welcome</p>
+                <p><em>Use variables like: {username}, {mention}, {server_name}, etc.</em></p>
             </div>
             
             <div class="checkbox-group">
@@ -362,6 +391,17 @@
             <div class="form-group">
                 <label for="scheduled-content">Message Content:</label>
                 <textarea id="scheduled-content" name="content" placeholder="Don't forget about tonight's race! Use variables like {server_name}, {date}, {time}" required></textarea>
+            </div>
+            
+            <div class="variables-help">
+                <h4>📝 Available Variables</h4>
+                <p><strong>User:</strong> username, mention, display_name, user_id</p>
+                <p><strong>Server:</strong> server_name, member_count, channel_name</p>
+                <p><strong>Date/Time:</strong> date, time, datetime, timestamp</p>
+                <p><strong>Zwift:</strong> zwift_id, zwift_name, racing_score</p>
+                <p><strong>Special:</strong> random_emoji, role_mention, join_position</p>
+                <p><strong>Channels:</strong> #general, #announcements, #racing, #zwift-chat, #results, #welcome</p>
+                <p><em>Use variables like: {server_name}, {date}, {time}, etc.</em></p>
             </div>
             
             <div class="form-group">
@@ -591,10 +631,29 @@
                     nextRunDisplay = `${dateStr} at ${timeStr}`;
                 }
                 
+                // Format schedule information
+                let scheduleInfo = 'No schedule';
+                if (message.schedule) {
+                    const scheduleType = message.schedule.type || 'unknown';
+                    const scheduleTime = message.schedule.time || '';
+                    const scheduleDay = message.schedule.day || '';
+                    
+                    if (scheduleType === 'daily') {
+                        scheduleInfo = `Daily at ${scheduleTime}`;
+                    } else if (scheduleType === 'weekly') {
+                        scheduleInfo = `Weekly on ${scheduleDay} at ${scheduleTime}`;
+                    } else if (scheduleType === 'monthly') {
+                        scheduleInfo = `Monthly at ${scheduleTime}`;
+                    } else {
+                        scheduleInfo = `${scheduleType} at ${scheduleTime}`;
+                    }
+                }
+                
                 item.innerHTML = `
                     <div class="message-content">
                         <div class="message-title">${message.title}</div>
                         <div class="message-preview">${preview}</div>
+                        <div class="message-preview">Schedule: ${scheduleInfo}</div>
                         <div class="message-preview">Next run: ${nextRunDisplay}</div>
                     </div>
                     <span class="message-status ${message.active ? 'status-active' : 'status-inactive'}">
