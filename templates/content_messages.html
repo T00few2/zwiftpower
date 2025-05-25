@@ -265,7 +265,7 @@
         }
     </style>
 </head>
-<body>
+<body data-api-key="{{ api_key }}">
     <div class="header">
         <h1>🤖 DZRDiscord Bot Content Management</h1>
         <p>Manage welcome messages and scheduled content for the DZR Discord server</p>
@@ -584,7 +584,7 @@
     </div>
 
     <script>
-        const API_KEY = '{{ api_key }}'; // Gets the API key from the server
+        const API_KEY = document.body.getAttribute('data-api-key'); // Gets the API key from the data attribute
         let welcomeMessages = [];
         let scheduledMessages = [];
 
@@ -753,13 +753,20 @@
                 const preview = message.content.length > 100 ? 
                     message.content.substring(0, 100) + '...' : message.content;
                 
-                const nextRun = message.next_run ? new Date(message.next_run).toLocaleString() : 'Not scheduled';
+                // Format next run date and time more clearly
+                let nextRunDisplay = 'Not scheduled';
+                if (message.next_run) {
+                    const nextRunDate = new Date(message.next_run);
+                    const dateStr = nextRunDate.toLocaleDateString();
+                    const timeStr = nextRunDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                    nextRunDisplay = `${dateStr} at ${timeStr}`;
+                }
                 
                 item.innerHTML = `
                     <div class="message-content">
                         <div class="message-title">${message.title}</div>
                         <div class="message-preview">${preview}</div>
-                        <div class="message-preview">Next run: ${nextRun}</div>
+                        <div class="message-preview">Next run: ${nextRunDisplay}</div>
                     </div>
                     <span class="message-status ${message.active ? 'status-active' : 'status-inactive'}">
                         ${message.active ? 'Active' : 'Inactive'}
