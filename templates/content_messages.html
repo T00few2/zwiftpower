@@ -530,6 +530,46 @@
                     </select>
                 </div>
                 
+                <div class="form-group" id="day-of-month-field" style="display: none;">
+                    <label for="schedule-day-of-month">Day of Month:</label>
+                    <select id="schedule-day-of-month" name="schedule_day_of_month">
+                        <option value="1">1st</option>
+                        <option value="2">2nd</option>
+                        <option value="3">3rd</option>
+                        <option value="4">4th</option>
+                        <option value="5">5th</option>
+                        <option value="6">6th</option>
+                        <option value="7">7th</option>
+                        <option value="8">8th</option>
+                        <option value="9">9th</option>
+                        <option value="10">10th</option>
+                        <option value="11">11th</option>
+                        <option value="12">12th</option>
+                        <option value="13">13th</option>
+                        <option value="14">14th</option>
+                        <option value="15">15th</option>
+                        <option value="16">16th</option>
+                        <option value="17">17th</option>
+                        <option value="18">18th</option>
+                        <option value="19">19th</option>
+                        <option value="20">20th</option>
+                        <option value="21">21st</option>
+                        <option value="22">22nd</option>
+                        <option value="23">23rd</option>
+                        <option value="24">24th</option>
+                        <option value="25">25th</option>
+                        <option value="26">26th</option>
+                        <option value="27">27th</option>
+                        <option value="28">28th</option>
+                        <option value="29">29th</option>
+                        <option value="30">30th</option>
+                        <option value="31">31st</option>
+                    </select>
+                    <small style="color: #666; font-size: 0.85em; display: block; margin-top: 5px;">
+                        Note: If the selected day doesn't exist in a month (e.g., 31st in February), the message will be sent on the last day of that month.
+                    </small>
+                </div>
+                
                 <div class="form-group">
                     <label for="schedule-time">Time (24h format):</label>
                     <input type="time" id="schedule-time" name="schedule_time" value="18:00">
@@ -557,6 +597,20 @@
         // Global variables for editing
         let editingMessage = null;
         let editingType = null;
+
+        // Helper function to get ordinal suffix
+        function getOrdinalSuffix(day) {
+            const dayNum = parseInt(day);
+            if (dayNum >= 11 && dayNum <= 13) {
+                return 'th';
+            }
+            switch (dayNum % 10) {
+                case 1: return 'st';
+                case 2: return 'nd';
+                case 3: return 'rd';
+                default: return 'th';
+            }
+        }
 
         // Tab switching
         function switchTab(tabName) {
@@ -596,11 +650,17 @@
         function updateScheduleFields() {
             const scheduleType = document.getElementById('schedule-type').value;
             const dayField = document.getElementById('day-field');
+            const dayOfMonthField = document.getElementById('day-of-month-field');
             
+            // Hide all conditional fields first
+            dayField.style.display = 'none';
+            dayOfMonthField.style.display = 'none';
+            
+            // Show appropriate field based on schedule type
             if (scheduleType === 'weekly') {
                 dayField.style.display = 'block';
-            } else {
-                dayField.style.display = 'none';
+            } else if (scheduleType === 'monthly') {
+                dayOfMonthField.style.display = 'block';
             }
         }
 
@@ -748,13 +808,15 @@
                     const scheduleType = message.schedule.type || 'unknown';
                     const scheduleTime = message.schedule.time || '';
                     const scheduleDay = message.schedule.day || '';
+                    const dayOfMonth = message.schedule.day_of_month || '';
                     
                     if (scheduleType === 'daily') {
                         scheduleInfo = `Daily at ${scheduleTime}`;
                     } else if (scheduleType === 'weekly') {
                         scheduleInfo = `Weekly on ${scheduleDay} at ${scheduleTime}`;
                     } else if (scheduleType === 'monthly') {
-                        scheduleInfo = `Monthly at ${scheduleTime}`;
+                        const dayText = dayOfMonth ? ` on the ${dayOfMonth}${getOrdinalSuffix(dayOfMonth)}` : '';
+                        scheduleInfo = `Monthly${dayText} at ${scheduleTime}`;
                     } else {
                         scheduleInfo = `${scheduleType} at ${scheduleTime}`;
                     }
@@ -864,6 +926,8 @@
             
             if (scheduleType === 'weekly') {
                 schedule.day = formData.get('schedule_day');
+            } else if (scheduleType === 'monthly') {
+                schedule.day_of_month = parseInt(formData.get('schedule_day_of_month'));
             }
             
             const data = {
@@ -975,6 +1039,9 @@
                     
                     if (message.schedule.day) {
                         document.getElementById('schedule-day').value = message.schedule.day;
+                    }
+                    if (message.schedule.day_of_month) {
+                        document.getElementById('schedule-day-of-month').value = message.schedule.day_of_month;
                     }
                     if (message.schedule.time) {
                         document.getElementById('schedule-time').value = message.schedule.time;

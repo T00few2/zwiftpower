@@ -853,6 +853,9 @@ def mark_scheduled_message_sent(schedule_id):
             next_run = current_time.replace(hour=schedule_hour, minute=schedule_minute, second=0, microsecond=0) + timedelta(weeks=1)
             
         elif schedule_type == 'monthly':
+            # Get the target day of month (default to current day if not specified)
+            target_day = schedule_config.get('day_of_month', current_time.day)
+            
             # Calculate next monthly occurrence
             next_run = current_time.replace(hour=schedule_hour, minute=schedule_minute, second=0, microsecond=0)
             
@@ -864,7 +867,7 @@ def mark_scheduled_message_sent(schedule_id):
                 
             # Handle day overflow (e.g., Jan 31 -> Feb 28)
             try:
-                next_run = next_run.replace(day=current_time.day)
+                next_run = next_run.replace(day=target_day)
             except ValueError:
                 # Day doesn't exist in target month, use last day of month
                 last_day = calendar.monthrange(next_run.year, next_run.month)[1]
@@ -964,10 +967,21 @@ def manage_scheduled_messages():
                     next_run = current_time.replace(hour=schedule_hour, minute=schedule_minute, second=0, microsecond=0) + timedelta(days=days_ahead)
                     
                 elif schedule_type == 'monthly':
-                    # Calculate next monthly occurrence (same day of month)
+                    # Get the target day of month (default to current day if not specified)
+                    target_day = schedule_config.get('day_of_month', current_time.day)
+                    
+                    # Calculate next monthly occurrence
                     next_run = current_time.replace(hour=schedule_hour, minute=schedule_minute, second=0, microsecond=0)
                     
-                    # If the time has already passed today, schedule for next month
+                    # Try to set the target day for this month first
+                    try:
+                        next_run = next_run.replace(day=target_day)
+                    except ValueError:
+                        # Day doesn't exist in current month, use last day of month
+                        last_day = calendar.monthrange(next_run.year, next_run.month)[1]
+                        next_run = next_run.replace(day=last_day)
+                    
+                    # If the time has already passed this month, schedule for next month
                     if next_run <= current_time:
                         # Handle month rollover
                         if current_time.month == 12:
@@ -975,9 +989,9 @@ def manage_scheduled_messages():
                         else:
                             next_run = next_run.replace(month=current_time.month + 1)
                             
-                        # Handle day overflow (e.g., Jan 31 -> Feb 28)
+                        # Handle day overflow for next month (e.g., Jan 31 -> Feb 28)
                         try:
-                            next_run = next_run.replace(day=current_time.day)
+                            next_run = next_run.replace(day=target_day)
                         except ValueError:
                             # Day doesn't exist in target month, use last day of month
                             last_day = calendar.monthrange(next_run.year, next_run.month)[1]
@@ -1154,10 +1168,21 @@ def update_scheduled_message(schedule_id):
                 data['next_run'] = next_run
                 
             elif schedule_type == 'monthly':
-                # Calculate next monthly occurrence (same day of month)
+                # Get the target day of month (default to current day if not specified)
+                target_day = schedule_config.get('day_of_month', current_time.day)
+                
+                # Calculate next monthly occurrence
                 next_run = current_time.replace(hour=schedule_hour, minute=schedule_minute, second=0, microsecond=0)
                 
-                # If the time has already passed today, schedule for next month
+                # Try to set the target day for this month first
+                try:
+                    next_run = next_run.replace(day=target_day)
+                except ValueError:
+                    # Day doesn't exist in current month, use last day of month
+                    last_day = calendar.monthrange(next_run.year, next_run.month)[1]
+                    next_run = next_run.replace(day=last_day)
+                
+                # If the time has already passed this month, schedule for next month
                 if next_run <= current_time:
                     # Handle month rollover
                     if current_time.month == 12:
@@ -1165,9 +1190,9 @@ def update_scheduled_message(schedule_id):
                     else:
                         next_run = next_run.replace(month=current_time.month + 1)
                         
-                    # Handle day overflow (e.g., Jan 31 -> Feb 28)
+                    # Handle day overflow for next month (e.g., Jan 31 -> Feb 28)
                     try:
-                        next_run = next_run.replace(day=current_time.day)
+                        next_run = next_run.replace(day=target_day)
                     except ValueError:
                         # Day doesn't exist in target month, use last day of month
                         last_day = calendar.monthrange(next_run.year, next_run.month)[1]
