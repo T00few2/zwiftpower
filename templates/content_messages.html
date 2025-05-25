@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Discord Bot Content Management</title>
+    <title>DZR Discord Bot Content Management</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -181,12 +181,94 @@
         .checkbox-group input[type="checkbox"] {
             width: auto;
         }
+        .variables-reference {
+            margin-top: 20px;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            border-left: 4px solid #667eea;
+        }
+        .variables-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 15px;
+        }
+        .variable-category {
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .variable-category h5 {
+            margin: 0 0 15px 0;
+            color: #667eea;
+            font-size: 1.1em;
+            border-bottom: 1px solid #e0e0e0;
+            padding-bottom: 8px;
+        }
+        .variable-item {
+            margin-bottom: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .variable-item code {
+            background-color: #e9ecef;
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            color: #495057;
+            font-size: 0.9em;
+            width: fit-content;
+        }
+        .variable-item span {
+            color: #6c757d;
+            font-size: 0.85em;
+            line-height: 1.3;
+        }
+        .variables-examples {
+            margin-top: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .variables-examples h5 {
+            margin: 0 0 15px 0;
+            color: #667eea;
+            font-size: 1.1em;
+        }
+        .example-item {
+            margin-bottom: 15px;
+            padding: 12px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            border-left: 3px solid #28a745;
+        }
+        .example-item strong {
+            color: #495057;
+            display: block;
+            margin-bottom: 5px;
+        }
+        .example-item code {
+            background-color: #e9ecef;
+            padding: 8px 12px;
+            border-radius: 4px;
+            display: block;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            color: #495057;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
     </style>
 </head>
 <body>
     <div class="header">
-        <h1>🤖 Discord Bot Content Management</h1>
-        <p>Manage welcome messages and scheduled content for your Discord server</p>
+        <h1>🤖 DZRDiscord Bot Content Management</h1>
+        <p>Manage welcome messages and scheduled content for the DZR Discord server</p>
     </div>
 
     <div class="stats">
@@ -224,6 +306,152 @@
             <div class="form-group">
                 <label for="welcome-content">Message Content:</label>
                 <textarea id="welcome-content" name="content" placeholder="Welcome {username} to {server_name}! Use variables like {username}, {mention}, {server_name}, {member_count}" required></textarea>
+            </div>
+            
+            <!-- Variables Reference -->
+            <div class="variables-reference">
+                <h4>📝 Available Variables</h4>
+                <div class="variables-grid">
+                    <div class="variable-category">
+                        <h5>👤 User Variables</h5>
+                        <div class="variable-item">
+                            <code>{username}</code>
+                            <span>Discord username (e.g., "john_doe")</span>
+                        </div>
+                        <div class="variable-item">
+                            <code>{mention}</code>
+                            <span>Discord mention (e.g., "@john_doe")</span>
+                        </div>
+                        <div class="variable-item">
+                            <code>{display_name}</code>
+                            <span>Server nickname or global name</span>
+                        </div>
+                        <div class="variable-item">
+                            <code>{user_id}</code>
+                            <span>Discord user ID</span>
+                        </div>
+                    </div>
+                    
+                    <div class="variable-category">
+                        <h5>🏠 Server Variables</h5>
+                        <div class="variable-item">
+                            <code>{server_name}</code>
+                            <span>Discord server name</span>
+                        </div>
+                        <div class="variable-item">
+                            <code>{member_count}</code>
+                            <span>Total server member count</span>
+                        </div>
+                        <div class="variable-item">
+                            <code>{channel_name}</code>
+                            <span>Current channel name</span>
+                        </div>
+                        <div class="variable-item">
+                            <code>{channel_mention}</code>
+                            <span>Mention current channel (e.g., "#general")</span>
+                        </div>
+                    </div>
+                    
+                    <div class="variable-category">
+                        <h5>📅 Date & Time Variables</h5>
+                        <div class="variable-item">
+                            <code>{date}</code>
+                            <span>Current date (YYYY-MM-DD)</span>
+                        </div>
+                        <div class="variable-item">
+                            <code>{time}</code>
+                            <span>Current time (HH:MM)</span>
+                        </div>
+                        <div class="variable-item">
+                            <code>{datetime}</code>
+                            <span>Full date and time</span>
+                        </div>
+                        <div class="variable-item">
+                            <code>{timestamp}</code>
+                            <span>Unix timestamp</span>
+                        </div>
+                    </div>
+                    
+                    <div class="variable-category">
+                        <h5>🚴 Zwift Variables</h5>
+                        <div class="variable-item">
+                            <code>{zwift_id}</code>
+                            <span>User's Zwift ID (if linked)</span>
+                        </div>
+                        <div class="variable-item">
+                            <code>{zwift_name}</code>
+                            <span>User's Zwift display name</span>
+                        </div>
+                        <div class="variable-item">
+                            <code>{racing_score}</code>
+                            <span>User's Zwift racing score</span>
+                        </div>
+                    </div>
+                    
+                    <div class="variable-category">
+                        <h5>🎯 Special Variables</h5>
+                        <div class="variable-item">
+                            <code>{random_emoji}</code>
+                            <span>Random emoji from preset list</span>
+                        </div>
+                        <div class="variable-item">
+                            <code>{role_mention}</code>
+                            <span>Mention highest role</span>
+                        </div>
+                        <div class="variable-item">
+                            <code>{join_position}</code>
+                            <span>Member join position (e.g., "42nd")</span>
+                        </div>
+                    </div>
+                    
+                    <div class="variable-category">
+                        <h5>📢 Channel Mentions</h5>
+                        <div class="variable-item">
+                            <code>{#general}</code>
+                            <span>Mention #general channel</span>
+                        </div>
+                        <div class="variable-item">
+                            <code>{#announcements}</code>
+                            <span>Mention #announcements channel</span>
+                        </div>
+                        <div class="variable-item">
+                            <code>{#racing}</code>
+                            <span>Mention #racing channel</span>
+                        </div>
+                        <div class="variable-item">
+                            <code>{#zwift-chat}</code>
+                            <span>Mention #zwift-chat channel</span>
+                        </div>
+                        <div class="variable-item">
+                            <code>{#results}</code>
+                            <span>Mention #results channel</span>
+                        </div>
+                        <div class="variable-item">
+                            <code>{#welcome}</code>
+                            <span>Mention #welcome channel</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="variables-examples">
+                    <h5>💡 Example Usage</h5>
+                    <div class="example-item">
+                        <strong>Welcome Message:</strong><br>
+                        <code>Welcome {mention} to {server_name}! You're our {join_position} member! 🎉 Check out {#general} for chat and {#racing} for upcoming events!</code>
+                    </div>
+                    <div class="example-item">
+                        <strong>Zwift Integration:</strong><br>
+                        <code>Hey {display_name}! Your Zwift ID {zwift_id} has been linked. Racing score: {racing_score}. Share your results in {#results}!</code>
+                    </div>
+                    <div class="example-item">
+                        <strong>Channel Redirect:</strong><br>
+                        <code>Thanks for joining! Please head over to {#welcome} to introduce yourself and check {#announcements} for important updates.</code>
+                    </div>
+                    <div class="example-item">
+                        <strong>Race Announcement:</strong><br>
+                        <code>🏁 Race reminder for {date} at {time}! Join the discussion in {#racing} and see you on Zwift, {server_name} riders!</code>
+                    </div>
+                </div>
             </div>
             
             <div class="checkbox-group">
@@ -280,6 +508,31 @@
             <div class="form-group">
                 <label for="scheduled-content">Message Content:</label>
                 <textarea id="scheduled-content" name="content" placeholder="Don't forget about tonight's race! Use variables like {server_name}, {date}, {time}" required></textarea>
+            </div>
+            
+            <!-- Variables Reference for Scheduled Messages -->
+            <div class="variables-reference">
+                <h4>📝 Available Variables</h4>
+                <p><em>Same variables as welcome messages are available for scheduled content.</em></p>
+                <div class="variables-examples">
+                    <h5>💡 Scheduled Message Examples</h5>
+                    <div class="example-item">
+                        <strong>Race Reminder:</strong><br>
+                        <code>🏁 Race starting in 1 hour! Join us on Zwift, {server_name} riders! Today is {date}. Discuss strategy in {#racing}!</code>
+                    </div>
+                    <div class="example-item">
+                        <strong>Weekly Update:</strong><br>
+                        <code>📊 Weekly stats update for {server_name}! We now have {member_count} members! {random_emoji} Check {#announcements} for details.</code>
+                    </div>
+                    <div class="example-item">
+                        <strong>Training Reminder:</strong><br>
+                        <code>🚴‍♂️ Training session at {time}! All skill levels welcome. See you in Watopia! Chat about it in {#zwift-chat}.</code>
+                    </div>
+                    <div class="example-item">
+                        <strong>Results Posted:</strong><br>
+                        <code>🏆 Last night's race results are now available in {#results}! Great job everyone who participated!</code>
+                    </div>
+                </div>
             </div>
             
             <div class="form-group">
