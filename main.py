@@ -872,15 +872,10 @@ def mark_scheduled_message_sent(schedule_id):
         
         print(f"[DEBUG] Schedule {schedule_id}: calculated next_run={next_run}")
         
-        # Convert to Firebase timestamp
-        import firebase_admin
-        next_run_timestamp = firebase_admin.firestore.firestore.Timestamp.from_datetime(next_run)
-        current_timestamp = firebase_admin.firestore.firestore.Timestamp.from_datetime(current_time)
-        
         # Update the document
         update_data = {
-            'last_sent': current_timestamp,
-            'next_run': next_run_timestamp
+            'last_sent': current_time,
+            'next_run': next_run
         }
         
         print(f"[DEBUG] Schedule {schedule_id}: updating with last_sent={current_time}, next_run={next_run}")
