@@ -127,8 +127,16 @@
 </head>
 <body>
     <div class="header">
-        <h1>🚴 DZR Backend - Endpoint Overview</h1>
-        <p>Comprehensive API for DZR related Zwift data, Zwift Power data, ZwiftRacing data, ChatGPT commentary and Discord integration</p>
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
+            <div>
+                <h1>🚴 DZR Backend - Endpoint Overview</h1>
+                <p>Comprehensive API for DZR related Zwift data, Zwift Power data, ZwiftRacing data, ChatGPT commentary and Discord integration</p>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <a href="/dashboard" style="background: rgba(255,255,255,0.2); color: white; padding: 8px 16px; border-radius: 5px; text-decoration: none; font-size: 0.9em;">← Dashboard</a>
+                <a href="/logout" style="background: rgba(255,255,255,0.2); color: white; padding: 8px 16px; border-radius: 5px; text-decoration: none; font-size: 0.9em;">Logout</a>
+            </div>
+        </div>
         <div class="stats">
             <div class="stat">{{ endpoints|length }} Endpoints</div>
             <div class="stat">REST API</div>

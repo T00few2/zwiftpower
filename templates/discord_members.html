@@ -168,11 +168,19 @@
 </head>
 <body>
     <div class="header">
-        <h1>Discord Members - Zwift ID Assignment</h1>
-        <div>
-            <span>Total members: {{ members|length }}</span>
-            <span>With Zwift IDs: {{ linked_count }}</span>
-            <span>Without Zwift IDs: {{ unlinked_count }}</span>
+        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+            <h1>Discord Members - Zwift ID Assignment</h1>
+            <div style="display: flex; gap: 15px; align-items: center;">
+                <div style="display: flex; gap: 15px;">
+                    <span>Total: {{ members|length }}</span>
+                    <span>Linked: {{ linked_count }}</span>
+                    <span>Unlinked: {{ unlinked_count }}</span>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <a href="/dashboard" style="background: rgba(255,255,255,0.2); color: white; padding: 8px 16px; border-radius: 5px; text-decoration: none; font-size: 0.9em;">← Dashboard</a>
+                    <a href="/logout" style="background: rgba(255,255,255,0.2); color: white; padding: 8px 16px; border-radius: 5px; text-decoration: none; font-size: 0.9em;">Logout</a>
+                </div>
+            </div>
         </div>
     </div>
 

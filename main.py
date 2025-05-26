@@ -325,6 +325,7 @@ def get_discord_users():
         return jsonify({"error": str(e)}), 500
 
 @app.route('/discord/members', methods=['GET'])
+@login_required
 def get_discord_members():
     """Webapplication to assign ZwiftIDs to Discord users"""
     try:
@@ -706,6 +707,7 @@ def update_club_stats_from_queue():
         return jsonify({"status": "error", "message": str(e)}), 500
     
 @app.route('/content/messages', methods=['GET'])
+@login_required
 def content_messages():
     """Web interface for managing Discord bot messages"""
     try:
@@ -1416,7 +1418,7 @@ def discord_callback():
         next_url = session.pop('next_url', None)
         if next_url:
             return redirect(next_url)
-        return redirect(url_for('content_messages'))
+        return redirect(url_for('dashboard'))
         
     except Exception as e:
         print(f"Discord OAuth error: {e}")
@@ -1431,8 +1433,93 @@ def logout():
     flash(f'Goodbye, {username}!', 'info')
     return redirect(url_for('login'))
 
+@app.route('/dashboard')
+@login_required
+def dashboard():
+    """Admin Dashboard - Overview of Discord server stats and navigation"""
+    try:
+        # Get Discord server stats
+        discord_api = DiscordAPI(DISCORD_BOT_TOKEN, DISCORD_GUILD_ID)
+        
+        # Get basic server info
+        server_stats = {
+            'total_members': 0,
+            'linked_members': 0,
+            'unlinked_members': 0,
+            'server_name': 'DZR Discord Server'
+        }
+        
+        try:
+            # Get all members with ZwiftIDs merged
+            members = discord_api.merge_with_zwift_ids(include_role_names=True)
+            server_stats['total_members'] = len(members)
+            server_stats['linked_members'] = len([m for m in members if m.get('has_zwift_id')])
+            server_stats['unlinked_members'] = server_stats['total_members'] - server_stats['linked_members']
+        except Exception as e:
+            print(f"Error getting Discord stats: {e}")
+        
+        # Get content stats from Firebase
+        try:
+            welcome_messages = firebase.get_collection('welcome_messages', limit=100, include_id=True)
+            scheduled_messages = firebase.get_collection('scheduled_messages', limit=100, include_id=True)
+            
+            content_stats = {
+                'total_welcome': len(welcome_messages),
+                'total_scheduled': len(scheduled_messages),
+                'active_welcome': len([m for m in welcome_messages if m.get('active', False)]),
+                'active_scheduled': len([m for m in scheduled_messages if m.get('active', False)])
+            }
+        except Exception as e:
+            print(f"Error getting content stats: {e}")
+            content_stats = {
+                'total_welcome': 0,
+                'total_scheduled': 0,
+                'active_welcome': 0,
+                'active_scheduled': 0
+            }
+        
+        # Get recent admin logins
+        try:
+            recent_logins = firebase.get_collection('admin_logins', limit=10, include_id=True)
+            # Sort by login_time if available
+            recent_logins.sort(key=lambda x: x.get('login_time', datetime.min), reverse=True)
+        except Exception as e:
+            print(f"Error getting recent logins: {e}")
+            recent_logins = []
+        
+        return render_template('dashboard.html', 
+                             user=session.get('user', {}),
+                             server_stats=server_stats,
+                             content_stats=content_stats,
+                             recent_logins=recent_logins[:5])  # Show only last 5
+        
+    except Exception as e:
+        flash(f'Error loading dashboard: {str(e)}', 'error')
+        return render_template('dashboard.html', 
+                             user=session.get('user', {}),
+                             server_stats={'total_members': 0, 'linked_members': 0, 'unlinked_members': 0},
+                             content_stats={'total_welcome': 0, 'total_scheduled': 0, 'active_welcome': 0, 'active_scheduled': 0},
+                             recent_logins=[])
+
+@app.route('/api-overview')
+@login_required
+def api_overview():
+    """Protected API Endpoint Overview"""
+    return index_content()
+
 @app.route('/', methods=['GET'])
 def index():
+    """
+    Public landing page - redirects to dashboard if logged in, otherwise shows basic info
+    """
+    # If user is logged in, redirect to dashboard
+    if 'user' in session and 'discord_id' in session:
+        return redirect(url_for('dashboard'))
+    
+    # Otherwise show public API overview
+    return index_content()
+
+def index_content():
     """
     API Endpoint Overview - Lists all available endpoints in this service
     """
