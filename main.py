@@ -1507,45 +1507,28 @@ def api_overview():
     """Protected API Endpoint Overview"""
     return index_content()
 
-# Add these endpoints to your main.py file after the existing endpoints
-
-@app.route('/discord/stats')
-@login_required
-def discord_stats():
-    """Discord server activity stats dashboard"""
-    try:
-        # Check if the request accepts HTML
-        is_html_request = request.headers.get('Accept', '').find('text/html') >= 0
-        
-        if is_html_request:
-            # For HTML requests, render the stats dashboard
-            return render_template('discord_stats.html')
-        else:
-            # For API requests, return summary data
-            stats_summary = get_discord_stats_summary()
-            return jsonify(stats_summary)
-    except Exception as e:
-        if is_html_request:
-            return f"<h1>Error</h1><p>{str(e)}</p>", 500
-        return jsonify({"error": str(e)}), 500
+# Discord stats endpoints
 
 @app.route('/api/discord/stats/summary', methods=['GET'])
 @login_required
 def get_discord_stats_summary():
     """Get summary statistics for Discord server activity"""
     try:
-        # Get recent activity data (last 30 days)
         from datetime import datetime, timedelta
         
+        # Get recent activity data (last 30 days)
         end_date = datetime.now()
         start_date = end_date - timedelta(days=30)
         
-        # Query Firebase for server_activity collection
+        # Convert to ISO string format to match Firebase data
+        end_date_str = end_date.isoformat() + "Z"
+        start_date_str = start_date.isoformat() + "Z"
+        
+        # Query Firebase using string timestamps
         activity_docs = firebase.db.collection('server_activity')\
-            .where('timestamp', '>=', start_date)\
-            .where('timestamp', '<=', end_date)\
+            .where('timestamp', '>=', start_date_str)\
+            .where('timestamp', '<=', end_date_str)\
             .order_by('timestamp', direction=firebase.firestore.Query.DESCENDING)\
-            .limit(100)\
             .stream()
         
         activities = [doc.to_dict() for doc in activity_docs]
@@ -1570,7 +1553,8 @@ def get_discord_stats_summary():
             all_channels.update(channel_activity.keys())
         
         # Calculate daily averages
-        days_with_data = len(set(activity.get('dateKey') for activity in activities if activity.get('dateKey')))
+        unique_dates = set(activity.get('dateKey') for activity in activities if activity.get('dateKey'))
+        days_with_data = len(unique_dates)
         avg_daily_messages = total_messages / max(days_with_data, 1)
         avg_daily_activities = total_activities / max(days_with_data, 1)
         
@@ -1609,7 +1593,6 @@ def get_discord_stats_summary():
 def get_daily_discord_stats():
     """Get daily activity statistics for charts"""
     try:
-        # Get parameters
         days = request.args.get('days', default=30, type=int)
         
         from datetime import datetime, timedelta
@@ -1617,16 +1600,20 @@ def get_daily_discord_stats():
         end_date = datetime.now()
         start_date = end_date - timedelta(days=days)
         
-        # Query Firebase for server_activity collection
+        # Convert to ISO string format to match Firebase data
+        end_date_str = end_date.isoformat() + "Z"
+        start_date_str = start_date.isoformat() + "Z"
+        
+        # Query Firebase
         activity_docs = firebase.db.collection('server_activity')\
-            .where('timestamp', '>=', start_date)\
-            .where('timestamp', '<=', end_date)\
+            .where('timestamp', '>=', start_date_str)\
+            .where('timestamp', '<=', end_date_str)\
             .order_by('timestamp')\
             .stream()
         
         activities = [doc.to_dict() for doc in activity_docs]
         
-        # Group by date
+        # Group by dateKey
         daily_stats = {}
         
         for activity in activities:
@@ -1686,7 +1673,6 @@ def get_daily_discord_stats():
 def get_top_users():
     """Get most active users"""
     try:
-        # Get parameters
         days = request.args.get('days', default=30, type=int)
         limit = request.args.get('limit', default=10, type=int)
         
@@ -1695,10 +1681,14 @@ def get_top_users():
         end_date = datetime.now()
         start_date = end_date - timedelta(days=days)
         
-        # Query Firebase for server_activity collection
+        # Convert to ISO string format
+        end_date_str = end_date.isoformat() + "Z"
+        start_date_str = start_date.isoformat() + "Z"
+        
+        # Query Firebase
         activity_docs = firebase.db.collection('server_activity')\
-            .where('timestamp', '>=', start_date)\
-            .where('timestamp', '<=', end_date)\
+            .where('timestamp', '>=', start_date_str)\
+            .where('timestamp', '<=', end_date_str)\
             .stream()
         
         activities = [doc.to_dict() for doc in activity_docs]
@@ -1719,8 +1709,7 @@ def get_top_users():
                         "reactions": 0,
                         "voice_activity": 0,
                         "interactions": 0,
-                        "total_activities": 0,
-                        "channels_active": set()
+                        "total_activities": 0
                     }
                 
                 user_totals[user_id]["messages"] += user_data.get('messages', 0)
@@ -1735,11 +1724,7 @@ def get_top_users():
                 )
         
         # Convert to list and sort by total activities
-        top_users = []
-        for user_data in user_totals.values():
-            user_data["channels_active"] = len(user_data["channels_active"])
-            top_users.append(user_data)
-        
+        top_users = list(user_totals.values())
         top_users.sort(key=lambda x: x["total_activities"], reverse=True)
         
         return jsonify({
@@ -1759,7 +1744,6 @@ def get_top_users():
 def get_top_channels():
     """Get most active channels"""
     try:
-        # Get parameters
         days = request.args.get('days', default=30, type=int)
         limit = request.args.get('limit', default=10, type=int)
         
@@ -1768,10 +1752,14 @@ def get_top_channels():
         end_date = datetime.now()
         start_date = end_date - timedelta(days=days)
         
-        # Query Firebase for server_activity collection
+        # Convert to ISO string format
+        end_date_str = end_date.isoformat() + "Z"
+        start_date_str = start_date.isoformat() + "Z"
+        
+        # Query Firebase
         activity_docs = firebase.db.collection('server_activity')\
-            .where('timestamp', '>=', start_date)\
-            .where('timestamp', '<=', end_date)\
+            .where('timestamp', '>=', start_date_str)\
+            .where('timestamp', '<=', end_date_str)\
             .stream()
         
         activities = [doc.to_dict() for doc in activity_docs]
@@ -1790,8 +1778,7 @@ def get_top_channels():
                         "channel_name": channel_data.get('channelName', 'Unknown'),
                         "messages": 0,
                         "reactions": 0,
-                        "total_activities": 0,
-                        "unique_users": set()
+                        "total_activities": 0
                     }
                 
                 channel_totals[channel_id]["messages"] += channel_data.get('messages', 0)
@@ -1802,11 +1789,7 @@ def get_top_channels():
                 )
         
         # Convert to list and sort by total activities
-        top_channels = []
-        for channel_data in channel_totals.values():
-            channel_data["unique_users"] = len(channel_data["unique_users"])
-            top_channels.append(channel_data)
-        
+        top_channels = list(channel_totals.values())
         top_channels.sort(key=lambda x: x["total_activities"], reverse=True)
         
         return jsonify({
@@ -1819,7 +1802,37 @@ def get_top_channels():
         })
         
     except Exception as e:
-        return jsonify({"error": str(e)}), 500 
+        return jsonify({"error": str(e)}), 500
+
+# Optional debug endpoint to verify data exists
+@app.route('/api/discord/stats/debug', methods=['GET'])
+@login_required
+def debug_discord_stats():
+    """Debug endpoint to check what data exists in Firebase"""
+    try:
+        # Get recent documents
+        activity_docs = firebase.db.collection('server_activity')\
+            .order_by('timestamp', direction=firebase.firestore.Query.DESCENDING)\
+            .limit(5)\
+            .stream()
+        
+        documents = []
+        for doc in activity_docs:
+            doc_data = doc.to_dict()
+            documents.append({
+                'id': doc.id,
+                'timestamp': doc_data.get('timestamp'),
+                'dateKey': doc_data.get('dateKey'),
+                'totalActivities': doc_data.get('totalActivities'),
+                'rawData': doc_data.get('rawData')
+            })
+        
+        return jsonify({
+            'total_documents': len(documents),
+            'documents': documents
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/', methods=['GET'])
 def index():
