@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Discord Server Stats - DZR Admin</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+            min-height: 100vh;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .back-btn {
+            background-color: rgba(255,255,255,0.2);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            text-decoration: none;
+            font-size: 0.9em;
+            transition: background-color 0.3s;
+        }
+        
+        .back-btn:hover {
+            background-color: rgba(255,255,255,0.3);
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 30px 20px;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        
+        .error {
+            background-color: #fed7d7;
+            color: #c53030;
+            border: 1px solid #feb2b2;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .stats-overview {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .stat-period {
+            color: #999;
+            font-size: 0.8em;
+            margin-top: 5px;
+        }
+        
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .chart-card {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .chart-title {
+            margin: 0 0 20px 0;
+            color: #333;
+            font-size: 1.2em;
+            font-weight: 500;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+        
+        .tables-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        .table-card {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .table-header {
+            background-color: #667eea;
+            color: white;
+            padding: 20px;
+            font-size: 1.1em;
+            font-weight: 500;
+        }
+        
+        .table-content {
+            padding: 0;
+        }
+        
+        .user-list, .channel-list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .user-item, .channel-item {
+            padding: 15px 20px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .user-item:last-child, .channel-item:last-child {
+            border-bottom: none;
+        }
+        
+        .user-name, .channel-name {
+            font-weight: 500;
+            color: #333;
+        }
+        
+        .user-stats, .channel-stats {
+            color: #666;
+            font-size: 0.9em;
+        }
+        
+        .activity-count {
+            background-color: #667eea;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: bold;
+        }
+        
+        .controls {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .control-group label {
+            font-weight: 500;
+            color: #333;
+        }
+        
+        .control-group select {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background: white;
+        }
+        
+        @media (max-width: 768px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .tables-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .stats-overview {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <div class="header-left">
+                <a href="{{ url_for('dashboard') }}" class="back-btn">← Back to Dashboard</a>
+                <h1>📊 Discord Server Stats</h1>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="controls">
+            <div class="control-group">
+                <label for="period-select">Time Period:</label>
+                <select id="period-select">
+                    <option value="7">Last 7 days</option>
+                    <option value="30" selected>Last 30 days</option>
+                    <option value="90">Last 90 days</option>
+                </select>
+            </div>
+            <button onclick="refreshData()" style="padding: 8px 16px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                🔄 Refresh Data
+            </button>
+        </div>
+
+        <div id="loading" class="loading">
+            <p>Loading Discord server statistics...</p>
+        </div>
+
+        <div id="error" class="error" style="display: none;">
+            <p>Error loading statistics. Please try again.</p>
+        </div>
+
+        <div id="content" style="display: none;">
+            <!-- Statistics Overview -->
+            <div class="stats-overview">
+                <div class="stat-card">
+                    <div class="stat-number" id="total-activities">-</div>
+                    <div class="stat-label">Total Activities</div>
+                    <div class="stat-period" id="period-label">Last 30 days</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-number" id="total-messages">-</div>
+                    <div class="stat-label">Messages</div>
+                    <div class="stat-period" id="avg-daily-messages">- per day avg</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-number" id="active-users">-</div>
+                    <div class="stat-label">Active Users</div>
+                    <div class="stat-period">Unique participants</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-number" id="active-channels">-</div>
+                    <div class="stat-label">Active Channels</div>
+                    <div class="stat-period">With activity</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-number" id="total-reactions">-</div>
+                    <div class="stat-label">Reactions</div>
+                    <div class="stat-period">Emoji responses</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-number" id="total-interactions">-</div>
+                    <div class="stat-label">Bot Commands</div>
+                    <div class="stat-period">Slash commands used</div>
+                </div>
+            </div>
+
+            <!-- Charts -->
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <h3 class="chart-title">Daily Activity Trend</h3>
+                    <div class="chart-container">
+                        <canvas id="activity-chart"></canvas>
+                    </div>
+                </div>
+                
+                <div class="chart-card">
+                    <h3 class="chart-title">Activity Breakdown</h3>
+                    <div class="chart-container">
+                        <canvas id="breakdown-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top Users and Channels -->
+            <div class="tables-grid">
+                <div class="table-card">
+                    <div class="table-header">
+                        🏆 Most Active Users
+                    </div>
+                    <div class="table-content">
+                        <ul id="top-users" class="user-list">
+                            <!-- Users will be populated here -->
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="table-card">
+                    <div class="table-header">
+                        📢 Most Active Channels
+                    </div>
+                    <div class="table-content">
+                        <ul id="top-channels" class="channel-list">
+                            <!-- Channels will be populated here -->
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let activityChart = null;
+        let breakdownChart = null;
+        
+        // Load data when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            loadData();
+            
+            // Add event listener for period change
+            document.getElementById('period-select').addEventListener('change', function() {
+                loadData();
+            });
+        });
+        
+        function refreshData() {
+            loadData();
+        }
+        
+        async function loadData() {
+            const period = document.getElementById('period-select').value;
+            
+            showLoading();
+            
+            try {
+                // Load summary data
+                const summaryResponse = await fetch('/api/discord/stats/summary');
+                const summaryData = await summaryResponse.json();
+                
+                // Load daily data
+                const dailyResponse = await fetch(`/api/discord/stats/daily?days=${period}`);
+                const dailyData = await dailyResponse.json();
+                
+                // Load top users
+                const usersResponse = await fetch(`/api/discord/stats/top-users?days=${period}&limit=10`);
+                const usersData = await usersResponse.json();
+                
+                // Load top channels
+                const channelsResponse = await fetch(`/api/discord/stats/top-channels?days=${period}&limit=10`);
+                const channelsData = await channelsResponse.json();
+                
+                // Update UI
+                updateSummaryStats(summaryData);
+                updateCharts(dailyData);
+                updateTopUsers(usersData.top_users);
+                updateTopChannels(channelsData.top_channels);
+                
+                showContent();
+                
+            } catch (error) {
+                console.error('Error loading data:', error);
+                showError();
+            }
+        }
+        
+        function updateSummaryStats(data) {
+            document.getElementById('total-activities').textContent = data.totals.activities.toLocaleString();
+            document.getElementById('total-messages').textContent = data.totals.messages.toLocaleString();
+            document.getElementById('active-users').textContent = data.unique_counts.active_users;
+            document.getElementById('active-channels').textContent = data.unique_counts.active_channels;
+            document.getElementById('total-reactions').textContent = data.totals.reactions.toLocaleString();
+            document.getElementById('total-interactions').textContent = data.totals.interactions.toLocaleString();
+            document.getElementById('avg-daily-messages').textContent = data.averages.daily_messages + ' per day avg';
+            
+            const period = document.getElementById('period-select').value;
+            document.getElementById('period-label').textContent = `Last ${period} days`;
+        }
+        
+        function updateCharts(data) {
+            const dailyStats = data.daily_stats;
+            
+            // Prepare data for activity trend chart
+            const dates = dailyStats.map(d => d.date);
+            const messages = dailyStats.map(d => d.messages);
+            const reactions = dailyStats.map(d => d.reactions);
+            const interactions = dailyStats.map(d => d.interactions);
+            
+            // Update activity trend chart
+            if (activityChart) {
+                activityChart.destroy();
+            }
+            
+            const activityCtx = document.getElementById('activity-chart').getContext('2d');
+            activityChart = new Chart(activityCtx, {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: [
+                        {
+                            label: 'Messages',
+                            data: messages,
+                            borderColor: '#667eea',
+                            backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Reactions',
+                            data: reactions,
+                            borderColor: '#f093fb',
+                            backgroundColor: 'rgba(240, 147, 251, 0.1)',
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Commands',
+                            data: interactions,
+                            borderColor: '#4facfe',
+                            backgroundColor: 'rgba(79, 172, 254, 0.1)',
+                            tension: 0.4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+            
+            // Update breakdown chart
+            if (breakdownChart) {
+                breakdownChart.destroy();
+            }
+            
+            const totalMessages = messages.reduce((a, b) => a + b, 0);
+            const totalReactions = reactions.reduce((a, b) => a + b, 0);
+            const totalInteractions = interactions.reduce((a, b) => a + b, 0);
+            
+            const breakdownCtx = document.getElementById('breakdown-chart').getContext('2d');
+            breakdownChart = new Chart(breakdownCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Messages', 'Reactions', 'Commands'],
+                    datasets: [{
+                        data: [totalMessages, totalReactions, totalInteractions],
+                        backgroundColor: ['#667eea', '#f093fb', '#4facfe']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+        }
+        
+        function updateTopUsers(users) {
+            const usersList = document.getElementById('top-users');
+            usersList.innerHTML = '';
+            
+            users.forEach((user, index) => {
+                const li = document.createElement('li');
+                li.className = 'user-item';
+                li.innerHTML = `
+                    <div>
+                        <div class="user-name">${user.username}</div>
+                        <div class="user-stats">${user.messages} messages, ${user.reactions} reactions</div>
+                    </div>
+                    <div class="activity-count">${user.total_activities}</div>
+                `;
+                usersList.appendChild(li);
+            });
+        }
+        
+        function updateTopChannels(channels) {
+            const channelsList = document.getElementById('top-channels');
+            channelsList.innerHTML = '';
+            
+            channels.forEach((channel, index) => {
+                const li = document.createElement('li');
+                li.className = 'channel-item';
+                li.innerHTML = `
+                    <div>
+                        <div class="channel-name">#${channel.channel_name}</div>
+                        <div class="channel-stats">${channel.messages} messages, ${channel.reactions} reactions</div>
+                    </div>
+                    <div class="activity-count">${channel.total_activities}</div>
+                `;
+                channelsList.appendChild(li);
+            });
+        }
+        
+        function showLoading() {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('error').style.display = 'none';
+            document.getElementById('content').style.display = 'none';
+        }
+        
+        function showContent() {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('error').style.display = 'none';
+            document.getElementById('content').style.display = 'block';
+        }
+        
+        function showError() {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('error').style.display = 'block';
+            document.getElementById('content').style.display = 'none';
+        }
+    </script>
+</body>
+</html> 

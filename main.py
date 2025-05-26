@@ -1507,6 +1507,320 @@ def api_overview():
     """Protected API Endpoint Overview"""
     return index_content()
 
+# Add these endpoints to your main.py file after the existing endpoints
+
+@app.route('/discord/stats')
+@login_required
+def discord_stats():
+    """Discord server activity stats dashboard"""
+    try:
+        # Check if the request accepts HTML
+        is_html_request = request.headers.get('Accept', '').find('text/html') >= 0
+        
+        if is_html_request:
+            # For HTML requests, render the stats dashboard
+            return render_template('discord_stats.html')
+        else:
+            # For API requests, return summary data
+            stats_summary = get_discord_stats_summary()
+            return jsonify(stats_summary)
+    except Exception as e:
+        if is_html_request:
+            return f"<h1>Error</h1><p>{str(e)}</p>", 500
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/discord/stats/summary', methods=['GET'])
+@login_required
+def get_discord_stats_summary():
+    """Get summary statistics for Discord server activity"""
+    try:
+        # Get recent activity data (last 30 days)
+        from datetime import datetime, timedelta
+        
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=30)
+        
+        # Query Firebase for server_activity collection
+        activity_docs = firebase.db.collection('server_activity')\
+            .where('timestamp', '>=', start_date)\
+            .where('timestamp', '<=', end_date)\
+            .order_by('timestamp', direction=firebase.firestore.Query.DESCENDING)\
+            .limit(100)\
+            .stream()
+        
+        activities = [doc.to_dict() for doc in activity_docs]
+        
+        # Calculate summary statistics
+        total_activities = sum(activity.get('totalActivities', 0) for activity in activities)
+        total_messages = sum(activity.get('rawData', {}).get('messageCount', 0) for activity in activities)
+        total_reactions = sum(activity.get('rawData', {}).get('reactionCount', 0) for activity in activities)
+        total_voice_activity = sum(activity.get('rawData', {}).get('voiceActivityCount', 0) for activity in activities)
+        total_interactions = sum(activity.get('rawData', {}).get('interactionCount', 0) for activity in activities)
+        
+        # Get unique users and channels
+        all_users = set()
+        all_channels = set()
+        
+        for activity in activities:
+            summary = activity.get('summary', {})
+            user_activity = summary.get('userActivity', {})
+            channel_activity = summary.get('channelActivity', {})
+            
+            all_users.update(user_activity.keys())
+            all_channels.update(channel_activity.keys())
+        
+        # Calculate daily averages
+        days_with_data = len(set(activity.get('dateKey') for activity in activities if activity.get('dateKey')))
+        avg_daily_messages = total_messages / max(days_with_data, 1)
+        avg_daily_activities = total_activities / max(days_with_data, 1)
+        
+        summary = {
+            "period": {
+                "start": start_date.isoformat(),
+                "end": end_date.isoformat(),
+                "days": 30
+            },
+            "totals": {
+                "activities": total_activities,
+                "messages": total_messages,
+                "reactions": total_reactions,
+                "voice_activity": total_voice_activity,
+                "interactions": total_interactions
+            },
+            "averages": {
+                "daily_messages": round(avg_daily_messages, 1),
+                "daily_activities": round(avg_daily_activities, 1)
+            },
+            "unique_counts": {
+                "active_users": len(all_users),
+                "active_channels": len(all_channels),
+                "days_with_activity": days_with_data
+            },
+            "recent_activity_count": len(activities)
+        }
+        
+        return jsonify(summary)
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/discord/stats/daily', methods=['GET'])
+@login_required
+def get_daily_discord_stats():
+    """Get daily activity statistics for charts"""
+    try:
+        # Get parameters
+        days = request.args.get('days', default=30, type=int)
+        
+        from datetime import datetime, timedelta
+        
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=days)
+        
+        # Query Firebase for server_activity collection
+        activity_docs = firebase.db.collection('server_activity')\
+            .where('timestamp', '>=', start_date)\
+            .where('timestamp', '<=', end_date)\
+            .order_by('timestamp')\
+            .stream()
+        
+        activities = [doc.to_dict() for doc in activity_docs]
+        
+        # Group by date
+        daily_stats = {}
+        
+        for activity in activities:
+            date_key = activity.get('dateKey')
+            if not date_key:
+                continue
+                
+            if date_key not in daily_stats:
+                daily_stats[date_key] = {
+                    "date": date_key,
+                    "messages": 0,
+                    "reactions": 0,
+                    "voice_activity": 0,
+                    "interactions": 0,
+                    "total_activities": 0,
+                    "unique_users": set(),
+                    "unique_channels": set()
+                }
+            
+            raw_data = activity.get('rawData', {})
+            daily_stats[date_key]["messages"] += raw_data.get('messageCount', 0)
+            daily_stats[date_key]["reactions"] += raw_data.get('reactionCount', 0)
+            daily_stats[date_key]["voice_activity"] += raw_data.get('voiceActivityCount', 0)
+            daily_stats[date_key]["interactions"] += raw_data.get('interactionCount', 0)
+            daily_stats[date_key]["total_activities"] += activity.get('totalActivities', 0)
+            
+            # Track unique users and channels
+            summary = activity.get('summary', {})
+            user_activity = summary.get('userActivity', {})
+            channel_activity = summary.get('channelActivity', {})
+            
+            daily_stats[date_key]["unique_users"].update(user_activity.keys())
+            daily_stats[date_key]["unique_channels"].update(channel_activity.keys())
+        
+        # Convert sets to counts and sort by date
+        result = []
+        for date_key in sorted(daily_stats.keys()):
+            stats = daily_stats[date_key]
+            stats["unique_users"] = len(stats["unique_users"])
+            stats["unique_channels"] = len(stats["unique_channels"])
+            result.append(stats)
+        
+        return jsonify({
+            "period": {
+                "start": start_date.isoformat(),
+                "end": end_date.isoformat(),
+                "days": days
+            },
+            "daily_stats": result
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/discord/stats/top-users', methods=['GET'])
+@login_required
+def get_top_users():
+    """Get most active users"""
+    try:
+        # Get parameters
+        days = request.args.get('days', default=30, type=int)
+        limit = request.args.get('limit', default=10, type=int)
+        
+        from datetime import datetime, timedelta
+        
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=days)
+        
+        # Query Firebase for server_activity collection
+        activity_docs = firebase.db.collection('server_activity')\
+            .where('timestamp', '>=', start_date)\
+            .where('timestamp', '<=', end_date)\
+            .stream()
+        
+        activities = [doc.to_dict() for doc in activity_docs]
+        
+        # Aggregate user activity
+        user_totals = {}
+        
+        for activity in activities:
+            summary = activity.get('summary', {})
+            user_activity = summary.get('userActivity', {})
+            
+            for user_id, user_data in user_activity.items():
+                if user_id not in user_totals:
+                    user_totals[user_id] = {
+                        "user_id": user_id,
+                        "username": user_data.get('username', 'Unknown'),
+                        "messages": 0,
+                        "reactions": 0,
+                        "voice_activity": 0,
+                        "interactions": 0,
+                        "total_activities": 0,
+                        "channels_active": set()
+                    }
+                
+                user_totals[user_id]["messages"] += user_data.get('messages', 0)
+                user_totals[user_id]["reactions"] += user_data.get('reactions', 0)
+                user_totals[user_id]["voice_activity"] += user_data.get('voiceActivity', 0)
+                user_totals[user_id]["interactions"] += user_data.get('interactions', 0)
+                user_totals[user_id]["total_activities"] += (
+                    user_data.get('messages', 0) + 
+                    user_data.get('reactions', 0) + 
+                    user_data.get('voiceActivity', 0) + 
+                    user_data.get('interactions', 0)
+                )
+        
+        # Convert to list and sort by total activities
+        top_users = []
+        for user_data in user_totals.values():
+            user_data["channels_active"] = len(user_data["channels_active"])
+            top_users.append(user_data)
+        
+        top_users.sort(key=lambda x: x["total_activities"], reverse=True)
+        
+        return jsonify({
+            "period": {
+                "start": start_date.isoformat(),
+                "end": end_date.isoformat(),
+                "days": days
+            },
+            "top_users": top_users[:limit]
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/discord/stats/top-channels', methods=['GET'])
+@login_required
+def get_top_channels():
+    """Get most active channels"""
+    try:
+        # Get parameters
+        days = request.args.get('days', default=30, type=int)
+        limit = request.args.get('limit', default=10, type=int)
+        
+        from datetime import datetime, timedelta
+        
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=days)
+        
+        # Query Firebase for server_activity collection
+        activity_docs = firebase.db.collection('server_activity')\
+            .where('timestamp', '>=', start_date)\
+            .where('timestamp', '<=', end_date)\
+            .stream()
+        
+        activities = [doc.to_dict() for doc in activity_docs]
+        
+        # Aggregate channel activity
+        channel_totals = {}
+        
+        for activity in activities:
+            summary = activity.get('summary', {})
+            channel_activity = summary.get('channelActivity', {})
+            
+            for channel_id, channel_data in channel_activity.items():
+                if channel_id not in channel_totals:
+                    channel_totals[channel_id] = {
+                        "channel_id": channel_id,
+                        "channel_name": channel_data.get('channelName', 'Unknown'),
+                        "messages": 0,
+                        "reactions": 0,
+                        "total_activities": 0,
+                        "unique_users": set()
+                    }
+                
+                channel_totals[channel_id]["messages"] += channel_data.get('messages', 0)
+                channel_totals[channel_id]["reactions"] += channel_data.get('reactions', 0)
+                channel_totals[channel_id]["total_activities"] += (
+                    channel_data.get('messages', 0) + 
+                    channel_data.get('reactions', 0)
+                )
+        
+        # Convert to list and sort by total activities
+        top_channels = []
+        for channel_data in channel_totals.values():
+            channel_data["unique_users"] = len(channel_data["unique_users"])
+            top_channels.append(channel_data)
+        
+        top_channels.sort(key=lambda x: x["total_activities"], reverse=True)
+        
+        return jsonify({
+            "period": {
+                "start": start_date.isoformat(),
+                "end": end_date.isoformat(),
+                "days": days
+            },
+            "top_channels": top_channels[:limit]
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500 
+
 @app.route('/', methods=['GET'])
 def index():
     """
