@@ -2,21 +2,31 @@ import os
 import time
 import inspect
 import logging
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, session, redirect, url_for, flash
 from dotenv import load_dotenv
-from zwiftpower import ZwiftPower
-from zwiftcommentator import ZwiftCommentator
+from functools import wraps
 import requests
 from datetime import datetime, timedelta
 import firebase
 from discord_api import DiscordAPI
 from zwift import ZwiftAPI
 import pytz
+from zwiftpower import ZwiftPower
+from zwiftcommentator import ZwiftCommentator
 
 # Load environment variables from .env file
 load_dotenv()
 
 app = Flask(__name__)
+
+# Configure session
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "your-secret-key-change-this-in-production")
+
+# Discord OAuth Configuration
+DISCORD_CLIENT_ID = os.getenv("DISCORD_CLIENT_ID", "your_discord_client_id")
+DISCORD_CLIENT_SECRET = os.getenv("DISCORD_CLIENT_SECRET", "your_discord_client_secret")
+DISCORD_REDIRECT_URI = os.getenv("DISCORD_REDIRECT_URI", "http://localhost:8080/auth/discord/callback")
+DISCORD_OAUTH_URL = f"https://discord.com/api/oauth2/authorize?client_id={DISCORD_CLIENT_ID}&redirect_uri={DISCORD_REDIRECT_URI}&response_type=code&scope=identify%20guilds"
 
 @app.before_request
 def log_request_path():
@@ -47,6 +57,45 @@ DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN", "your_discord_bot_token")
 DISCORD_GUILD_ID = os.getenv("DISCORD_GUILD_ID", "your_discord_guild_id")
 
 CONTENT_API_KEY = os.getenv("CONTENT_API_KEY", "your_content_api_key")
+
+def login_required(f):
+    """Decorator to require Discord OAuth login with admin rights"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user' not in session or 'discord_id' not in session:
+            # Store the URL they were trying to access
+            session['next_url'] = request.url
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+def check_discord_admin(discord_id, access_token):
+    """Check if user has admin rights in the Discord server"""
+    try:
+        # Get user's guilds
+        headers = {
+            'Authorization': f'Bearer {access_token}',
+            'Content-Type': 'application/json'
+        }
+        
+        response = requests.get('https://discord.com/api/users/@me/guilds', headers=headers)
+        if response.status_code != 200:
+            return False
+        
+        guilds = response.json()
+        
+        # Check if user is in our guild and has admin permissions
+        for guild in guilds:
+            if guild['id'] == DISCORD_GUILD_ID:
+                # Check for admin permissions (0x8 = ADMINISTRATOR)
+                permissions = int(guild.get('permissions', 0))
+                has_admin = (permissions & 0x8) == 0x8
+                return has_admin
+        
+        return False
+    except Exception as e:
+        print(f"Error checking Discord admin status: {e}")
+        return False
 
 def verify_api_key():
     """Verify API key from Authorization header"""
@@ -1288,6 +1337,99 @@ def debug_scheduled_messages():
         return jsonify(debug_info)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@app.route('/login')
+def login():
+    """Discord OAuth login page"""
+    return render_template('login.html', discord_oauth_url=DISCORD_OAUTH_URL)
+
+@app.route('/auth/discord/callback')
+def discord_callback():
+    """Handle Discord OAuth callback"""
+    code = request.args.get('code')
+    if not code:
+        flash('Authorization failed', 'error')
+        return redirect(url_for('login'))
+    
+    try:
+        # Exchange code for access token
+        token_data = {
+            'client_id': DISCORD_CLIENT_ID,
+            'client_secret': DISCORD_CLIENT_SECRET,
+            'grant_type': 'authorization_code',
+            'code': code,
+            'redirect_uri': DISCORD_REDIRECT_URI
+        }
+        
+        token_response = requests.post('https://discord.com/api/oauth2/token', data=token_data)
+        if token_response.status_code != 200:
+            flash('Failed to get access token', 'error')
+            return redirect(url_for('login'))
+        
+        token_info = token_response.json()
+        access_token = token_info['access_token']
+        
+        # Get user info
+        headers = {
+            'Authorization': f'Bearer {access_token}',
+            'Content-Type': 'application/json'
+        }
+        
+        user_response = requests.get('https://discord.com/api/users/@me', headers=headers)
+        if user_response.status_code != 200:
+            flash('Failed to get user information', 'error')
+            return redirect(url_for('login'))
+        
+        user_info = user_response.json()
+        discord_id = user_info['id']
+        username = user_info['username']
+        
+        # Check if user has admin rights
+        if not check_discord_admin(discord_id, access_token):
+            flash('Access denied: You need administrator rights in the DZR Discord server', 'error')
+            return redirect(url_for('login'))
+        
+        # Store user info in session
+        session['user'] = {
+            'discord_id': discord_id,
+            'username': username,
+            'avatar': user_info.get('avatar'),
+            'access_token': access_token
+        }
+        session['discord_id'] = discord_id
+        session['logged_in'] = True
+        
+        # Store user in Firebase (optional - for audit trail)
+        try:
+            firebase.db.collection('admin_logins').add({
+                'discord_id': discord_id,
+                'username': username,
+                'login_time': datetime.now(),
+                'ip_address': request.remote_addr
+            })
+        except Exception as e:
+            print(f"Failed to log admin login to Firebase: {e}")
+        
+        flash(f'Welcome, {username}!', 'success')
+        
+        # Redirect to the page they were trying to access
+        next_url = session.pop('next_url', None)
+        if next_url:
+            return redirect(next_url)
+        return redirect(url_for('content_messages'))
+        
+    except Exception as e:
+        print(f"Discord OAuth error: {e}")
+        flash('Authentication failed', 'error')
+        return redirect(url_for('login'))
+
+@app.route('/logout')
+def logout():
+    """Logout and clear session"""
+    username = session.get('user', {}).get('username', 'Unknown')
+    session.clear()
+    flash(f'Goodbye, {username}!', 'info')
+    return redirect(url_for('login'))
 
 @app.route('/', methods=['GET'])
 def index():
