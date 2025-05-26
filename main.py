@@ -1510,14 +1510,14 @@ def api_overview():
 @app.route('/', methods=['GET'])
 def index():
     """
-    Public landing page - redirects to dashboard if logged in, otherwise shows basic info
+    Root page - redirects to dashboard if logged in, otherwise redirects to login
     """
     # If user is logged in, redirect to dashboard
     if 'user' in session and 'discord_id' in session:
         return redirect(url_for('dashboard'))
     
-    # Otherwise show public API overview
-    return index_content()
+    # Otherwise redirect to login
+    return redirect(url_for('login'))
 
 def index_content():
     """
