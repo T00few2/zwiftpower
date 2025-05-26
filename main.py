@@ -1804,6 +1804,13 @@ def get_top_channels():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# Main Discord stats page
+@app.route('/discord/stats', methods=['GET'])
+@login_required
+def discord_stats():
+    """Discord server statistics dashboard"""
+    return render_template('discord_stats.html')
+
 # Optional debug endpoint to verify data exists
 @app.route('/api/discord/stats/debug', methods=['GET'])
 @login_required
