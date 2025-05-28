@@ -975,78 +975,83 @@ def manage_scheduled_messages():
                 current_time = datetime.now(cet)
                 
                 schedule_type = schedule_config.get('type', 'weekly')
-                schedule_time = schedule_config.get('time', '18:00')  # Default to 6 PM
                 
-                # Parse the schedule time (format: "HH:MM")
-                try:
-                    time_parts = schedule_time.split(':')
-                    schedule_hour = int(time_parts[0])
-                    schedule_minute = int(time_parts[1])
-                except (ValueError, IndexError):
-                    schedule_hour = 18
-                    schedule_minute = 0
-                
-                if schedule_type == 'daily':
-                    # Calculate next daily occurrence
-                    next_run = current_time.replace(hour=schedule_hour, minute=schedule_minute, second=0, microsecond=0)
-                    # If the time has already passed today, schedule for tomorrow
-                    if next_run <= current_time:
-                        next_run += timedelta(days=1)
-                        
-                elif schedule_type == 'weekly':
-                    schedule_day = schedule_config.get('day', 'monday').lower()
+                # For probability-based scheduling, don't calculate next_run
+                if schedule_type == 'probability':
+                    next_run = None  # Probability-based messages don't use next_run
+                else:
+                    schedule_time = schedule_config.get('time', '18:00')  # Default to 6 PM
                     
-                    # Map day names to weekday numbers (Monday = 0)
-                    day_map = {
-                        'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3,
-                        'friday': 4, 'saturday': 5, 'sunday': 6
-                    }
-                    target_weekday = day_map.get(schedule_day, 0)
-                    
-                    # Calculate next weekly occurrence
-                    current_weekday = current_time.weekday()
-                    days_ahead = target_weekday - current_weekday
-                    
-                    if days_ahead < 0:  # Target day already happened this week
-                        days_ahead += 7
-                    elif days_ahead == 0:  # Target day is today
-                        # Check if the time has already passed
-                        today_at_time = current_time.replace(hour=schedule_hour, minute=schedule_minute, second=0, microsecond=0)
-                        if today_at_time <= current_time:
-                            days_ahead = 7  # Schedule for next week
-                    
-                    next_run = current_time.replace(hour=schedule_hour, minute=schedule_minute, second=0, microsecond=0) + timedelta(days=days_ahead)
-                    
-                elif schedule_type == 'monthly':
-                    # Get the target day of month (default to current day if not specified)
-                    target_day = schedule_config.get('day_of_month', current_time.day)
-                    
-                    # Calculate next monthly occurrence
-                    next_run = current_time.replace(hour=schedule_hour, minute=schedule_minute, second=0, microsecond=0)
-                    
-                    # Try to set the target day for this month first
+                    # Parse the schedule time (format: "HH:MM")
                     try:
-                        next_run = next_run.replace(day=target_day)
-                    except ValueError:
-                        # Day doesn't exist in current month, use last day of month
-                        last_day = calendar.monthrange(next_run.year, next_run.month)[1]
-                        next_run = next_run.replace(day=last_day)
+                        time_parts = schedule_time.split(':')
+                        schedule_hour = int(time_parts[0])
+                        schedule_minute = int(time_parts[1])
+                    except (ValueError, IndexError):
+                        schedule_hour = 18
+                        schedule_minute = 0
                     
-                    # If the time has already passed this month, schedule for next month
-                    if next_run <= current_time:
-                        # Handle month rollover
-                        if current_time.month == 12:
-                            next_run = next_run.replace(year=current_time.year + 1, month=1)
-                        else:
-                            next_run = next_run.replace(month=current_time.month + 1)
+                    if schedule_type == 'daily':
+                        # Calculate next daily occurrence
+                        next_run = current_time.replace(hour=schedule_hour, minute=schedule_minute, second=0, microsecond=0)
+                        # If the time has already passed today, schedule for tomorrow
+                        if next_run <= current_time:
+                            next_run += timedelta(days=1)
                             
-                        # Handle day overflow for next month (e.g., Jan 31 -> Feb 28)
+                    elif schedule_type == 'weekly':
+                        schedule_day = schedule_config.get('day', 'monday').lower()
+                        
+                        # Map day names to weekday numbers (Monday = 0)
+                        day_map = {
+                            'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3,
+                            'friday': 4, 'saturday': 5, 'sunday': 6
+                        }
+                        target_weekday = day_map.get(schedule_day, 0)
+                        
+                        # Calculate next weekly occurrence
+                        current_weekday = current_time.weekday()
+                        days_ahead = target_weekday - current_weekday
+                        
+                        if days_ahead < 0:  # Target day already happened this week
+                            days_ahead += 7
+                        elif days_ahead == 0:  # Target day is today
+                            # Check if the time has already passed
+                            today_at_time = current_time.replace(hour=schedule_hour, minute=schedule_minute, second=0, microsecond=0)
+                            if today_at_time <= current_time:
+                                days_ahead = 7  # Schedule for next week
+                        
+                        next_run = current_time.replace(hour=schedule_hour, minute=schedule_minute, second=0, microsecond=0) + timedelta(days=days_ahead)
+                        
+                    elif schedule_type == 'monthly':
+                        # Get the target day of month (default to current day if not specified)
+                        target_day = schedule_config.get('day_of_month', current_time.day)
+                        
+                        # Calculate next monthly occurrence
+                        next_run = current_time.replace(hour=schedule_hour, minute=schedule_minute, second=0, microsecond=0)
+                        
+                        # Try to set the target day for this month first
                         try:
                             next_run = next_run.replace(day=target_day)
                         except ValueError:
-                            # Day doesn't exist in target month, use last day of month
+                            # Day doesn't exist in current month, use last day of month
                             last_day = calendar.monthrange(next_run.year, next_run.month)[1]
                             next_run = next_run.replace(day=last_day)
+                        
+                        # If the time has already passed this month, schedule for next month
+                        if next_run <= current_time:
+                            # Handle month rollover
+                            if current_time.month == 12:
+                                next_run = next_run.replace(year=current_time.year + 1, month=1)
+                            else:
+                                next_run = next_run.replace(month=current_time.month + 1)
+                                
+                            # Handle day overflow for next month (e.g., Jan 31 -> Feb 28)
+                            try:
+                                next_run = next_run.replace(day=target_day)
+                            except ValueError:
+                                # Day doesn't exist in target month, use last day of month
+                                last_day = calendar.monthrange(next_run.year, next_run.month)[1]
+                                next_run = next_run.replace(day=last_day)
             
             # Add metadata - use datetime objects directly
             schedule_data = {
@@ -1174,82 +1179,87 @@ def update_scheduled_message(schedule_id):
             current_time = datetime.now(cet)
             
             schedule_type = schedule_config.get('type', 'weekly')
-            schedule_time = schedule_config.get('time', '18:00')
             
-            # Parse the schedule time (format: "HH:MM")
-            try:
-                time_parts = schedule_time.split(':')
-                schedule_hour = int(time_parts[0])
-                schedule_minute = int(time_parts[1])
-            except (ValueError, IndexError):
-                schedule_hour = 18
-                schedule_minute = 0
-            
-            if schedule_type == 'daily':
-                # Calculate next daily occurrence
-                next_run = current_time.replace(hour=schedule_hour, minute=schedule_minute, second=0, microsecond=0)
-                # If the time has already passed today, schedule for tomorrow
-                if next_run <= current_time:
-                    next_run += timedelta(days=1)
-                data['next_run'] = next_run
-                    
-            elif schedule_type == 'weekly':
-                schedule_day = schedule_config.get('day', 'monday').lower()
+            # For probability-based scheduling, don't calculate next_run
+            if schedule_type == 'probability':
+                data['next_run'] = None  # Probability-based messages don't use next_run
+            else:
+                schedule_time = schedule_config.get('time', '18:00')
                 
-                # Map day names to weekday numbers (Monday = 0)
-                day_map = {
-                    'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3,
-                    'friday': 4, 'saturday': 5, 'sunday': 6
-                }
-                target_weekday = day_map.get(schedule_day, 0)
-                
-                # Calculate next weekly occurrence
-                current_weekday = current_time.weekday()
-                days_ahead = target_weekday - current_weekday
-                
-                if days_ahead < 0:  # Target day already happened this week
-                    days_ahead += 7
-                elif days_ahead == 0:  # Target day is today
-                    # Check if the time has already passed
-                    today_at_time = current_time.replace(hour=schedule_hour, minute=schedule_minute, second=0, microsecond=0)
-                    if today_at_time <= current_time:
-                        days_ahead = 7  # Schedule for next week
-                
-                next_run = current_time.replace(hour=schedule_hour, minute=schedule_minute, second=0, microsecond=0) + timedelta(days=days_ahead)
-                data['next_run'] = next_run
-                
-            elif schedule_type == 'monthly':
-                # Get the target day of month (default to current day if not specified)
-                target_day = schedule_config.get('day_of_month', current_time.day)
-                
-                # Calculate next monthly occurrence
-                next_run = current_time.replace(hour=schedule_hour, minute=schedule_minute, second=0, microsecond=0)
-                
-                # Try to set the target day for this month first
+                # Parse the schedule time (format: "HH:MM")
                 try:
-                    next_run = next_run.replace(day=target_day)
-                except ValueError:
-                    # Day doesn't exist in current month, use last day of month
-                    last_day = calendar.monthrange(next_run.year, next_run.month)[1]
-                    next_run = next_run.replace(day=last_day)
+                    time_parts = schedule_time.split(':')
+                    schedule_hour = int(time_parts[0])
+                    schedule_minute = int(time_parts[1])
+                except (ValueError, IndexError):
+                    schedule_hour = 18
+                    schedule_minute = 0
                 
-                # If the time has already passed this month, schedule for next month
-                if next_run <= current_time:
-                    # Handle month rollover
-                    if current_time.month == 12:
-                        next_run = next_run.replace(year=current_time.year + 1, month=1)
-                    else:
-                        next_run = next_run.replace(month=current_time.month + 1)
+                if schedule_type == 'daily':
+                    # Calculate next daily occurrence
+                    next_run = current_time.replace(hour=schedule_hour, minute=schedule_minute, second=0, microsecond=0)
+                    # If the time has already passed today, schedule for tomorrow
+                    if next_run <= current_time:
+                        next_run += timedelta(days=1)
+                    data['next_run'] = next_run
                         
-                    # Handle day overflow for next month (e.g., Jan 31 -> Feb 28)
+                elif schedule_type == 'weekly':
+                    schedule_day = schedule_config.get('day', 'monday').lower()
+                    
+                    # Map day names to weekday numbers (Monday = 0)
+                    day_map = {
+                        'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3,
+                        'friday': 4, 'saturday': 5, 'sunday': 6
+                    }
+                    target_weekday = day_map.get(schedule_day, 0)
+                    
+                    # Calculate next weekly occurrence
+                    current_weekday = current_time.weekday()
+                    days_ahead = target_weekday - current_weekday
+                    
+                    if days_ahead < 0:  # Target day already happened this week
+                        days_ahead += 7
+                    elif days_ahead == 0:  # Target day is today
+                        # Check if the time has already passed
+                        today_at_time = current_time.replace(hour=schedule_hour, minute=schedule_minute, second=0, microsecond=0)
+                        if today_at_time <= current_time:
+                            days_ahead = 7  # Schedule for next week
+                    
+                    next_run = current_time.replace(hour=schedule_hour, minute=schedule_minute, second=0, microsecond=0) + timedelta(days=days_ahead)
+                    data['next_run'] = next_run
+                    
+                elif schedule_type == 'monthly':
+                    # Get the target day of month (default to current day if not specified)
+                    target_day = schedule_config.get('day_of_month', current_time.day)
+                    
+                    # Calculate next monthly occurrence
+                    next_run = current_time.replace(hour=schedule_hour, minute=schedule_minute, second=0, microsecond=0)
+                    
+                    # Try to set the target day for this month first
                     try:
                         next_run = next_run.replace(day=target_day)
                     except ValueError:
-                        # Day doesn't exist in target month, use last day of month
+                        # Day doesn't exist in current month, use last day of month
                         last_day = calendar.monthrange(next_run.year, next_run.month)[1]
                         next_run = next_run.replace(day=last_day)
-                
-                data['next_run'] = next_run
+                    
+                    # If the time has already passed this month, schedule for next month
+                    if next_run <= current_time:
+                        # Handle month rollover
+                        if current_time.month == 12:
+                            next_run = next_run.replace(year=current_time.year + 1, month=1)
+                        else:
+                            next_run = next_run.replace(month=current_time.month + 1)
+                            
+                        # Handle day overflow for next month (e.g., Jan 31 -> Feb 28)
+                        try:
+                            next_run = next_run.replace(day=target_day)
+                        except ValueError:
+                            # Day doesn't exist in target month, use last day of month
+                            last_day = calendar.monthrange(next_run.year, next_run.month)[1]
+                            next_run = next_run.replace(day=last_day)
+                    
+                    data['next_run'] = next_run
         
         # Add update metadata
         update_data = {
@@ -1903,6 +1913,142 @@ def index_content():
         })
     else:
         return render_template('api_overview.html', endpoints=output)
+
+@app.route('/api/schedules/probability-due', methods=['GET'])
+def get_probability_due_messages():
+    """Get messages that should be considered for probability-based sending today"""
+    if not verify_api_key():
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        # Get all active probability-based schedules
+        schedules = firebase.get_collection('scheduled_messages', limit=100, include_id=True)
+        
+        probability_messages = []
+        from datetime import datetime, timezone
+        import pytz
+        
+        # Use Central European Time for consistency
+        cet = pytz.timezone('Europe/Berlin')
+        current_time = datetime.now(cet)
+        current_date = current_time.date()
+        
+        print(f"[DEBUG] Checking for probability-based messages for date {current_date}")
+        
+        for schedule in schedules:
+            if not schedule.get('active', False):
+                continue
+            
+            # Only process probability-based schedules
+            schedule_config = schedule.get('schedule', {})
+            if schedule_config.get('type') != 'probability':
+                continue
+            
+            # Check if we've already sent a message today
+            last_sent = schedule.get('last_sent')
+            if last_sent:
+                # Convert to date for comparison
+                if hasattr(last_sent, 'seconds'):
+                    # Firebase Timestamp
+                    last_sent_date = datetime.fromtimestamp(last_sent.seconds, tz=cet).date()
+                elif isinstance(last_sent, datetime):
+                    if last_sent.tzinfo is None:
+                        last_sent_date = cet.localize(last_sent).date()
+                    else:
+                        last_sent_date = last_sent.astimezone(cet).date()
+                else:
+                    try:
+                        last_sent_datetime = datetime.fromisoformat(str(last_sent))
+                        if last_sent_datetime.tzinfo is None:
+                            last_sent_date = cet.localize(last_sent_datetime).date()
+                        else:
+                            last_sent_date = last_sent_datetime.astimezone(cet).date()
+                    except:
+                        last_sent_date = None
+                
+                # Skip if already sent today
+                if last_sent_date == current_date:
+                    print(f"[DEBUG] Schedule {schedule.get('id', 'unknown')} already sent today")
+                    continue
+            
+            print(f"[DEBUG] Schedule {schedule.get('id', 'unknown')} is eligible for probability check")
+            probability_messages.append(schedule)
+        
+        print(f"[DEBUG] Found {len(probability_messages)} probability-eligible messages")
+        return jsonify(probability_messages)
+    except Exception as e:
+        print(f"Error in get_probability_due_messages: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/schedules/probability-check', methods=['POST'])
+def check_probability_and_select():
+    """Check if messages should be sent based on probability and select which ones"""
+    if not verify_api_key():
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        import random
+        
+        # Get probability-eligible messages
+        response = get_probability_due_messages()
+        if response[1] != 200:  # Check status code
+            return response
+        
+        eligible_messages = response[0].get_json()
+        
+        if not eligible_messages:
+            return jsonify({"messages_to_send": [], "total_eligible": 0})
+        
+        # Group messages by channel and daily_probability
+        channel_groups = {}
+        for message in eligible_messages:
+            channel_id = message.get('channel_id')
+            if channel_id not in channel_groups:
+                channel_groups[channel_id] = {
+                    'daily_probability': message.get('schedule', {}).get('daily_probability', 0.1),
+                    'messages': []
+                }
+            channel_groups[channel_id]['messages'].append(message)
+        
+        messages_to_send = []
+        
+        # For each channel, check if we should send a message today
+        for channel_id, group in channel_groups.items():
+            daily_probability = group['daily_probability']
+            
+            # Roll the dice for this channel
+            if random.random() < daily_probability:
+                print(f"[DEBUG] Channel {channel_id} won the probability roll (p={daily_probability})")
+                
+                # Select a message based on likelihood weights
+                messages = group['messages']
+                weights = []
+                for msg in messages:
+                    likelihood = msg.get('schedule', {}).get('likelihood', 1.0)
+                    weights.append(likelihood)
+                
+                # Weighted random selection
+                if weights and sum(weights) > 0:
+                    selected_message = random.choices(messages, weights=weights)[0]
+                    messages_to_send.append(selected_message)
+                    print(f"[DEBUG] Selected message: {selected_message.get('title', 'Unknown')} (likelihood={selected_message.get('schedule', {}).get('likelihood', 1.0)})")
+                else:
+                    # Fallback to random selection if no weights
+                    selected_message = random.choice(messages)
+                    messages_to_send.append(selected_message)
+                    print(f"[DEBUG] Selected message (no weights): {selected_message.get('title', 'Unknown')}")
+            else:
+                print(f"[DEBUG] Channel {channel_id} did not win the probability roll (p={daily_probability})")
+        
+        return jsonify({
+            "messages_to_send": messages_to_send,
+            "total_eligible": len(eligible_messages),
+            "channels_checked": len(channel_groups)
+        })
+        
+    except Exception as e:
+        print(f"Error in check_probability_and_select: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 8080))

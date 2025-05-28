@@ -520,6 +520,7 @@
                         <option value="daily">Daily</option>
                         <option value="weekly">Weekly</option>
                         <option value="monthly">Monthly</option>
+                        <option value="probability">Probability-based</option>
                     </select>
                 </div>
                 
@@ -576,9 +577,25 @@
                     </small>
                 </div>
                 
-                <div class="form-group">
+                <div class="form-group" id="time-field">
                     <label for="schedule-time">Time (24h format):</label>
                     <input type="time" id="schedule-time" name="schedule_time" value="18:00">
+                </div>
+                
+                <div class="form-group" id="probability-fields" style="display: none;">
+                    <label for="daily-probability">Daily Probability (0.0 - 1.0):</label>
+                    <input type="number" id="daily-probability" name="daily_probability" min="0" max="1" step="0.01" value="0.1" placeholder="0.1">
+                    <small style="color: #666; font-size: 0.85em; display: block; margin-top: 5px;">
+                        Probability that a message will be sent on any given day (e.g., 0.1 = 10% chance per day)
+                    </small>
+                </div>
+                
+                <div class="form-group" id="likelihood-field" style="display: none;">
+                    <label for="message-likelihood">Message Likelihood (relative weight):</label>
+                    <input type="number" id="message-likelihood" name="likelihood" min="0.1" step="0.1" value="1.0" placeholder="1.0">
+                    <small style="color: #666; font-size: 0.85em; display: block; margin-top: 5px;">
+                        Relative likelihood this message will be selected when a message is sent (higher = more likely)
+                    </small>
                 </div>
             </div>
             
@@ -657,16 +674,26 @@
             const scheduleType = document.getElementById('schedule-type').value;
             const dayField = document.getElementById('day-field');
             const dayOfMonthField = document.getElementById('day-of-month-field');
+            const timeField = document.getElementById('time-field');
+            const probabilityFields = document.getElementById('probability-fields');
+            const likelihoodField = document.getElementById('likelihood-field');
             
             // Hide all conditional fields first
             dayField.style.display = 'none';
             dayOfMonthField.style.display = 'none';
+            timeField.style.display = 'block';
+            probabilityFields.style.display = 'none';
+            likelihoodField.style.display = 'none';
             
-            // Show appropriate field based on schedule type
+            // Show appropriate fields based on schedule type
             if (scheduleType === 'weekly') {
                 dayField.style.display = 'block';
             } else if (scheduleType === 'monthly') {
                 dayOfMonthField.style.display = 'block';
+            } else if (scheduleType === 'probability') {
+                timeField.style.display = 'none';
+                probabilityFields.style.display = 'block';
+                likelihoodField.style.display = 'block';
             }
         }
 
@@ -823,6 +850,10 @@
                     } else if (scheduleType === 'monthly') {
                         const dayText = dayOfMonth ? ` on the ${dayOfMonth}${getOrdinalSuffix(dayOfMonth)}` : '';
                         scheduleInfo = `Monthly${dayText} at ${scheduleTime}`;
+                    } else if (scheduleType === 'probability') {
+                        const dailyProb = (message.schedule.daily_probability * 100).toFixed(1);
+                        const likelihood = message.schedule.likelihood || 1.0;
+                        scheduleInfo = `Probability-based (${dailyProb}% daily, likelihood: ${likelihood})`;
                     } else {
                         scheduleInfo = `${scheduleType} at ${scheduleTime}`;
                     }
@@ -926,14 +957,22 @@
             const scheduleType = formData.get('schedule_type');
             
             const schedule = {
-                type: scheduleType,
-                time: formData.get('schedule_time')
+                type: scheduleType
             };
             
-            if (scheduleType === 'weekly') {
-                schedule.day = formData.get('schedule_day');
-            } else if (scheduleType === 'monthly') {
-                schedule.day_of_month = parseInt(formData.get('schedule_day_of_month'));
+            if (scheduleType === 'probability') {
+                // For probability-based scheduling
+                schedule.daily_probability = parseFloat(formData.get('daily_probability')) || 0.1;
+                schedule.likelihood = parseFloat(formData.get('likelihood')) || 1.0;
+            } else {
+                // For time-based scheduling
+                schedule.time = formData.get('schedule_time');
+                
+                if (scheduleType === 'weekly') {
+                    schedule.day = formData.get('schedule_day');
+                } else if (scheduleType === 'monthly') {
+                    schedule.day_of_month = parseInt(formData.get('schedule_day_of_month'));
+                }
             }
             
             const data = {
@@ -1051,6 +1090,12 @@
                     }
                     if (message.schedule.time) {
                         document.getElementById('schedule-time').value = message.schedule.time;
+                    }
+                    if (message.schedule.daily_probability !== undefined) {
+                        document.getElementById('daily-probability').value = message.schedule.daily_probability;
+                    }
+                    if (message.schedule.likelihood !== undefined) {
+                        document.getElementById('message-likelihood').value = message.schedule.likelihood;
                     }
                 }
                 
