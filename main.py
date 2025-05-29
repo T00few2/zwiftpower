@@ -1989,12 +1989,66 @@ def check_probability_and_select():
     try:
         import random
         
-        # Get probability-eligible messages
-        response = get_probability_due_messages()
-        if response[1] != 200:  # Check status code
-            return response
-        
-        eligible_messages = response[0].get_json()
+        # Get probability-eligible messages by calling the logic directly
+        try:
+            # Get all active probability-based schedules
+            schedules = firebase.get_collection('scheduled_messages', limit=100, include_id=True)
+            
+            probability_messages = []
+            from datetime import datetime, timezone
+            import pytz
+            
+            # Use Central European Time for consistency
+            cet = pytz.timezone('Europe/Berlin')
+            current_time = datetime.now(cet)
+            current_date = current_time.date()
+            
+            print(f"[DEBUG] Checking for probability-based messages for date {current_date}")
+            
+            for schedule in schedules:
+                if not schedule.get('active', False):
+                    continue
+                
+                # Only process probability-based schedules
+                schedule_config = schedule.get('schedule', {})
+                if schedule_config.get('type') != 'probability':
+                    continue
+                
+                # Check if we've already sent a message today
+                last_sent = schedule.get('last_sent')
+                if last_sent:
+                    # Convert to date for comparison
+                    if hasattr(last_sent, 'seconds'):
+                        # Firebase Timestamp
+                        last_sent_date = datetime.fromtimestamp(last_sent.seconds, tz=cet).date()
+                    elif isinstance(last_sent, datetime):
+                        if last_sent.tzinfo is None:
+                            last_sent_date = cet.localize(last_sent).date()
+                        else:
+                            last_sent_date = last_sent.astimezone(cet).date()
+                    else:
+                        try:
+                            last_sent_datetime = datetime.fromisoformat(str(last_sent))
+                            if last_sent_datetime.tzinfo is None:
+                                last_sent_date = cet.localize(last_sent_datetime).date()
+                            else:
+                                last_sent_date = last_sent_datetime.astimezone(cet).date()
+                        except:
+                            last_sent_date = None
+                    
+                    # Skip if already sent today
+                    if last_sent_date == current_date:
+                        print(f"[DEBUG] Schedule {schedule.get('id', 'unknown')} already sent today")
+                        continue
+                
+                print(f"[DEBUG] Schedule {schedule.get('id', 'unknown')} is eligible for probability check")
+                probability_messages.append(schedule)
+            
+            eligible_messages = probability_messages
+            
+        except Exception as e:
+            print(f"Error getting probability eligible messages: {str(e)}")
+            return jsonify({"error": f"Failed to get eligible messages: {str(e)}"}), 500
         
         if not eligible_messages:
             return jsonify({"messages_to_send": [], "total_eligible": 0})
