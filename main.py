@@ -2221,6 +2221,10 @@ def create_role_panel():
         if panel_id in panels_doc.get('panels', {}):
             return jsonify({"error": "Panel ID already exists"}), 400
         
+        # Use regular datetime instead of SERVER_TIMESTAMP
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
+        
         # Create new panel
         new_panel = {
             'channelId': channel_id,
@@ -2231,15 +2235,15 @@ def create_role_panel():
             'requiredRoles': required_roles,
             'approvalChannelId': approval_channel_id,
             'order': len(panels_doc.get('panels', {})) + 1,  
-            'createdAt': firebase.firestore.SERVER_TIMESTAMP,
-            'updatedAt': firebase.firestore.SERVER_TIMESTAMP
+            'createdAt': now.isoformat(),
+            'updatedAt': now.isoformat()
         }
         
         # Add to panels
         if 'panels' not in panels_doc:
             panels_doc['panels'] = {}
         panels_doc['panels'][panel_id] = new_panel
-        panels_doc['updatedAt'] = firebase.firestore.SERVER_TIMESTAMP
+        panels_doc['updatedAt'] = now.isoformat()
         
         # Save to Firebase
         firebase.set_document("selfRoles", DISCORD_GUILD_ID, panels_doc)
@@ -2275,9 +2279,13 @@ def update_role_panel(panel_id):
             panel['requiredRoles'] = data['requiredRoles']
         if 'approvalChannelId' in data:
             panel['approvalChannelId'] = data['approvalChannelId']
-            
-        panel['updatedAt'] = firebase.firestore.SERVER_TIMESTAMP
-        panels_doc['updatedAt'] = firebase.firestore.SERVER_TIMESTAMP
+        
+        # Use regular datetime instead of SERVER_TIMESTAMP
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
+        
+        panel['updatedAt'] = now.isoformat()
+        panels_doc['updatedAt'] = now.isoformat()
         
         # Save to Firebase
         firebase.set_document("selfRoles", DISCORD_GUILD_ID, panels_doc)
@@ -2339,7 +2347,10 @@ def add_role_to_panel(panel_id):
         if any(role['roleId'] == role_id for role in panel['roles']):
             return jsonify({"error": "Role already exists in this panel"}), 400
         
-        # Add role to panel
+        # Add role to panel - use regular datetime instead of SERVER_TIMESTAMP
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
+        
         new_role = {
             'roleId': role_id,
             'roleName': data['roleName'],
@@ -2348,13 +2359,13 @@ def add_role_to_panel(panel_id):
             'requiresApproval': data.get('requiresApproval', False),
             'teamCaptainId': data.get('teamCaptainId'),
             'roleApprovalChannelId': data.get('roleApprovalChannelId'),
-            'addedAt': firebase.firestore.SERVER_TIMESTAMP
+            'addedAt': now.isoformat()
         }
         
         print(f"[DEBUG] New role to add: {new_role}")
         panel['roles'].append(new_role)
-        panel['updatedAt'] = firebase.firestore.SERVER_TIMESTAMP
-        panels_doc['updatedAt'] = firebase.firestore.SERVER_TIMESTAMP
+        panel['updatedAt'] = now.isoformat()
+        panels_doc['updatedAt'] = now.isoformat()
         
         print(f"[DEBUG] Panel after adding role: {panel}")
         print(f"[DEBUG] Full panels_doc before saving: {panels_doc}")
@@ -2362,6 +2373,10 @@ def add_role_to_panel(panel_id):
         # Save to Firebase
         result = firebase.set_document("selfRoles", DISCORD_GUILD_ID, panels_doc)
         print(f"[DEBUG] Firebase save result: {result}")
+        
+        # Verify the save by reading it back
+        verification_doc = firebase.get_document("selfRoles", DISCORD_GUILD_ID)
+        print(f"[DEBUG] Verification read after save: {verification_doc}")
         
         return jsonify({"success": True, "message": f"Role '{data['roleName']}' added to panel"})
         
@@ -2390,8 +2405,12 @@ def remove_role_from_panel(panel_id, role_id):
         if len(panel['roles']) == original_length:
             return jsonify({"error": "Role not found in panel"}), 404
         
-        panel['updatedAt'] = firebase.firestore.SERVER_TIMESTAMP
-        panels_doc['updatedAt'] = firebase.firestore.SERVER_TIMESTAMP
+        # Use regular datetime instead of SERVER_TIMESTAMP
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
+        
+        panel['updatedAt'] = now.isoformat()
+        panels_doc['updatedAt'] = now.isoformat()
         
         # Save to Firebase
         firebase.set_document("selfRoles", DISCORD_GUILD_ID, panels_doc)
@@ -2444,6 +2463,26 @@ def get_discord_channels():
         
     except Exception as e:
         print(f"Error fetching Discord channels: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/roles/debug', methods=['GET'])
+@login_required
+def debug_roles():
+    """Debug endpoint to check what's actually stored in Firebase for roles"""
+    try:
+        # Get the raw document from Firebase
+        panels_doc = firebase.get_document("selfRoles", DISCORD_GUILD_ID)
+        
+        return jsonify({
+            "raw_firebase_data": panels_doc,
+            "guild_id": DISCORD_GUILD_ID,
+            "timestamp": datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        print(f"Error in debug endpoint: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':

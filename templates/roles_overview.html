@@ -697,6 +697,21 @@
             console.log('Loaded panels data:', data);
             panels = data.panels || [];
             console.log('Parsed panels:', panels);
+            
+            // Debug: Log each panel's roles in detail
+            panels.forEach((panel, index) => {
+                console.log(`Panel ${index} (${panel.panelId}):`, panel);
+                console.log(`  - Name: ${panel.name}`);
+                console.log(`  - Roles count: ${panel.roles ? panel.roles.length : 0}`);
+                if (panel.roles && panel.roles.length > 0) {
+                    console.log(`  - Roles:`, panel.roles);
+                    panel.roles.forEach((role, roleIndex) => {
+                        console.log(`    Role ${roleIndex}: ${role.roleName} (${role.roleId})`);
+                    });
+                } else {
+                    console.log(`  - No roles found in panel`);
+                }
+            });
         }
 
         async function loadGuildRoles() {
