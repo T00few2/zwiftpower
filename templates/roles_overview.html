@@ -301,6 +301,26 @@
             background: rgba(102, 126, 234, 0.2);
         }
         
+        .role-remove-btn {
+            background: rgba(220, 53, 69, 0.8);
+            color: white;
+            border: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            font-size: 10px;
+            cursor: pointer;
+            margin-left: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s ease;
+        }
+        
+        .role-remove-btn:hover {
+            background: rgba(220, 53, 69, 1);
+        }
+        
         .no-panels {
             text-align: center;
             padding: 60px 20px;
@@ -583,6 +603,66 @@
         </div>
     </div>
 
+    <!-- Add Role Modal -->
+    <div id="addRoleModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Add Role to Panel</h2>
+                <span class="close" onclick="closeModal('addRoleModal')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="addRoleForm">
+                    <div class="form-group">
+                        <label class="form-label" for="roleSelect">Role *</label>
+                        <select class="form-control" id="roleSelect" required>
+                            <option value="">Select a role...</option>
+                        </select>
+                        <div class="form-text">Choose the Discord role to add to this panel</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="roleDescription">Description</label>
+                        <textarea class="form-control" id="roleDescription" rows="2" placeholder="Optional description for this role"></textarea>
+                        <div class="form-text">Explain what this role provides or represents</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="roleEmoji">Emoji</label>
+                        <input type="text" class="form-control" id="roleEmoji" placeholder="🔹" maxlength="10">
+                        <div class="form-text">Optional emoji to display with the role (e.g., 🎮, 🎯, 👑)</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">
+                            <input type="checkbox" id="requiresApproval" style="margin-right: 8px;">
+                            Requires Approval
+                        </label>
+                        <div class="form-text">Check this if role assignment should require approval</div>
+                    </div>
+                    
+                    <div class="form-group" id="teamCaptainGroup" style="display: none;">
+                        <label class="form-label" for="teamCaptain">Team Captain</label>
+                        <input type="text" class="form-control" id="teamCaptain" placeholder="User ID of team captain">
+                        <div class="form-text">Discord User ID of the team captain who can approve this role</div>
+                    </div>
+                    
+                    <div class="form-group" id="roleApprovalChannelGroup" style="display: none;">
+                        <label class="form-label" for="roleApprovalChannel">Role-Specific Approval Channel</label>
+                        <select class="form-control" id="roleApprovalChannel">
+                            <option value="">Use panel default</option>
+                        </select>
+                        <div class="form-text">Override the panel's approval channel for this specific role</div>
+                    </div>
+                    
+                    <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 30px;">
+                        <button type="button" class="btn btn-secondary" onclick="closeModal('addRoleModal')">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Add Role</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <script>
         let panels = [];
         let guildRoles = [];
@@ -668,6 +748,7 @@
                 return `
                     <span class="role-badge${missingClass}" style="background-color: ${color}">
                         ${role.emoji || '🔹'} ${role.roleName}
+                        <button class="role-remove-btn" onclick="removeRoleFromPanel('${panel.panelId}', '${role.roleId}')" title="Remove Role">×</button>
                     </span>
                 `;
             }).join('');
@@ -837,13 +918,132 @@
             });
         }
 
-        // Placeholder functions for future implementation
-        function editPanel(panelId) {
-            showError('Edit panel functionality coming soon!');
+        // Global variable to store the current panel ID for adding roles
+        let currentPanelForRole = null;
+
+        // Add role functionality
+        function addRoleToPanel(panelId) {
+            currentPanelForRole = panelId;
+            
+            // Populate role dropdown - exclude roles already in this panel
+            const currentPanel = panels.find(p => p.panelId === panelId);
+            const existingRoleIds = currentPanel ? currentPanel.roles.map(r => r.roleId) : [];
+            
+            const roleSelect = document.getElementById('roleSelect');
+            roleSelect.innerHTML = '<option value="">Select a role...</option>' +
+                guildRoles
+                    .filter(role => !existingRoleIds.includes(role.id)) // Filter out existing roles
+                    .map(role => `<option value="${role.id}" data-name="${role.name}">${role.name}</option>`)
+                    .join('');
+            
+            // Populate approval channel dropdown for role-specific overrides
+            const roleApprovalChannel = document.getElementById('roleApprovalChannel');
+            roleApprovalChannel.innerHTML = '<option value="">Use panel default</option>' +
+                channels.map(channel => `<option value="${channel.id}">#${channel.name}</option>`).join('');
+            
+            // Reset form
+            document.getElementById('addRoleForm').reset();
+            document.getElementById('teamCaptainGroup').style.display = 'none';
+            document.getElementById('roleApprovalChannelGroup').style.display = 'none';
+            
+            document.getElementById('addRoleModal').style.display = 'block';
         }
 
-        function addRoleToPanel(panelId) {
-            showError('Add role functionality coming soon!');
+        // Handle approval checkbox change
+        document.getElementById('requiresApproval').addEventListener('change', function(e) {
+            const teamCaptainGroup = document.getElementById('teamCaptainGroup');
+            const roleApprovalChannelGroup = document.getElementById('roleApprovalChannelGroup');
+            
+            if (e.target.checked) {
+                teamCaptainGroup.style.display = 'block';
+                roleApprovalChannelGroup.style.display = 'block';
+            } else {
+                teamCaptainGroup.style.display = 'none';
+                roleApprovalChannelGroup.style.display = 'none';
+            }
+        });
+
+        // Handle add role form submission
+        document.getElementById('addRoleForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            if (!currentPanelForRole) {
+                showError('No panel selected');
+                return;
+            }
+            
+            const roleSelect = document.getElementById('roleSelect');
+            const selectedOption = roleSelect.options[roleSelect.selectedIndex];
+            
+            if (!selectedOption || !selectedOption.value) {
+                showError('Please select a role');
+                return;
+            }
+            
+            const formData = {
+                roleId: selectedOption.value,
+                roleName: selectedOption.dataset.name,
+                description: document.getElementById('roleDescription').value || null,
+                emoji: document.getElementById('roleEmoji').value || null,
+                requiresApproval: document.getElementById('requiresApproval').checked,
+                teamCaptainId: document.getElementById('teamCaptain').value || null,
+                roleApprovalChannelId: document.getElementById('roleApprovalChannel').value || null
+            };
+            
+            try {
+                const response = await fetch(`/api/roles/panels/${currentPanelForRole}/roles`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to add role to panel');
+                }
+                
+                const result = await response.json();
+                showSuccess(result.message);
+                closeModal('addRoleModal');
+                document.getElementById('addRoleForm').reset();
+                currentPanelForRole = null;
+                loadData(); // Refresh the data to show the new role
+                
+            } catch (error) {
+                showError(error.message);
+            }
+        });
+
+        // Remove role from panel functionality
+        async function removeRoleFromPanel(panelId, roleId) {
+            if (!confirm('Are you sure you want to remove this role from the panel?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/roles/panels/${panelId}/roles/${roleId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to remove role from panel');
+                }
+                
+                const result = await response.json();
+                showSuccess(result.message);
+                loadData(); // Refresh the data to show the updated panel
+                
+            } catch (error) {
+                showError(error.message);
+            }
+        }
+
+        // Edit panel functionality (placeholder for now)
+        function editPanel(panelId) {
+            showError('Edit panel functionality coming soon!');
         }
     </script>
 </body>
