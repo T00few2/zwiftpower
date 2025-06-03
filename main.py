@@ -2117,17 +2117,19 @@ def get_role_panels():
     try:
         # Get panels from Firebase (using the same structure as the bot)
         panels_doc = firebase.get_document("selfRoles", DISCORD_GUILD_ID)
+        print(f"[DEBUG] Fetched panels_doc: {panels_doc}")
         
         if not panels_doc or 'panels' not in panels_doc:
             return jsonify({"panels": []})
         
         # Get Discord API instance to fetch role information
-        discord_api = DiscordAPI()
+        discord_api = DiscordAPI(DISCORD_BOT_TOKEN, DISCORD_GUILD_ID)
         guild_roles = discord_api.get_guild_roles()
         
         # Format panels with role information
         formatted_panels = []
         for panel_id, panel_data in panels_doc['panels'].items():
+            print(f"[DEBUG] Processing panel {panel_id}: {panel_data}")
             # Add role details to each role in the panel
             roles_with_details = []
             for role in panel_data.get('roles', []):
@@ -2157,6 +2159,7 @@ def get_role_panels():
         # Sort panels by order
         formatted_panels.sort(key=lambda x: x['order'])
         
+        print(f"[DEBUG] Returning formatted_panels: {formatted_panels}")
         return jsonify({"panels": formatted_panels})
         
     except Exception as e:
@@ -2168,7 +2171,7 @@ def get_role_panels():
 def get_guild_roles():
     """Get all guild roles for role selection"""
     try:
-        discord_api = DiscordAPI()
+        discord_api = DiscordAPI(DISCORD_BOT_TOKEN, DISCORD_GUILD_ID)
         guild_roles = discord_api.get_guild_roles()
         
         # Filter out managed roles and @everyone
@@ -2314,6 +2317,7 @@ def add_role_to_panel(panel_id):
     """Add a role to a specific panel"""
     try:
         data = request.get_json()
+        print(f"[DEBUG] Adding role to panel {panel_id}: {data}")
         
         required_fields = ['roleId', 'roleName']
         for field in required_fields:
@@ -2322,10 +2326,13 @@ def add_role_to_panel(panel_id):
         
         # Get existing panels document
         panels_doc = firebase.get_document("selfRoles", DISCORD_GUILD_ID)
+        print(f"[DEBUG] Current panels_doc before adding role: {panels_doc}")
+        
         if not panels_doc or 'panels' not in panels_doc or panel_id not in panels_doc['panels']:
             return jsonify({"error": "Panel not found"}), 404
         
         panel = panels_doc['panels'][panel_id]
+        print(f"[DEBUG] Current panel before adding role: {panel}")
         
         # Check if role already exists in panel
         role_id = data['roleId']
@@ -2344,17 +2351,24 @@ def add_role_to_panel(panel_id):
             'addedAt': firebase.firestore.SERVER_TIMESTAMP
         }
         
+        print(f"[DEBUG] New role to add: {new_role}")
         panel['roles'].append(new_role)
         panel['updatedAt'] = firebase.firestore.SERVER_TIMESTAMP
         panels_doc['updatedAt'] = firebase.firestore.SERVER_TIMESTAMP
         
+        print(f"[DEBUG] Panel after adding role: {panel}")
+        print(f"[DEBUG] Full panels_doc before saving: {panels_doc}")
+        
         # Save to Firebase
-        firebase.set_document("selfRoles", DISCORD_GUILD_ID, panels_doc)
+        result = firebase.set_document("selfRoles", DISCORD_GUILD_ID, panels_doc)
+        print(f"[DEBUG] Firebase save result: {result}")
         
         return jsonify({"success": True, "message": f"Role '{data['roleName']}' added to panel"})
         
     except Exception as e:
         print(f"Error adding role to panel: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/roles/panels/<panel_id>/roles/<role_id>', methods=['DELETE'])
@@ -2393,7 +2407,7 @@ def remove_role_from_panel(panel_id, role_id):
 def get_discord_channels():
     """Get all Discord text channels"""
     try:
-        discord_api = DiscordAPI()
+        discord_api = DiscordAPI(DISCORD_BOT_TOKEN, DISCORD_GUILD_ID)
         
         # Get guild channels using Discord API
         headers = {
