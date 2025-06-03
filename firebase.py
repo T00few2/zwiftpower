@@ -104,6 +104,30 @@ def get_documents_by_field(
     """
     return query_collection(collection, field, "==", value, limit)
 
+def set_document(collection: str, doc_id: str, data: Dict[str, Any], merge: bool = False) -> bool:
+    """
+    Set or update a document in Firestore.
+    
+    Args:
+        collection: The collection name
+        doc_id: The document ID
+        data: The data to set/update
+        merge: Whether to merge with existing data (default: False)
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        doc_ref = db.collection(collection).document(doc_id)
+        if merge:
+            doc_ref.set(data, merge=True)
+        else:
+            doc_ref.set(data)
+        return True
+    except Exception as e:
+        print(f"Error setting document: {e}")
+        return False
+
 def update_discord_zwift_link(discord_id: str, zwift_id: str, username: str = None) -> Dict[str, Any]:
     """
     Update or create a Discord user with a ZwiftID.

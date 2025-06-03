@@ -2104,6 +2104,322 @@ def check_probability_and_select():
         print(f"Error in check_probability_and_select: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
+@app.route('/roles', methods=['GET'])
+@login_required
+def roles_overview():
+    """Role management overview page"""
+    return render_template('roles_overview.html')
+
+@app.route('/api/roles/panels', methods=['GET'])
+@login_required
+def get_role_panels():
+    """Get all role panels for the guild"""
+    try:
+        # Get panels from Firebase (using the same structure as the bot)
+        panels_doc = firebase.get_document("selfRoles", DISCORD_GUILD_ID)
+        
+        if not panels_doc or 'panels' not in panels_doc:
+            return jsonify({"panels": []})
+        
+        # Get Discord API instance to fetch role information
+        discord_api = DiscordAPI()
+        guild_roles = discord_api.get_guild_roles()
+        
+        # Format panels with role information
+        formatted_panels = []
+        for panel_id, panel_data in panels_doc['panels'].items():
+            # Add role details to each role in the panel
+            roles_with_details = []
+            for role in panel_data.get('roles', []):
+                role_id = role['roleId']
+                role_details = guild_roles.get(role_id, {})
+                roles_with_details.append({
+                    **role,
+                    'roleName': role_details.get('name', role.get('roleName', 'Unknown Role')),
+                    'roleColor': role_details.get('color', 0),
+                    'rolePosition': role_details.get('position', 0),
+                    'roleExists': role_id in guild_roles
+                })
+            
+            formatted_panels.append({
+                'panelId': panel_id,
+                'name': panel_data.get('name', 'Unnamed Panel'),
+                'description': panel_data.get('description', ''),
+                'channelId': panel_data.get('channelId'),
+                'roles': roles_with_details,
+                'requiredRoles': panel_data.get('requiredRoles', []),
+                'approvalChannelId': panel_data.get('approvalChannelId'),
+                'createdAt': panel_data.get('createdAt'),
+                'updatedAt': panel_data.get('updatedAt'),
+                'order': panel_data.get('order', 0)
+            })
+        
+        # Sort panels by order
+        formatted_panels.sort(key=lambda x: x['order'])
+        
+        return jsonify({"panels": formatted_panels})
+        
+    except Exception as e:
+        print(f"Error fetching role panels: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/roles/guild-roles', methods=['GET'])
+@login_required
+def get_guild_roles():
+    """Get all available roles in the Discord guild"""
+    try:
+        discord_api = DiscordAPI()
+        guild_roles = discord_api.get_guild_roles()
+        
+        # Filter out managed roles and @everyone
+        available_roles = []
+        for role_id, role_data in guild_roles.items():
+            if not role_data.get('managed') and role_data.get('name') != '@everyone':
+                available_roles.append({
+                    'id': role_id,
+                    'name': role_data['name'],
+                    'color': role_data['color'],
+                    'position': role_data['position'],
+                    'mentionable': role_data['mentionable']
+                })
+        
+        # Sort by position (highest first)
+        available_roles.sort(key=lambda x: x['position'], reverse=True)
+        
+        return jsonify({"roles": available_roles})
+        
+    except Exception as e:
+        print(f"Error fetching guild roles: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/roles/panels', methods=['POST'])
+@login_required
+def create_role_panel():
+    """Create a new role panel"""
+    try:
+        data = request.get_json()
+        
+        required_fields = ['panelId', 'channelId', 'name']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({"error": f"Missing required field: {field}"}), 400
+        
+        panel_id = data['panelId']
+        channel_id = data['channelId']
+        name = data['name']
+        description = data.get('description', 'Click the buttons below to add or remove roles!')
+        required_roles = data.get('requiredRoles', [])
+        approval_channel_id = data.get('approvalChannelId')
+        
+        # Get existing panels document
+        panels_doc = firebase.get_document("selfRoles", DISCORD_GUILD_ID) or {"panels": {}}
+        
+        # Check if panel ID already exists
+        if panel_id in panels_doc.get('panels', {}):
+            return jsonify({"error": "Panel ID already exists"}), 400
+        
+        # Create new panel
+        new_panel = {
+            'channelId': channel_id,
+            'name': name,
+            'description': description,
+            'roles': [],
+            'panelMessageId': None,
+            'requiredRoles': required_roles,
+            'approvalChannelId': approval_channel_id,
+            'order': len(panels_doc.get('panels', {})) + 1,  
+            'createdAt': firebase.firestore.SERVER_TIMESTAMP,
+            'updatedAt': firebase.firestore.SERVER_TIMESTAMP
+        }
+        
+        # Add to panels
+        if 'panels' not in panels_doc:
+            panels_doc['panels'] = {}
+        panels_doc['panels'][panel_id] = new_panel
+        panels_doc['updatedAt'] = firebase.firestore.SERVER_TIMESTAMP
+        
+        # Save to Firebase
+        firebase.set_document("selfRoles", DISCORD_GUILD_ID, panels_doc)
+        
+        return jsonify({"success": True, "message": f"Panel '{name}' created successfully"})
+        
+    except Exception as e:
+        print(f"Error creating role panel: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/roles/panels/<panel_id>', methods=['PUT'])
+@login_required  
+def update_role_panel(panel_id):
+    """Update an existing role panel"""
+    try:
+        data = request.get_json()
+        
+        # Get existing panels document
+        panels_doc = firebase.get_document("selfRoles", DISCORD_GUILD_ID)
+        if not panels_doc or 'panels' not in panels_doc or panel_id not in panels_doc['panels']:
+            return jsonify({"error": "Panel not found"}), 404
+        
+        panel = panels_doc['panels'][panel_id]
+        
+        # Update fields
+        if 'name' in data:
+            panel['name'] = data['name']
+        if 'description' in data:
+            panel['description'] = data['description']
+        if 'channelId' in data:
+            panel['channelId'] = data['channelId']
+        if 'requiredRoles' in data:
+            panel['requiredRoles'] = data['requiredRoles']
+        if 'approvalChannelId' in data:
+            panel['approvalChannelId'] = data['approvalChannelId']
+            
+        panel['updatedAt'] = firebase.firestore.SERVER_TIMESTAMP
+        panels_doc['updatedAt'] = firebase.firestore.SERVER_TIMESTAMP
+        
+        # Save to Firebase
+        firebase.set_document("selfRoles", DISCORD_GUILD_ID, panels_doc)
+        
+        return jsonify({"success": True, "message": "Panel updated successfully"})
+        
+    except Exception as e:
+        print(f"Error updating role panel: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/roles/panels/<panel_id>', methods=['DELETE'])
+@login_required
+def delete_role_panel(panel_id):
+    """Delete a role panel"""
+    try:
+        # Get existing panels document
+        panels_doc = firebase.get_document("selfRoles", DISCORD_GUILD_ID)
+        if not panels_doc or 'panels' not in panels_doc or panel_id not in panels_doc['panels']:
+            return jsonify({"error": "Panel not found"}), 404
+        
+        # Remove panel
+        del panels_doc['panels'][panel_id]
+        panels_doc['updatedAt'] = firebase.firestore.SERVER_TIMESTAMP
+        
+        # Save to Firebase
+        firebase.set_document("selfRoles", DISCORD_GUILD_ID, panels_doc)
+        
+        return jsonify({"success": True, "message": "Panel deleted successfully"})
+        
+    except Exception as e:
+        print(f"Error deleting role panel: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/roles/panels/<panel_id>/roles', methods=['POST'])
+@login_required
+def add_role_to_panel(panel_id):
+    """Add a role to a specific panel"""
+    try:
+        data = request.get_json()
+        
+        required_fields = ['roleId', 'roleName']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({"error": f"Missing required field: {field}"}), 400
+        
+        # Get existing panels document
+        panels_doc = firebase.get_document("selfRoles", DISCORD_GUILD_ID)
+        if not panels_doc or 'panels' not in panels_doc or panel_id not in panels_doc['panels']:
+            return jsonify({"error": "Panel not found"}), 404
+        
+        panel = panels_doc['panels'][panel_id]
+        
+        # Check if role already exists in panel
+        role_id = data['roleId']
+        if any(role['roleId'] == role_id for role in panel['roles']):
+            return jsonify({"error": "Role already exists in this panel"}), 400
+        
+        # Add role to panel
+        new_role = {
+            'roleId': role_id,
+            'roleName': data['roleName'],
+            'description': data.get('description'),
+            'emoji': data.get('emoji'),
+            'requiresApproval': data.get('requiresApproval', False),
+            'teamCaptainId': data.get('teamCaptainId'),
+            'roleApprovalChannelId': data.get('roleApprovalChannelId'),
+            'addedAt': firebase.firestore.SERVER_TIMESTAMP
+        }
+        
+        panel['roles'].append(new_role)
+        panel['updatedAt'] = firebase.firestore.SERVER_TIMESTAMP
+        panels_doc['updatedAt'] = firebase.firestore.SERVER_TIMESTAMP
+        
+        # Save to Firebase
+        firebase.set_document("selfRoles", DISCORD_GUILD_ID, panels_doc)
+        
+        return jsonify({"success": True, "message": f"Role '{data['roleName']}' added to panel"})
+        
+    except Exception as e:
+        print(f"Error adding role to panel: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/roles/panels/<panel_id>/roles/<role_id>', methods=['DELETE'])
+@login_required
+def remove_role_from_panel(panel_id, role_id):
+    """Remove a role from a specific panel"""
+    try:
+        # Get existing panels document
+        panels_doc = firebase.get_document("selfRoles", DISCORD_GUILD_ID)
+        if not panels_doc or 'panels' not in panels_doc or panel_id not in panels_doc['panels']:
+            return jsonify({"error": "Panel not found"}), 404
+        
+        panel = panels_doc['panels'][panel_id]
+        
+        # Find and remove role
+        original_length = len(panel['roles'])
+        panel['roles'] = [role for role in panel['roles'] if role['roleId'] != role_id]
+        
+        if len(panel['roles']) == original_length:
+            return jsonify({"error": "Role not found in panel"}), 404
+        
+        panel['updatedAt'] = firebase.firestore.SERVER_TIMESTAMP
+        panels_doc['updatedAt'] = firebase.firestore.SERVER_TIMESTAMP
+        
+        # Save to Firebase
+        firebase.set_document("selfRoles", DISCORD_GUILD_ID, panels_doc)
+        
+        return jsonify({"success": True, "message": "Role removed from panel"})
+        
+    except Exception as e:
+        print(f"Error removing role from panel: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/discord/channels', methods=['GET'])
+@login_required
+def get_discord_channels():
+    """Get all text channels in the Discord guild"""
+    try:
+        response = requests.get(
+            f"https://discord.com/api/v10/guilds/{DISCORD_GUILD_ID}/channels",
+            headers={'Authorization': f'Bot {DISCORD_BOT_TOKEN}'}
+        )
+        response.raise_for_status()
+        
+        channels = response.json()
+        # Filter for text channels only
+        text_channels = [
+            {
+                'id': channel['id'],
+                'name': channel['name'],
+                'position': channel.get('position', 0)
+            }
+            for channel in channels 
+            if channel.get('type') == 0  # 0 = text channel
+        ]
+        
+        # Sort by position
+        text_channels.sort(key=lambda x: x['position'])
+        
+        return jsonify({"channels": text_channels})
+        
+    except Exception as e:
+        print(f"Error fetching Discord channels: {e}")
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 8080))
     app.run(host='0.0.0.0', port=port)
