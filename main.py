@@ -2166,27 +2166,27 @@ def get_role_panels():
 @app.route('/api/roles/guild-roles', methods=['GET'])
 @login_required
 def get_guild_roles():
-    """Get all available roles in the Discord guild"""
+    """Get all guild roles for role selection"""
     try:
         discord_api = DiscordAPI()
         guild_roles = discord_api.get_guild_roles()
         
         # Filter out managed roles and @everyone
-        available_roles = []
+        filtered_roles = []
         for role_id, role_data in guild_roles.items():
-            if not role_data.get('managed') and role_data.get('name') != '@everyone':
-                available_roles.append({
+            if not role_data.get('managed', False) and role_data.get('name') != '@everyone':
+                filtered_roles.append({
                     'id': role_id,
-                    'name': role_data['name'],
-                    'color': role_data['color'],
-                    'position': role_data['position'],
-                    'mentionable': role_data['mentionable']
+                    'name': role_data.get('name', 'Unknown Role'),
+                    'color': role_data.get('color', 0),
+                    'position': role_data.get('position', 0),
+                    'permissions': role_data.get('permissions', '0')
                 })
         
-        # Sort by position (highest first)
-        available_roles.sort(key=lambda x: x['position'], reverse=True)
+        # Sort by position (higher position = higher in hierarchy)
+        filtered_roles.sort(key=lambda x: x['position'], reverse=True)
         
-        return jsonify({"roles": available_roles})
+        return jsonify({"roles": filtered_roles})
         
     except Exception as e:
         print(f"Error fetching guild roles: {e}")
@@ -2389,27 +2389,39 @@ def remove_role_from_panel(panel_id, role_id):
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/discord/channels', methods=['GET'])
-@login_required
+@login_required  
 def get_discord_channels():
-    """Get all text channels in the Discord guild"""
+    """Get all Discord text channels"""
     try:
-        response = requests.get(
-            f"https://discord.com/api/v10/guilds/{DISCORD_GUILD_ID}/channels",
-            headers={'Authorization': f'Bot {DISCORD_BOT_TOKEN}'}
-        )
-        response.raise_for_status()
+        discord_api = DiscordAPI()
         
-        channels = response.json()
+        # Get guild channels using Discord API
+        headers = {
+            'Authorization': f'Bot {discord_api.bot_token}',
+            'Content-Type': 'application/json'
+        }
+        
+        response = requests.get(
+            f'https://discord.com/api/v10/guilds/{DISCORD_GUILD_ID}/channels',
+            headers=headers
+        )
+        
+        if response.status_code != 200:
+            return jsonify({"error": "Failed to fetch Discord channels"}), 500
+        
+        all_channels = response.json()
+        
         # Filter for text channels only
-        text_channels = [
-            {
-                'id': channel['id'],
-                'name': channel['name'],
-                'position': channel.get('position', 0)
-            }
-            for channel in channels 
-            if channel.get('type') == 0  # 0 = text channel
-        ]
+        text_channels = []
+        for channel in all_channels:
+            if channel.get('type') == 0:  # 0 = GUILD_TEXT
+                text_channels.append({
+                    'id': channel['id'],
+                    'name': channel['name'],
+                    'position': channel.get('position', 0),
+                    'parent_id': channel.get('parent_id'),
+                    'nsfw': channel.get('nsfw', False)
+                })
         
         # Sort by position
         text_channels.sort(key=lambda x: x['position'])

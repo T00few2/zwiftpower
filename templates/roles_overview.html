@@ -694,7 +694,9 @@
             const response = await fetch('/api/roles/panels');
             if (!response.ok) throw new Error('Failed to load panels');
             const data = await response.json();
+            console.log('Loaded panels data:', data);
             panels = data.panels || [];
+            console.log('Parsed panels:', panels);
         }
 
         async function loadGuildRoles() {
@@ -990,6 +992,9 @@
                 roleApprovalChannelId: document.getElementById('roleApprovalChannel').value || null
             };
             
+            console.log('Submitting role data:', formData);
+            console.log('Adding to panel:', currentPanelForRole);
+            
             try {
                 const response = await fetch(`/api/roles/panels/${currentPanelForRole}/roles`, {
                     method: 'POST',
@@ -999,19 +1004,25 @@
                     body: JSON.stringify(formData)
                 });
                 
+                console.log('Response status:', response.status);
+                const result = await response.json();
+                console.log('Response data:', result);
+                
                 if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.error || 'Failed to add role to panel');
+                    throw new Error(result.error || 'Failed to add role to panel');
                 }
                 
-                const result = await response.json();
                 showSuccess(result.message);
                 closeModal('addRoleModal');
                 document.getElementById('addRoleForm').reset();
                 currentPanelForRole = null;
-                loadData(); // Refresh the data to show the new role
+                
+                console.log('About to refresh data...');
+                await loadData(); // Refresh the data to show the new role
+                console.log('Data refresh completed');
                 
             } catch (error) {
+                console.error('Error adding role:', error);
                 showError(error.message);
             }
         });
