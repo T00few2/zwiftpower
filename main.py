@@ -2485,6 +2485,98 @@ def debug_roles():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/roles/panels/<panel_id>/roles/<role_id>', methods=['PUT'])
+@login_required
+def update_role_in_panel(panel_id, role_id):
+    """Update a role in a specific panel"""
+    try:
+        data = request.get_json()
+        print(f"[DEBUG] Updating role {role_id} in panel {panel_id}: {data}")
+        
+        # Get existing panels document
+        panels_doc = firebase.get_document("selfRoles", DISCORD_GUILD_ID)
+        if not panels_doc or 'panels' not in panels_doc or panel_id not in panels_doc['panels']:
+            return jsonify({"error": "Panel not found"}), 404
+        
+        panel = panels_doc['panels'][panel_id]
+        
+        # Find the role to update
+        role_to_update = None
+        for i, role in enumerate(panel['roles']):
+            if role['roleId'] == role_id:
+                role_to_update = role
+                break
+        
+        if not role_to_update:
+            return jsonify({"error": "Role not found in panel"}), 404
+        
+        # Update role fields
+        if 'description' in data:
+            role_to_update['description'] = data['description']
+        if 'emoji' in data:
+            role_to_update['emoji'] = data['emoji']
+        if 'requiresApproval' in data:
+            role_to_update['requiresApproval'] = data['requiresApproval']
+        if 'teamCaptainId' in data:
+            role_to_update['teamCaptainId'] = data['teamCaptainId']
+        if 'roleApprovalChannelId' in data:
+            role_to_update['roleApprovalChannelId'] = data['roleApprovalChannelId']
+        
+        # Update timestamps
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
+        
+        role_to_update['updatedAt'] = now.isoformat()
+        panel['updatedAt'] = now.isoformat()
+        panels_doc['updatedAt'] = now.isoformat()
+        
+        # Save to Firebase
+        result = firebase.set_document("selfRoles", DISCORD_GUILD_ID, panels_doc)
+        print(f"[DEBUG] Firebase save result: {result}")
+        
+        return jsonify({"success": True, "message": f"Role '{role_to_update['roleName']}' updated successfully"})
+        
+    except Exception as e:
+        print(f"Error updating role in panel: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/roles/panels/<panel_id>/roles/<role_id>', methods=['DELETE'])
+@login_required
+def remove_role_from_panel(panel_id, role_id):
+    """Remove a role from a specific panel"""
+    try:
+        # Get existing panels document
+        panels_doc = firebase.get_document("selfRoles", DISCORD_GUILD_ID)
+        if not panels_doc or 'panels' not in panels_doc or panel_id not in panels_doc['panels']:
+            return jsonify({"error": "Panel not found"}), 404
+        
+        panel = panels_doc['panels'][panel_id]
+        
+        # Find and remove role
+        original_length = len(panel['roles'])
+        panel['roles'] = [role for role in panel['roles'] if role['roleId'] != role_id]
+        
+        if len(panel['roles']) == original_length:
+            return jsonify({"error": "Role not found in panel"}), 404
+        
+        # Use regular datetime instead of SERVER_TIMESTAMP
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
+        
+        panel['updatedAt'] = now.isoformat()
+        panels_doc['updatedAt'] = now.isoformat()
+        
+        # Save to Firebase
+        firebase.set_document("selfRoles", DISCORD_GUILD_ID, panels_doc)
+        
+        return jsonify({"success": True, "message": "Role removed from panel"})
+        
+    except Exception as e:
+        print(f"Error removing role from panel: {e}")
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 8080))
     app.run(host='0.0.0.0', port=port)

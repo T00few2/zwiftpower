@@ -269,6 +269,34 @@
             gap: 8px;
         }
         
+        .roles-list-enhanced {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .role-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+            transition: all 0.2s ease;
+        }
+        
+        .role-item:hover {
+            border-color: #667eea;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1);
+        }
+        
+        .role-item.missing {
+            opacity: 0.6;
+            border-color: #dc3545;
+            background: #f8d7da;
+        }
+        
         .role-badge {
             padding: 6px 12px;
             border-radius: 20px;
@@ -278,7 +306,86 @@
             align-items: center;
             gap: 6px;
             color: white;
-            position: relative;
+            min-width: fit-content;
+            flex-shrink: 0;
+        }
+        
+        .role-details {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .role-description {
+            font-size: 0.85em;
+            color: #666;
+            margin-bottom: 6px;
+            font-style: italic;
+        }
+        
+        .role-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        
+        .meta-tag {
+            background: #e9ecef;
+            color: #495057;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.7em;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .meta-tag.approval {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .meta-tag.captain {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        
+        .meta-tag.channel {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .role-actions {
+            display: flex;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+        
+        .role-action-btn {
+            background: rgba(102, 126, 234, 0.1);
+            border: none;
+            color: #667eea;
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            font-size: 0.9em;
+        }
+        
+        .role-action-btn:hover {
+            background: rgba(102, 126, 234, 0.2);
+        }
+        
+        .role-action-btn.remove-btn {
+            background: rgba(220, 53, 69, 0.1);
+            color: #dc3545;
+        }
+        
+        .role-action-btn.remove-btn:hover {
+            background: rgba(220, 53, 69, 0.2);
         }
         
         .role-badge.missing {
@@ -663,6 +770,64 @@
         </div>
     </div>
 
+    <!-- Edit Role Modal -->
+    <div id="editRoleModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Edit Role</h2>
+                <span class="close" onclick="closeModal('editRoleModal')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="editRoleForm">
+                    <div class="form-group">
+                        <label class="form-label" for="editRoleName">Role Name</label>
+                        <input type="text" class="form-control" id="editRoleName" readonly>
+                        <div class="form-text">Role name cannot be changed (managed by Discord)</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="editRoleDescription">Description</label>
+                        <textarea class="form-control" id="editRoleDescription" rows="2" placeholder="Optional description for this role"></textarea>
+                        <div class="form-text">Explain what this role provides or represents</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="editRoleEmoji">Emoji</label>
+                        <input type="text" class="form-control" id="editRoleEmoji" placeholder="🔹" maxlength="10">
+                        <div class="form-text">Optional emoji to display with the role (e.g., 🎮, 🎯, 👑)</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">
+                            <input type="checkbox" id="editRequiresApproval" style="margin-right: 8px;">
+                            Requires Approval
+                        </label>
+                        <div class="form-text">Check this if role assignment should require approval</div>
+                    </div>
+                    
+                    <div class="form-group" id="editTeamCaptainGroup" style="display: none;">
+                        <label class="form-label" for="editTeamCaptain">Team Captain</label>
+                        <input type="text" class="form-control" id="editTeamCaptain" placeholder="User ID of team captain">
+                        <div class="form-text">Discord User ID of the team captain who can approve this role</div>
+                    </div>
+                    
+                    <div class="form-group" id="editRoleApprovalChannelGroup" style="display: none;">
+                        <label class="form-label" for="editRoleApprovalChannel">Role-Specific Approval Channel</label>
+                        <select class="form-control" id="editRoleApprovalChannel">
+                            <option value="">Use panel default</option>
+                        </select>
+                        <div class="form-text">Override the panel's approval channel for this specific role</div>
+                    </div>
+                    
+                    <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 30px;">
+                        <button type="button" class="btn btn-secondary" onclick="closeModal('editRoleModal')">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Update Role</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <script>
         let panels = [];
         let guildRoles = [];
@@ -762,11 +927,34 @@
             const rolesHtml = panel.roles.map(role => {
                 const color = role.roleColor ? `#${role.roleColor.toString(16).padStart(6, '0')}` : '#6c757d';
                 const missingClass = !role.roleExists ? ' missing' : '';
+                
+                // Create role info tooltip/details
+                const roleDetails = [];
+                if (role.description) roleDetails.push(`Description: ${role.description}`);
+                if (role.requiresApproval) roleDetails.push('Requires approval');
+                if (role.teamCaptainId) roleDetails.push(`Team Captain: ${role.teamCaptainId}`);
+                if (role.roleApprovalChannelId) roleDetails.push('Has custom approval channel');
+                
+                const tooltipText = roleDetails.length > 0 ? roleDetails.join(' • ') : 'No additional settings';
+                
                 return `
-                    <span class="role-badge${missingClass}" style="background-color: ${color}">
-                        ${role.emoji || '🔹'} ${role.roleName}
-                        <button class="role-remove-btn" onclick="removeRoleFromPanel('${panel.panelId}', '${role.roleId}')" title="Remove Role">×</button>
-                    </span>
+                    <div class="role-item${missingClass}" title="${escapeHtml(tooltipText)}">
+                        <div class="role-badge" style="background-color: ${color}">
+                            ${role.emoji || '🔹'} ${role.roleName}
+                        </div>
+                        <div class="role-details">
+                            ${role.description ? `<div class="role-description">${escapeHtml(role.description)}</div>` : ''}
+                            <div class="role-meta">
+                                ${role.requiresApproval ? '<span class="meta-tag approval">Requires Approval</span>' : ''}
+                                ${role.teamCaptainId ? '<span class="meta-tag captain">Has Team Captain</span>' : ''}
+                                ${role.roleApprovalChannelId ? '<span class="meta-tag channel">Custom Channel</span>' : ''}
+                            </div>
+                        </div>
+                        <div class="role-actions">
+                            <button class="role-action-btn edit-btn" onclick="editRole('${panel.panelId}', '${role.roleId}')" title="Edit Role">✏️</button>
+                            <button class="role-action-btn remove-btn" onclick="removeRoleFromPanel('${panel.panelId}', '${role.roleId}')" title="Remove Role">🗑️</button>
+                        </div>
+                    </div>
                 `;
             }).join('');
             
@@ -795,7 +983,7 @@
                         </div>
                         <div class="form-group">
                             <div class="info-label">Roles</div>
-                            <div class="roles-list">
+                            <div class="roles-list-enhanced">
                                 ${rolesHtml}
                                 <button class="add-role-btn" onclick="addRoleToPanel('${panel.panelId}')">
                                     ➕ Add Role
@@ -937,6 +1125,7 @@
 
         // Global variable to store the current panel ID for adding roles
         let currentPanelForRole = null;
+        let currentEditingRole = null;
 
         // Add role functionality
         function addRoleToPanel(panelId) {
@@ -966,6 +1155,48 @@
             document.getElementById('addRoleModal').style.display = 'block';
         }
 
+        // Edit role functionality
+        function editRole(panelId, roleId) {
+            const panel = panels.find(p => p.panelId === panelId);
+            if (!panel) {
+                showError('Panel not found');
+                return;
+            }
+            
+            const role = panel.roles.find(r => r.roleId === roleId);
+            if (!role) {
+                showError('Role not found');
+                return;
+            }
+            
+            // Store current editing context
+            currentEditingRole = { panelId, roleId, role };
+            
+            // Populate form with current role data
+            document.getElementById('editRoleName').value = role.roleName;
+            document.getElementById('editRoleDescription').value = role.description || '';
+            document.getElementById('editRoleEmoji').value = role.emoji || '';
+            document.getElementById('editRequiresApproval').checked = role.requiresApproval || false;
+            document.getElementById('editTeamCaptain').value = role.teamCaptainId || '';
+            
+            // Show/hide conditional fields
+            const showApprovalFields = role.requiresApproval || false;
+            document.getElementById('editTeamCaptainGroup').style.display = showApprovalFields ? 'block' : 'none';
+            document.getElementById('editRoleApprovalChannelGroup').style.display = showApprovalFields ? 'block' : 'none';
+            
+            // Populate approval channel dropdown
+            const editRoleApprovalChannel = document.getElementById('editRoleApprovalChannel');
+            editRoleApprovalChannel.innerHTML = '<option value="">Use panel default</option>' +
+                channels.map(channel => `<option value="${channel.id}">#${channel.name}</option>`).join('');
+            
+            // Set current approval channel
+            if (role.roleApprovalChannelId) {
+                editRoleApprovalChannel.value = role.roleApprovalChannelId;
+            }
+            
+            document.getElementById('editRoleModal').style.display = 'block';
+        }
+
         // Handle approval checkbox change
         document.getElementById('requiresApproval').addEventListener('change', function(e) {
             const teamCaptainGroup = document.getElementById('teamCaptainGroup');
@@ -977,6 +1208,20 @@
             } else {
                 teamCaptainGroup.style.display = 'none';
                 roleApprovalChannelGroup.style.display = 'none';
+            }
+        });
+
+        // Handle edit role approval checkbox change
+        document.getElementById('editRequiresApproval').addEventListener('change', function(e) {
+            const editTeamCaptainGroup = document.getElementById('editTeamCaptainGroup');
+            const editRoleApprovalChannelGroup = document.getElementById('editRoleApprovalChannelGroup');
+            
+            if (e.target.checked) {
+                editTeamCaptainGroup.style.display = 'block';
+                editRoleApprovalChannelGroup.style.display = 'block';
+            } else {
+                editTeamCaptainGroup.style.display = 'none';
+                editRoleApprovalChannelGroup.style.display = 'none';
             }
         });
 
@@ -1038,6 +1283,51 @@
                 
             } catch (error) {
                 console.error('Error adding role:', error);
+                showError(error.message);
+            }
+        });
+
+        // Handle edit role form submission
+        document.getElementById('editRoleForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            if (!currentEditingRole) {
+                showError('No role selected for editing');
+                return;
+            }
+            
+            const formData = {
+                description: document.getElementById('editRoleDescription').value || null,
+                emoji: document.getElementById('editRoleEmoji').value || null,
+                requiresApproval: document.getElementById('editRequiresApproval').checked,
+                teamCaptainId: document.getElementById('editTeamCaptain').value || null,
+                roleApprovalChannelId: document.getElementById('editRoleApprovalChannel').value || null
+            };
+            
+            try {
+                const response = await fetch(`/api/roles/panels/${currentEditingRole.panelId}/roles/${currentEditingRole.roleId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+                
+                const result = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(result.error || 'Failed to update role');
+                }
+                
+                showSuccess(result.message);
+                closeModal('editRoleModal');
+                document.getElementById('editRoleForm').reset();
+                currentEditingRole = null;
+                
+                await loadData(); // Refresh the data to show the updated role
+                
+            } catch (error) {
+                console.error('Error updating role:', error);
                 showError(error.message);
             }
         });
