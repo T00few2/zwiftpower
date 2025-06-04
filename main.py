@@ -2546,6 +2546,67 @@ def update_role_in_panel(panel_id, role_id):
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/roles/panels/<panel_id>/reorder', methods=['PUT'])
+@login_required
+def reorder_panel_roles(panel_id):
+    """Reorder roles within a specific panel"""
+    try:
+        data = request.get_json()
+        print(f"[DEBUG] Reordering roles in panel {panel_id}: {data}")
+        
+        if 'roleOrder' not in data:
+            return jsonify({"error": "Missing roleOrder in request"}), 400
+        
+        role_order = data['roleOrder']
+        if not isinstance(role_order, list):
+            return jsonify({"error": "roleOrder must be an array"}), 400
+        
+        # Get existing panels document
+        panels_doc = firebase.get_document("selfRoles", DISCORD_GUILD_ID)
+        if not panels_doc or 'panels' not in panels_doc or panel_id not in panels_doc['panels']:
+            return jsonify({"error": "Panel not found"}), 404
+        
+        panel = panels_doc['panels'][panel_id]
+        existing_roles = panel['roles']
+        
+        # Validate that all role IDs in the order exist
+        existing_role_ids = {role['roleId'] for role in existing_roles}
+        provided_role_ids = set(role_order)
+        
+        if existing_role_ids != provided_role_ids:
+            missing = existing_role_ids - provided_role_ids
+            extra = provided_role_ids - existing_role_ids
+            error_msg = f"Role ID mismatch. Missing: {missing}, Extra: {extra}"
+            return jsonify({"error": error_msg}), 400
+        
+        # Create a mapping of roleId to role object
+        role_map = {role['roleId']: role for role in existing_roles}
+        
+        # Reorder the roles according to the new order
+        reordered_roles = [role_map[role_id] for role_id in role_order]
+        
+        # Update the panel with the new order
+        panel['roles'] = reordered_roles
+        
+        # Update timestamps
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
+        
+        panel['updatedAt'] = now.isoformat()
+        panels_doc['updatedAt'] = now.isoformat()
+        
+        # Save to Firebase
+        result = firebase.set_document("selfRoles", DISCORD_GUILD_ID, panels_doc)
+        print(f"[DEBUG] Firebase save result: {result}")
+        
+        return jsonify({"success": True, "message": f"Role order updated successfully"})
+        
+    except Exception as e:
+        print(f"Error reordering panel roles: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 8080))
     app.run(host='0.0.0.0', port=port)

@@ -10,6 +10,9 @@
     <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎭</text></svg>">
     <meta name="theme-color" content="#667eea">
     
+    <!-- SortableJS for drag and drop -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -284,6 +287,8 @@
             border-radius: 8px;
             border: 1px solid #e9ecef;
             transition: all 0.2s ease;
+            cursor: default;
+            position: relative;
         }
         
         .role-item:hover {
@@ -295,6 +300,52 @@
             opacity: 0.6;
             border-color: #dc3545;
             background: #f8d7da;
+        }
+        
+        /* Drag and Drop Styles */
+        .role-item.sortable-ghost {
+            opacity: 0.4;
+            background: #e3f2fd;
+        }
+        
+        .role-item.sortable-chosen {
+            transform: scale(1.02);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+        
+        .role-item.sortable-drag {
+            transform: rotate(5deg);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+        }
+        
+        .drag-handle {
+            cursor: grab;
+            color: #999;
+            font-size: 1.2em;
+            padding: 4px;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+        }
+        
+        .drag-handle:hover {
+            color: #667eea;
+            background: rgba(102, 126, 234, 0.1);
+        }
+        
+        .drag-handle:active {
+            cursor: grabbing;
+        }
+        
+        .roles-list-enhanced.sortable {
+            min-height: 60px;
+        }
+        
+        .roles-list-enhanced.sortable-placeholder {
+            background: #e3f2fd;
+            border: 2px dashed #667eea;
+            border-radius: 8px;
+            margin: 6px 0;
         }
         
         .role-badge {
@@ -918,6 +969,9 @@
             panelsGrid.style.display = 'grid';
             
             panelsGrid.innerHTML = panels.map(panel => createPanelCard(panel)).join('');
+            
+            // Initialize drag and drop after rendering
+            setTimeout(initializeDragAndDrop, 100);
         }
 
         function createPanelCard(panel) {
@@ -938,7 +992,8 @@
                 const tooltipText = roleDetails.length > 0 ? roleDetails.join(' • ') : 'No additional settings';
                 
                 return `
-                    <div class="role-item${missingClass}" title="${escapeHtml(tooltipText)}">
+                    <div class="role-item${missingClass}" data-role-id="${role.roleId}" title="${escapeHtml(tooltipText)}">
+                        <div class="drag-handle" title="Drag to reorder">⋮⋮</div>
                         <div class="role-badge" style="background-color: ${color}">
                             ${role.emoji || '🔹'} ${role.roleName}
                         </div>
@@ -983,7 +1038,7 @@
                         </div>
                         <div class="form-group">
                             <div class="info-label">Roles</div>
-                            <div class="roles-list-enhanced">
+                            <div class="roles-list-enhanced sortable-roles" data-panel-id="${panel.panelId}">
                                 ${rolesHtml}
                                 <button class="add-role-btn" onclick="addRoleToPanel('${panel.panelId}')">
                                     ➕ Add Role
@@ -1360,6 +1415,83 @@
         // Edit panel functionality (placeholder for now)
         function editPanel(panelId) {
             showError('Edit panel functionality coming soon!');
+        }
+
+        // Initialize drag and drop functionality
+        function initializeDragAndDrop() {
+            // Find all role lists and make them sortable
+            const roleLists = document.querySelectorAll('.sortable-roles');
+            
+            roleLists.forEach(roleList => {
+                const panelId = roleList.dataset.panelId;
+                
+                new Sortable(roleList, {
+                    handle: '.drag-handle',
+                    animation: 150,
+                    ghostClass: 'sortable-ghost',
+                    chosenClass: 'sortable-chosen',
+                    dragClass: 'sortable-drag',
+                    filter: '.add-role-btn',
+                    preventOnFilter: false,
+                    onEnd: function(evt) {
+                        handleRoleReorder(panelId, evt);
+                    }
+                });
+            });
+        }
+
+        // Handle role reordering
+        async function handleRoleReorder(panelId, evt) {
+            try {
+                const roleList = evt.to;
+                const roleItems = roleList.querySelectorAll('.role-item[data-role-id]');
+                
+                // Get the new order of role IDs
+                const newOrder = Array.from(roleItems).map(item => item.dataset.roleId);
+                
+                console.log(`[DEBUG] Reordering panel ${panelId} roles to:`, newOrder);
+                
+                // Send the new order to the backend
+                const response = await fetch(`/api/roles/panels/${panelId}/reorder`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        roleOrder: newOrder
+                    })
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to reorder roles');
+                }
+                
+                const result = await response.json();
+                console.log(`[DEBUG] Reorder successful:`, result);
+                
+                // Show success message briefly
+                showSuccess('Role order updated successfully!');
+                
+                // Update the local panels data to reflect the new order
+                const panel = panels.find(p => p.panelId === panelId);
+                if (panel) {
+                    const roleMap = {};
+                    panel.roles.forEach(role => {
+                        roleMap[role.roleId] = role;
+                    });
+                    
+                    // Reorder the local data
+                    panel.roles = newOrder.map(roleId => roleMap[roleId]);
+                }
+                
+            } catch (error) {
+                console.error('Error reordering roles:', error);
+                showError(error.message);
+                
+                // Revert the visual change by reloading data
+                loadData();
+            }
         }
     </script>
 </body>
