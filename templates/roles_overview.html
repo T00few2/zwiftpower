@@ -405,6 +405,11 @@
             color: #721c24;
         }
         
+        .meta-tag.button-color {
+            background: #e7f3ff;
+            color: #004085;
+        }
+        
         .role-actions {
             display: flex;
             gap: 6px;
@@ -791,6 +796,17 @@
                     </div>
                     
                     <div class="form-group">
+                        <label class="form-label" for="buttonColor">Button Color</label>
+                        <select class="form-control" id="buttonColor">
+                            <option value="Secondary">Gray (Secondary)</option>
+                            <option value="Primary">Blue (Primary)</option>
+                            <option value="Success">Green (Success)</option>
+                            <option value="Danger">Red (Danger)</option>
+                        </select>
+                        <div class="form-text">Choose the color of the button users will click in Discord</div>
+                    </div>
+                    
+                    <div class="form-group">
                         <label class="form-label">
                             <input type="checkbox" id="requiresApproval" style="margin-right: 8px;">
                             Requires Approval
@@ -846,6 +862,17 @@
                         <label class="form-label" for="editRoleEmoji">Emoji</label>
                         <input type="text" class="form-control" id="editRoleEmoji" placeholder="🔹" maxlength="10">
                         <div class="form-text">Optional emoji to display with the role (e.g., 🎮, 🎯, 👑)</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="editButtonColor">Button Color</label>
+                        <select class="form-control" id="editButtonColor">
+                            <option value="Secondary">Gray (Secondary)</option>
+                            <option value="Primary">Blue (Primary)</option>
+                            <option value="Success">Green (Success)</option>
+                            <option value="Danger">Red (Danger)</option>
+                        </select>
+                        <div class="form-text">Choose the color of the button users will click in Discord</div>
                     </div>
                     
                     <div class="form-group">
@@ -1003,6 +1030,7 @@
                                 ${role.requiresApproval ? '<span class="meta-tag approval">Requires Approval</span>' : ''}
                                 ${role.teamCaptainId ? '<span class="meta-tag captain">Has Team Captain</span>' : ''}
                                 ${role.roleApprovalChannelId ? '<span class="meta-tag channel">Custom Channel</span>' : ''}
+                                ${role.buttonColor && role.buttonColor !== 'Secondary' ? `<span class="meta-tag button-color">${role.buttonColor} Button</span>` : ''}
                             </div>
                         </div>
                         <div class="role-actions">
@@ -1231,6 +1259,7 @@
             document.getElementById('editRoleName').value = role.roleName;
             document.getElementById('editRoleDescription').value = role.description || '';
             document.getElementById('editRoleEmoji').value = role.emoji || '';
+            document.getElementById('editButtonColor').value = role.buttonColor || 'Secondary';
             document.getElementById('editRequiresApproval').checked = role.requiresApproval || false;
             document.getElementById('editTeamCaptain').value = role.teamCaptainId || '';
             
@@ -1302,6 +1331,7 @@
                 roleName: selectedOption.dataset.name,
                 description: document.getElementById('roleDescription').value || null,
                 emoji: document.getElementById('roleEmoji').value || null,
+                buttonColor: document.getElementById('buttonColor').value,
                 requiresApproval: document.getElementById('requiresApproval').checked,
                 teamCaptainId: document.getElementById('teamCaptain').value || null,
                 roleApprovalChannelId: document.getElementById('roleApprovalChannel').value || null
@@ -1354,6 +1384,7 @@
             const formData = {
                 description: document.getElementById('editRoleDescription').value || null,
                 emoji: document.getElementById('editRoleEmoji').value || null,
+                buttonColor: document.getElementById('editButtonColor').value,
                 requiresApproval: document.getElementById('editRequiresApproval').checked,
                 teamCaptainId: document.getElementById('editTeamCaptain').value || null,
                 roleApprovalChannelId: document.getElementById('editRoleApprovalChannel').value || null

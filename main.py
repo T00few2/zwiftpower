@@ -2363,6 +2363,7 @@ def add_role_to_panel(panel_id):
             'requiresApproval': data.get('requiresApproval', False),
             'teamCaptainId': data.get('teamCaptainId'),
             'roleApprovalChannelId': data.get('roleApprovalChannelId'),
+            'buttonColor': data.get('buttonColor', 'Secondary'),
             'addedAt': now.isoformat()
         }
         
@@ -2525,6 +2526,11 @@ def update_role_in_panel(panel_id, role_id):
             role_to_update['teamCaptainId'] = data['teamCaptainId']
         if 'roleApprovalChannelId' in data:
             role_to_update['roleApprovalChannelId'] = data['roleApprovalChannelId']
+        if 'buttonColor' in data:
+            # Validate button color
+            valid_colors = ['Primary', 'Secondary', 'Success', 'Danger']
+            if data['buttonColor'] in valid_colors:
+                role_to_update['buttonColor'] = data['buttonColor']
         
         # Update timestamps
         from datetime import datetime, timezone
