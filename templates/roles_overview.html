@@ -995,7 +995,7 @@
                     <div class="role-item${missingClass}" data-role-id="${role.roleId}" title="${escapeHtml(tooltipText)}">
                         <div class="drag-handle" title="Drag to reorder">⋮⋮</div>
                         <div class="role-badge" style="background-color: ${color}">
-                            ${role.emoji || '🔹'} ${role.roleName}
+                            ${role.emoji ? role.emoji + ' ' : ''}${role.roleName}
                         </div>
                         <div class="role-details">
                             ${role.description ? `<div class="role-description">${escapeHtml(role.description)}</div>` : ''}
