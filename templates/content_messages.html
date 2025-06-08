@@ -329,19 +329,6 @@
     <!-- Welcome Messages Tab -->
     <div id="welcome-tab" class="tab-content active">
         <h2>Welcome Messages</h2>
-        
-        <!-- Global Settings Section -->
-        <div class="global-settings" style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 30px; border-left: 4px solid #007bff;">
-            <h3>📊 Global Probability Settings</h3>
-            <div class="form-group">
-                <label for="global-daily-probability">Global Daily Probability (0.0 - 1.0):</label>
-                <input type="number" id="global-daily-probability" min="0" max="1" step="0.01" value="0.2" placeholder="0.2">
-                <small style="color: #666; font-size: 0.85em; display: block; margin-top: 5px;">
-                    Daily probability that any probability-based message will be sent. If triggered, one message is selected from all eligible messages across all channels based on likelihood weights (e.g., 0.2 = 20% chance per day)
-                </small>
-            </div>
-            <button type="button" class="button" onclick="saveGlobalSettings()">Save Global Settings</button>
-        </div>
 
         <form id="welcome-form">
             <div class="form-group">
@@ -457,6 +444,19 @@
     <!-- Scheduled Messages Tab -->
     <div id="scheduled-tab" class="tab-content">
         <h2>Scheduled Messages</h2>
+        
+        <!-- Global Settings Section -->
+        <div class="global-settings" style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 30px; border-left: 4px solid #007bff;">
+            <h3>📊 Global Probability Settings</h3>
+            <div class="form-group">
+                <label for="global-daily-probability">Global Daily Probability (0.0 - 1.0):</label>
+                <input type="number" id="global-daily-probability" min="0" max="1" step="0.01" value="0.2" placeholder="0.2">
+                <small style="color: #666; font-size: 0.85em; display: block; margin-top: 5px;">
+                    Daily probability that any probability-based message will be sent. If triggered, one message is selected from all eligible messages across all channels based on likelihood weights (e.g., 0.2 = 20% chance per day)
+                </small>
+            </div>
+            <button type="button" class="button" onclick="saveGlobalSettings()">Save Global Settings</button>
+        </div>
         
         <form id="scheduled-form">
             <div class="form-group">
