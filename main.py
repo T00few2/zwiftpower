@@ -720,16 +720,18 @@ def content_messages():
         else:
             # For API requests, return summary data
             welcome_messages = firebase.get_collection('welcome_messages', limit=100, include_id=True)
+            role_messages = firebase.get_collection('role_messages', limit=100, include_id=True)
             scheduled_messages = firebase.get_collection('scheduled_messages', limit=100, include_id=True)
             
             return jsonify({
                 "welcome_messages": welcome_messages,
+                "role_messages": role_messages,
                 "scheduled_messages": scheduled_messages,
                 "stats": {
                     "total_welcome": len(welcome_messages),
-                    "total_scheduled": len(scheduled_messages),
+                    "total_scheduled": len(scheduled_messages) + len(role_messages),
                     "active_welcome": len([m for m in welcome_messages if m.get('active', False)]),
-                    "active_scheduled": len([m for m in scheduled_messages if m.get('active', False)])
+                    "active_scheduled": len([m for m in scheduled_messages if m.get('active', False)]) + len([m for m in role_messages if m.get('active', False)])
                 }
             })
     except Exception as e:
@@ -1129,6 +1131,110 @@ def update_welcome_message(message_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/messages/role-messages', methods=['GET'])
+def get_role_messages():
+    """Get all role messages for the Discord bot"""
+    if not verify_api_key():
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        # Get role messages from Firebase with document IDs
+        messages = firebase.get_collection('role_messages', limit=100, include_id=True)
+        return jsonify(messages)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/messages/role-messages', methods=['POST'])
+def create_role_message():
+    """Create a new role message"""
+    if not verify_api_key():
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        data = request.json
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+        
+        # Validate required fields
+        if not data.get('title') or not data.get('content') or not data.get('role_id') or not data.get('channel_id'):
+            return jsonify({"error": "Missing required fields: title, content, role_id, channel_id"}), 400
+        
+        # Create message data
+        from datetime import datetime, timezone
+        message_data = {
+            'title': data['title'],
+            'content': data['content'],
+            'role_id': data['role_id'],
+            'channel_id': data['channel_id'],
+            'active': data.get('active', True),
+            'created_at': datetime.now(timezone.utc),
+            'created_by': 'admin'
+        }
+        
+        # Add to Firebase
+        doc_ref = firebase.db.collection('role_messages').add(message_data)
+        
+        return jsonify({"status": "success", "message": "Role message created", "id": doc_ref[1].id})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/messages/role-messages/<message_id>', methods=['DELETE'])
+def delete_role_message(message_id):
+    """Delete a role message"""
+    if not verify_api_key():
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        # Delete the document from Firebase
+        doc_ref = firebase.db.collection('role_messages').document(message_id)
+        doc = doc_ref.get()
+        
+        if not doc.exists:
+            return jsonify({"error": "Message not found"}), 404
+        
+        doc_ref.delete()
+        
+        return jsonify({"status": "success", "message": "Role message deleted"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/messages/role-messages/<message_id>', methods=['PUT'])
+def update_role_message(message_id):
+    """Update a role message"""
+    if not verify_api_key():
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        data = request.json
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+        
+        # Get the document reference
+        doc_ref = firebase.db.collection('role_messages').document(message_id)
+        doc = doc_ref.get()
+        
+        if not doc.exists:
+            return jsonify({"error": "Message not found"}), 404
+        
+        # Add update metadata
+        from datetime import datetime, timezone
+        update_data = {
+            **data,
+            "updated_at": datetime.now(timezone.utc),
+            "updated_by": "admin"
+        }
+        
+        # Update the document
+        doc_ref.update(update_data)
+        
+        # Return updated document
+        updated_doc = doc_ref.get().to_dict()
+        updated_doc["id"] = message_id
+        
+        return jsonify({"status": "success", "message": updated_doc})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/schedules/<schedule_id>', methods=['DELETE'])
 def delete_scheduled_message(schedule_id):
     """Delete a scheduled message"""
@@ -1471,13 +1577,14 @@ def dashboard():
         # Get content stats from Firebase
         try:
             welcome_messages = firebase.get_collection('welcome_messages', limit=100, include_id=True)
+            role_messages = firebase.get_collection('role_messages', limit=100, include_id=True)
             scheduled_messages = firebase.get_collection('scheduled_messages', limit=100, include_id=True)
             
             content_stats = {
                 'total_welcome': len(welcome_messages),
-                'total_scheduled': len(scheduled_messages),
+                'total_scheduled': len(scheduled_messages) + len(role_messages),
                 'active_welcome': len([m for m in welcome_messages if m.get('active', False)]),
-                'active_scheduled': len([m for m in scheduled_messages if m.get('active', False)])
+                'active_scheduled': len([m for m in scheduled_messages if m.get('active', False)]) + len([m for m in role_messages if m.get('active', False)])
             }
         except Exception as e:
             print(f"Error getting content stats: {e}")

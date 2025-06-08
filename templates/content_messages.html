@@ -322,15 +322,17 @@
     <div class="notification" id="notification"></div>
 
     <div class="tabs">
-        <button class="tab active" onclick="switchTab('welcome')">Welcome Messages</button>
+        <button class="tab active" onclick="switchTab('join')">Join Messages</button>
+        <button class="tab" onclick="switchTab('role')">Role Messages</button>
         <button class="tab" onclick="switchTab('scheduled')">Scheduled Messages</button>
     </div>
 
-    <!-- Welcome Messages Tab -->
-    <div id="welcome-tab" class="tab-content active">
-        <h2>Welcome Messages</h2>
+    <!-- Join Messages Tab -->
+    <div id="join-tab" class="tab-content active">
+        <h2>Join Messages</h2>
+        <p style="color: #666; margin-bottom: 25px;">Messages sent automatically when someone joins the Discord server.</p>
 
-        <form id="welcome-form">
+        <form id="join-form">
             <div class="form-group">
                 <label for="welcome-title">Title:</label>
                 <input type="text" id="welcome-title" name="title" required>
@@ -339,6 +341,13 @@
             <div class="form-group">
                 <label for="welcome-content">Message Content:</label>
                 <textarea id="welcome-content" name="content" placeholder="Welcome {username} to {server_name}! Use variables like {username}, {mention}, {server_name}, {member_count}" required></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="join-channel">Channel:</label>
+                <select id="join-channel" name="channel_id" required>
+                    <option value="">Select a channel...</option>
+                </select>
             </div>
             
             <div class="variables-help">
@@ -437,8 +446,96 @@
             <button type="button" class="button" onclick="clearForm('welcome')">Clear</button>
         </form>
         
-        <h3>Existing Welcome Messages</h3>
+        <h3>Existing Join Messages</h3>
         <div id="welcome-list" class="message-list"></div>
+    </div>
+
+    <!-- Role Messages Tab -->
+    <div id="role-tab" class="tab-content">
+        <h2>Role Messages</h2>
+        <p style="color: #666; margin-bottom: 25px;">Messages sent automatically when someone receives a specific role.</p>
+
+        <form id="role-form">
+            <div class="form-group">
+                <label for="role-title">Title:</label>
+                <input type="text" id="role-title" name="title" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="role-content">Message Content:</label>
+                <textarea id="role-content" name="content" placeholder="Congratulations {username}! You now have the {role_name} role. Use variables like {username}, {mention}, {role_name}, {server_name}" required></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="role-trigger">Trigger Role:</label>
+                <select id="role-trigger" name="role_id" required>
+                    <option value="">Select a role...</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="role-channel">Channel:</label>
+                <select id="role-channel" name="channel_id" required>
+                    <option value="">Select a channel...</option>
+                </select>
+            </div>
+            
+            <div class="variables-help">
+                <h4 onclick="toggleVariables('role')" style="cursor: pointer; user-select: none; display: flex; align-items: center; justify-content: space-between;">
+                    📝 Available Variables 
+                    <span id="role-variables-arrow" style="transition: transform 0.3s;">▼</span>
+                </h4>
+                <div id="role-variables-content" style="display: none;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 10px;">
+                        <div>
+                            <p><strong>👤 User Variables:</strong></p>
+                            <p><code>{username}</code> - User's Discord username</p>
+                            <p><code>{mention}</code> - Mentions the user (@username)</p>
+                            <p><code>{display_name}</code> - Server nickname or username</p>
+                            <p><code>{user_id}</code> - Discord user ID</p>
+                        </div>
+                        <div>
+                            <p><strong>🏠 Server Variables:</strong></p>
+                            <p><code>{server_name}</code> - Discord server name</p>
+                            <p><code>{member_count}</code> - Total server members</p>
+                            <p><code>{channel_name}</code> - Current channel name</p>
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 10px;">
+                        <div>
+                            <p><strong>🎭 Role Variables:</strong></p>
+                            <p><code>{role_name}</code> - Name of the assigned role</p>
+                            <p><code>{role_mention}</code> - Mention the role</p>
+                            <p><code>{role_color}</code> - Role color (hex)</p>
+                        </div>
+                        <div>
+                            <p><strong>📅 Date/Time Variables:</strong></p>
+                            <p><code>{date}</code> - Current date (YYYY-MM-DD)</p>
+                            <p><code>{time}</code> - Current time (HH:MM)</p>
+                            <p><code>{datetime}</code> - Full date and time</p>
+                            <p><code>{timestamp}</code> - Unix timestamp</p>
+                        </div>
+                    </div>
+                    <div style="background: #f0f8ff; padding: 10px; border-radius: 5px; margin-top: 10px;">
+                        <p><strong>💡 Usage Examples:</strong></p>
+                        <p>• <code>Welcome to the {role_name} team, {mention}!</code></p>
+                        <p>• <code>Congratulations {username} on your new role!</code></p>
+                        <p>• <code>You now have access to special features in {server_name}</code></p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="checkbox-group">
+                <input type="checkbox" id="role-active" name="active" checked>
+                <label for="role-active">Active</label>
+            </div>
+            
+            <button type="submit" class="button">Create Role Message</button>
+            <button type="button" class="button" onclick="clearForm('role')">Clear</button>
+        </form>
+        
+        <h3>Existing Role Messages</h3>
+        <div id="role-list" class="message-list"></div>
     </div>
 
     <!-- Scheduled Messages Tab -->
@@ -629,7 +726,10 @@
     <script>
         const API_KEY = document.body.getAttribute('data-api-key'); // Gets the API key from the data attribute
         let welcomeMessages = [];
+        let roleMessages = [];
         let scheduledMessages = [];
+        let discordChannels = [];
+        let discordRoles = [];
 
         // Global variables for editing
         let editingMessage = null;
@@ -660,6 +760,11 @@
             
             document.getElementById(tabName + '-tab').classList.add('active');
             event.target.classList.add('active');
+            
+            // Load data specific to the tab
+            if (tabName === 'role') {
+                loadDiscordData();
+            }
         }
 
         // Toggle embed fields for welcome messages
@@ -723,10 +828,83 @@
         // Clear form
         function clearForm(formType) {
             document.getElementById(formType + '-form').reset();
-            if (formType === 'welcome') {
+            if (formType === 'join') {
                 document.getElementById('welcome-embed-fields').style.display = 'none';
                 document.getElementById('welcome-has-embed').checked = false;
             }
+        }
+
+        // Load Discord data (channels and roles)
+        async function loadDiscordData() {
+            try {
+                // Load Discord channels
+                const channelsResponse = await fetch('/api/discord/channels', {
+                    headers: { 'Authorization': `Bearer ${API_KEY}` }
+                });
+                if (channelsResponse.ok) {
+                    discordChannels = await channelsResponse.json();
+                    populateChannelDropdowns();
+                }
+
+                // Load Discord roles
+                const rolesResponse = await fetch('/api/roles/guild-roles', {
+                    headers: { 'Authorization': `Bearer ${API_KEY}` }
+                });
+                if (rolesResponse.ok) {
+                    discordRoles = await rolesResponse.json();
+                    populateRoleDropdowns();
+                }
+            } catch (error) {
+                console.error('Error loading Discord data:', error);
+            }
+        }
+
+        // Populate channel dropdowns
+        function populateChannelDropdowns() {
+            const joinChannelSelect = document.getElementById('join-channel');
+            const roleChannelSelect = document.getElementById('role-channel');
+            
+            // Clear existing options (except the first placeholder)
+            [joinChannelSelect, roleChannelSelect].forEach(select => {
+                while (select.children.length > 1) {
+                    select.removeChild(select.lastChild);
+                }
+            });
+
+            // Add channel options
+            discordChannels.forEach(channel => {
+                if (channel.type === 0) { // Text channels only
+                    const option1 = document.createElement('option');
+                    option1.value = channel.id;
+                    option1.textContent = `#${channel.name}`;
+                    joinChannelSelect.appendChild(option1);
+
+                    const option2 = document.createElement('option');
+                    option2.value = channel.id;
+                    option2.textContent = `#${channel.name}`;
+                    roleChannelSelect.appendChild(option2);
+                }
+            });
+        }
+
+        // Populate role dropdowns
+        function populateRoleDropdowns() {
+            const roleSelect = document.getElementById('role-trigger');
+            
+            // Clear existing options (except the first placeholder)
+            while (roleSelect.children.length > 1) {
+                roleSelect.removeChild(roleSelect.lastChild);
+            }
+
+            // Add role options (exclude @everyone and managed roles)
+            discordRoles.forEach(role => {
+                if (role.name !== '@everyone' && !role.managed) {
+                    const option = document.createElement('option');
+                    option.value = role.id;
+                    option.textContent = role.name;
+                    roleSelect.appendChild(option);
+                }
+            });
         }
 
         // Load data on page load
@@ -735,6 +913,9 @@
                 // Load global settings
                 await loadGlobalSettings();
                 
+                // Load Discord data
+                await loadDiscordData();
+                
                 // Load welcome messages
                 const welcomeResponse = await fetch('/api/messages/welcome-messages', {
                     headers: { 'Authorization': `Bearer ${API_KEY}` }
@@ -742,6 +923,15 @@
                 if (welcomeResponse.ok) {
                     welcomeMessages = await welcomeResponse.json();
                     console.log('Welcome messages loaded:', welcomeMessages);
+                }
+
+                // Load role messages
+                const roleResponse = await fetch('/api/messages/role-messages', {
+                    headers: { 'Authorization': `Bearer ${API_KEY}` }
+                });
+                if (roleResponse.ok) {
+                    roleMessages = await roleResponse.json();
+                    console.log('Role messages loaded:', roleMessages);
                 }
                 
                 // Load scheduled messages
@@ -822,6 +1012,7 @@
         // Update display
         function updateDisplay() {
             updateWelcomeList();
+            updateRoleList();
             updateScheduledList();
         }
 
@@ -855,6 +1046,51 @@
                     <div class="message-actions">
                         <button class="button" onclick="editMessage('welcome', '${messageId}')">Edit</button>
                         <button class="button danger" onclick="deleteMessage('welcome', '${messageId}')">Delete</button>
+                    </div>
+                `;
+                
+                list.appendChild(item);
+            });
+        }
+
+        // Update role messages list
+        function updateRoleList() {
+            const list = document.getElementById('role-list');
+            list.innerHTML = '';
+            
+            roleMessages.forEach(message => {
+                console.log('Rendering role message:', message);
+                const messageId = message.id || message.document_id || 'no-id';
+                
+                if (messageId === 'no-id') {
+                    console.error('Message without ID:', message);
+                }
+                
+                const item = document.createElement('div');
+                item.className = 'message-item';
+                
+                const preview = message.content.length > 100 ? 
+                    message.content.substring(0, 100) + '...' : message.content;
+                
+                // Find role and channel names
+                const role = discordRoles.find(r => r.id === message.role_id);
+                const channel = discordChannels.find(c => c.id === message.channel_id);
+                const roleName = role ? role.name : message.role_id || 'Unknown Role';
+                const channelName = channel ? `#${channel.name}` : message.channel_id || 'Unknown Channel';
+                
+                item.innerHTML = `
+                    <div class="message-content">
+                        <div class="message-title">${message.title}</div>
+                        <div class="message-preview">${preview}</div>
+                        <div class="message-preview">Trigger Role: ${roleName}</div>
+                        <div class="message-preview">Channel: ${channelName}</div>
+                    </div>
+                    <span class="message-status ${message.active ? 'status-active' : 'status-inactive'}">
+                        ${message.active ? 'Active' : 'Inactive'}
+                    </span>
+                    <div class="message-actions">
+                        <button class="button" onclick="editMessage('role', '${messageId}')">Edit</button>
+                        <button class="button danger" onclick="deleteMessage('role', '${messageId}')">Delete</button>
                     </div>
                 `;
                 
@@ -936,24 +1172,27 @@
 
         // Update statistics
         function updateStats() {
-            const welcomeCount = welcomeMessages.length;
+            const joinCount = welcomeMessages.length;
+            const roleCount = roleMessages.length;
             const scheduledCount = scheduledMessages.length;
             const activeCount = welcomeMessages.filter(m => m.active).length + 
+                              roleMessages.filter(m => m.active).length +
                               scheduledMessages.filter(m => m.active).length;
             
-            document.getElementById('welcome-count').textContent = welcomeCount;
-            document.getElementById('scheduled-count').textContent = scheduledCount;
+            document.getElementById('welcome-count').textContent = joinCount;
+            document.getElementById('scheduled-count').textContent = scheduledCount + roleCount;
             document.getElementById('active-count').textContent = activeCount;
         }
 
         // Form submission handlers
-        document.getElementById('welcome-form').addEventListener('submit', async (e) => {
+        document.getElementById('join-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             
             const formData = new FormData(e.target);
             const data = {
                 title: formData.get('title'),
                 content: formData.get('content'),
+                channel_id: formData.get('channel_id'),
                 active: document.getElementById('welcome-active').checked
             };
             
@@ -973,7 +1212,7 @@
             
             try {
                 // Determine if we're editing or creating
-                const isEditing = editingMessage && editingType === 'welcome';
+                const isEditing = editingMessage && editingType === 'join';
                 const endpoint = isEditing ? 
                     `/api/messages/welcome-messages/${editingMessage}` : 
                     '/api/messages/welcome-messages';
@@ -992,8 +1231,8 @@
                 
                 if (response.ok) {
                     const actionText = isEditing ? 'updated' : 'created';
-                    showNotification(`Welcome message ${actionText} successfully!`);
-                    clearForm('welcome');
+                    showNotification(`Join message ${actionText} successfully!`);
+                    clearForm('join');
                     cancelEdit(); // Reset edit state
                     loadData();
                 } else {
@@ -1069,6 +1308,52 @@
             }
         });
 
+        // Role form submission handler
+        document.getElementById('role-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData(e.target);
+            const data = {
+                title: formData.get('title'),
+                content: formData.get('content'),
+                role_id: formData.get('role_id'),
+                channel_id: formData.get('channel_id'),
+                active: document.getElementById('role-active').checked
+            };
+            
+            try {
+                // Determine if we're editing or creating
+                const isEditing = editingMessage && editingType === 'role';
+                const endpoint = isEditing ? 
+                    `/api/messages/role-messages/${editingMessage}` : 
+                    '/api/messages/role-messages';
+                const method = isEditing ? 'PUT' : 'POST';
+                
+                const response = await fetch(endpoint, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${API_KEY}`
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    const actionText = isEditing ? 'updated' : 'created';
+                    showNotification(`Role message ${actionText} successfully!`);
+                    clearForm('role');
+                    cancelEdit(); // Reset edit state
+                    loadData();
+                } else {
+                    showNotification('Error: ' + result.error, 'error');
+                }
+            } catch (error) {
+                showNotification('Error saving message: ' + error.message, 'error');
+            }
+        });
+
         // Edit message function
         function editMessage(type, id) {
             console.log('Editing message:', type, id);
@@ -1077,8 +1362,10 @@
             
             // Find the message in the current data
             let message;
-            if (type === 'welcome') {
+            if (type === 'join') {
                 message = welcomeMessages.find(m => (m.id || m.document_id) === id);
+            } else if (type === 'role') {
+                message = roleMessages.find(m => (m.id || m.document_id) === id);
             } else {
                 message = scheduledMessages.find(m => (m.id || m.document_id) === id);
             }
@@ -1091,12 +1378,13 @@
             }
             
             // Switch to the appropriate tab
-            if (type === 'welcome') {
-                switchTab('welcome');
+            if (type === 'join') {
+                switchTab('join');
                 
-                // Pre-fill the welcome form
+                // Pre-fill the join form
                 document.getElementById('welcome-title').value = message.title || '';
                 document.getElementById('welcome-content').value = message.content || '';
+                document.getElementById('join-channel').value = message.channel_id || '';
                 document.getElementById('welcome-active').checked = message.active || false;
                 
                 // Handle embeds
@@ -1117,8 +1405,23 @@
                 }
                 
                 // Change button text
-                const submitBtn = document.querySelector('#welcome-form button[type="submit"]');
-                submitBtn.textContent = 'Update Welcome Message';
+                const submitBtn = document.querySelector('#join-form button[type="submit"]');
+                submitBtn.textContent = 'Update Join Message';
+                submitBtn.style.backgroundColor = '#ff9500';
+                
+            } else if (type === 'role') {
+                switchTab('role');
+                
+                // Pre-fill the role form
+                document.getElementById('role-title').value = message.title || '';
+                document.getElementById('role-content').value = message.content || '';
+                document.getElementById('role-trigger').value = message.role_id || '';
+                document.getElementById('role-channel').value = message.channel_id || '';
+                document.getElementById('role-active').checked = message.active || false;
+                
+                // Change button text
+                const submitBtn = document.querySelector('#role-form button[type="submit"]');
+                submitBtn.textContent = 'Update Role Message';
                 submitBtn.style.backgroundColor = '#ff9500';
                 
             } else {
@@ -1165,20 +1468,26 @@
             editingType = null;
             
             // Reset forms
-            clearForm('welcome');
+            clearForm('join');
+            clearForm('role');
             clearForm('scheduled');
             
             // Reset button texts and colors
-            const welcomeBtn = document.querySelector('#welcome-form button[type="submit"]');
-            welcomeBtn.textContent = 'Create Welcome Message';
-            welcomeBtn.style.backgroundColor = '#667eea';
+            const joinBtn = document.querySelector('#join-form button[type="submit"]');
+            joinBtn.textContent = 'Create Join Message';
+            joinBtn.style.backgroundColor = '#667eea';
+            
+            const roleBtn = document.querySelector('#role-form button[type="submit"]');
+            roleBtn.textContent = 'Create Role Message';
+            roleBtn.style.backgroundColor = '#667eea';
             
             const scheduledBtn = document.querySelector('#scheduled-form button[type="submit"]');
             scheduledBtn.textContent = 'Create Scheduled Message';
             scheduledBtn.style.backgroundColor = '#667eea';
             
             // Hide cancel buttons
-            hideCancelEditButton('welcome');
+            hideCancelEditButton('join');
+            hideCancelEditButton('role');
             hideCancelEditButton('scheduled');
         }
 
@@ -1222,9 +1531,14 @@
                 return;
             }
             
-            const endpoint = type === 'welcome' ? 
-                `/api/messages/welcome-messages/${id}` : 
-                `/api/schedules/${id}`;
+            let endpoint;
+            if (type === 'join') {
+                endpoint = `/api/messages/welcome-messages/${id}`;
+            } else if (type === 'role') {
+                endpoint = `/api/messages/role-messages/${id}`;
+            } else {
+                endpoint = `/api/schedules/${id}`;
+            }
             
             try {
                 const response = await fetch(endpoint, {
