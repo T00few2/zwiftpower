@@ -330,6 +330,19 @@
     <div id="welcome-tab" class="tab-content active">
         <h2>Welcome Messages</h2>
         
+        <!-- Global Settings Section -->
+        <div class="global-settings" style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 30px; border-left: 4px solid #007bff;">
+            <h3>📊 Global Probability Settings</h3>
+            <div class="form-group">
+                <label for="global-daily-probability">Global Daily Probability (0.0 - 1.0):</label>
+                <input type="number" id="global-daily-probability" min="0" max="1" step="0.01" value="0.2" placeholder="0.2">
+                <small style="color: #666; font-size: 0.85em; display: block; margin-top: 5px;">
+                    Daily probability that any probability-based message will be sent. If triggered, one message is selected from all eligible messages across all channels based on likelihood weights (e.g., 0.2 = 20% chance per day)
+                </small>
+            </div>
+            <button type="button" class="button" onclick="saveGlobalSettings()">Save Global Settings</button>
+        </div>
+
         <form id="welcome-form">
             <div class="form-group">
                 <label for="welcome-title">Title:</label>
@@ -592,14 +605,6 @@
                 </div>
                 
                 <div class="form-group" id="probability-fields" style="display: none;">
-                    <label for="daily-probability">Daily Probability (0.0 - 1.0):</label>
-                    <input type="number" id="daily-probability" name="daily_probability" min="0" max="1" step="0.01" value="0.1" placeholder="0.1">
-                    <small style="color: #666; font-size: 0.85em; display: block; margin-top: 5px;">
-                        Probability that a message will be sent on any given day (e.g., 0.1 = 10% chance per day)
-                    </small>
-                </div>
-                
-                <div class="form-group" id="likelihood-field" style="display: none;">
                     <label for="message-likelihood">Message Likelihood (relative weight):</label>
                     <input type="number" id="message-likelihood" name="likelihood" min="0.1" step="0.1" value="1.0" placeholder="1.0">
                     <small style="color: #666; font-size: 0.85em; display: block; margin-top: 5px;">
@@ -685,14 +690,12 @@
             const dayOfMonthField = document.getElementById('day-of-month-field');
             const timeField = document.getElementById('time-field');
             const probabilityFields = document.getElementById('probability-fields');
-            const likelihoodField = document.getElementById('likelihood-field');
             
             // Hide all conditional fields first
             dayField.style.display = 'none';
             dayOfMonthField.style.display = 'none';
             timeField.style.display = 'block';
             probabilityFields.style.display = 'none';
-            likelihoodField.style.display = 'none';
             
             // Show appropriate fields based on schedule type
             if (scheduleType === 'weekly') {
@@ -702,7 +705,6 @@
             } else if (scheduleType === 'probability') {
                 timeField.style.display = 'none';
                 probabilityFields.style.display = 'block';
-                likelihoodField.style.display = 'block';
             }
         }
 
@@ -727,32 +729,24 @@
             }
         }
 
-        // Load data from server
+        // Load data on page load
         async function loadData() {
             try {
+                // Load global settings
+                await loadGlobalSettings();
+                
                 // Load welcome messages
                 const welcomeResponse = await fetch('/api/messages/welcome-messages', {
-                    headers: {
-                        'Authorization': `Bearer ${API_KEY}`
-                    }
+                    headers: { 'Authorization': `Bearer ${API_KEY}` }
                 });
                 if (welcomeResponse.ok) {
                     welcomeMessages = await welcomeResponse.json();
                     console.log('Welcome messages loaded:', welcomeMessages);
-                    // Ensure each message has an ID
-                    welcomeMessages = welcomeMessages.map(msg => {
-                        if (!msg.id && msg.document_id) {
-                            msg.id = msg.document_id;
-                        }
-                        return msg;
-                    });
                 }
                 
                 // Load scheduled messages
                 const scheduledResponse = await fetch('/api/schedules', {
-                    headers: {
-                        'Authorization': `Bearer ${API_KEY}`
-                    }
+                    headers: { 'Authorization': `Bearer ${API_KEY}` }
                 });
                 if (scheduledResponse.ok) {
                     scheduledMessages = await scheduledResponse.json();
@@ -770,6 +764,58 @@
                 updateStats();
             } catch (error) {
                 showNotification('Error loading data: ' + error.message, 'error');
+            }
+        }
+
+        // Load global settings
+        async function loadGlobalSettings() {
+            try {
+                const response = await fetch('/api/settings/global', {
+                    headers: { 'Authorization': `Bearer ${API_KEY}` }
+                });
+                if (response.ok) {
+                    const settings = await response.json();
+                    document.getElementById('global-daily-probability').value = settings.daily_probability || 0.2;
+                } else {
+                    console.log('No global settings found, using defaults');
+                }
+            } catch (error) {
+                console.log('Error loading global settings:', error);
+                // Use defaults if loading fails
+            }
+        }
+
+        // Save global settings
+        async function saveGlobalSettings() {
+            try {
+                const dailyProbability = parseFloat(document.getElementById('global-daily-probability').value);
+                
+                if (isNaN(dailyProbability) || dailyProbability < 0 || dailyProbability > 1) {
+                    showNotification('Daily probability must be between 0.0 and 1.0', 'error');
+                    return;
+                }
+
+                const settings = {
+                    daily_probability: dailyProbability
+                };
+
+                const response = await fetch('/api/settings/global', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${API_KEY}`
+                    },
+                    body: JSON.stringify(settings)
+                });
+
+                if (response.ok) {
+                    showNotification('Global settings saved successfully!');
+                } else {
+                    const result = await response.json();
+                    showNotification('Error saving settings: ' + result.error, 'error');
+                }
+            } catch (error) {
+                showNotification('Error saving global settings: ' + error.message, 'error');
             }
         }
 
@@ -860,9 +906,8 @@
                         const dayText = dayOfMonth ? ` on the ${dayOfMonth}${getOrdinalSuffix(dayOfMonth)}` : '';
                         scheduleInfo = `Monthly${dayText} at ${scheduleTime}`;
                     } else if (scheduleType === 'probability') {
-                        const dailyProb = (message.schedule.daily_probability * 100).toFixed(1);
                         const likelihood = message.schedule.likelihood || 1.0;
-                        scheduleInfo = `Probability-based (${dailyProb}% daily, likelihood: ${likelihood})`;
+                        scheduleInfo = `Probability-based (Global probability, likelihood: ${likelihood})`;
                     } else {
                         scheduleInfo = `${scheduleType} at ${scheduleTime}`;
                     }
@@ -970,8 +1015,7 @@
             };
             
             if (scheduleType === 'probability') {
-                // For probability-based scheduling
-                schedule.daily_probability = parseFloat(formData.get('daily_probability')) || 0.1;
+                // For probability-based scheduling, only include likelihood
                 schedule.likelihood = parseFloat(formData.get('likelihood')) || 1.0;
             } else {
                 // For time-based scheduling
@@ -1099,9 +1143,6 @@
                     }
                     if (message.schedule.time) {
                         document.getElementById('schedule-time').value = message.schedule.time;
-                    }
-                    if (message.schedule.daily_probability !== undefined) {
-                        document.getElementById('daily-probability').value = message.schedule.daily_probability;
                     }
                     if (message.schedule.likelihood !== undefined) {
                         document.getElementById('message-likelihood').value = message.schedule.likelihood;

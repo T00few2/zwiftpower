@@ -2053,51 +2053,46 @@ def check_probability_and_select():
         if not eligible_messages:
             return jsonify({"messages_to_send": [], "total_eligible": 0})
         
-        # Group messages by channel and daily_probability
-        channel_groups = {}
-        for message in eligible_messages:
-            channel_id = message.get('channel_id')
-            if channel_id not in channel_groups:
-                channel_groups[channel_id] = {
-                    'daily_probability': message.get('schedule', {}).get('daily_probability', 0.1),
-                    'messages': []
-                }
-            channel_groups[channel_id]['messages'].append(message)
+        # Get global daily probability setting
+        global_settings = firebase.get_document('system_settings', 'global')
+        global_daily_probability = global_settings.get('daily_probability', 0.2) if global_settings else 0.2
         
-        messages_to_send = []
+        print(f"[DEBUG] Using global daily probability: {global_daily_probability}")
+        print(f"[DEBUG] Total eligible messages across all channels: {len(eligible_messages)}")
         
-        # For each channel, check if we should send a message today
-        for channel_id, group in channel_groups.items():
-            daily_probability = group['daily_probability']
+        # Single probability roll for ALL messages
+        if random.random() < global_daily_probability:
+            print(f"[DEBUG] Global probability roll succeeded (p={global_daily_probability})")
             
-            # Roll the dice for this channel
-            if random.random() < daily_probability:
-                print(f"[DEBUG] Channel {channel_id} won the probability roll (p={daily_probability})")
-                
-                # Select a message based on likelihood weights
-                messages = group['messages']
-                weights = []
-                for msg in messages:
-                    likelihood = msg.get('schedule', {}).get('likelihood', 1.0)
-                    weights.append(likelihood)
-                
-                # Weighted random selection
-                if weights and sum(weights) > 0:
-                    selected_message = random.choices(messages, weights=weights)[0]
-                    messages_to_send.append(selected_message)
-                    print(f"[DEBUG] Selected message: {selected_message.get('title', 'Unknown')} (likelihood={selected_message.get('schedule', {}).get('likelihood', 1.0)})")
-                else:
-                    # Fallback to random selection if no weights
-                    selected_message = random.choice(messages)
-                    messages_to_send.append(selected_message)
-                    print(f"[DEBUG] Selected message (no weights): {selected_message.get('title', 'Unknown')}")
+            # Select ONE message from ALL eligible messages based on likelihood weights
+            weights = []
+            for msg in eligible_messages:
+                likelihood = msg.get('schedule', {}).get('likelihood', 1.0)
+                weights.append(likelihood)
+            
+            # Weighted random selection from all messages
+            if weights and sum(weights) > 0:
+                selected_message = random.choices(eligible_messages, weights=weights)[0]
+                print(f"[DEBUG] Selected message: {selected_message.get('title', 'Unknown')} (channel: {selected_message.get('channel_id')}, likelihood={selected_message.get('schedule', {}).get('likelihood', 1.0)})")
+                messages_to_send = [selected_message]
             else:
-                print(f"[DEBUG] Channel {channel_id} did not win the probability roll (p={daily_probability})")
+                # Fallback to random selection if no weights
+                selected_message = random.choice(eligible_messages)
+                print(f"[DEBUG] Selected message (no weights): {selected_message.get('title', 'Unknown')} (channel: {selected_message.get('channel_id')})")
+                messages_to_send = [selected_message]
+        else:
+            print(f"[DEBUG] Global probability roll failed (p={global_daily_probability})")
+            messages_to_send = []
+        
+        # Count unique channels for reporting
+        unique_channels = len(set(msg.get('channel_id') for msg in eligible_messages))
         
         return jsonify({
             "messages_to_send": messages_to_send,
             "total_eligible": len(eligible_messages),
-            "channels_checked": len(channel_groups)
+            "channels_with_eligible_messages": unique_channels,
+            "global_daily_probability": global_daily_probability,
+            "selection_method": "global_probability_single_selection"
         })
         
     except Exception as e:
@@ -2611,6 +2606,56 @@ def reorder_panel_roles(panel_id):
         print(f"Error reordering panel roles: {e}")
         import traceback
         traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/settings/global', methods=['GET'])
+def get_global_settings():
+    """Get global system settings"""
+    if not verify_api_key():
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        # Get global settings document from Firebase
+        settings = firebase.get_document('system_settings', 'global')
+        
+        if not settings:
+            # Return default settings if none exist
+            return jsonify({
+                "daily_probability": 0.2
+            })
+        
+        return jsonify(settings)
+        
+    except Exception as e:
+        print(f"Error getting global settings: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/settings/global', methods=['POST'])
+def save_global_settings():
+    """Save global system settings"""
+    if not verify_api_key():
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        data = request.get_json()
+        
+        # Validate daily_probability
+        daily_probability = data.get('daily_probability')
+        if daily_probability is None or not (0 <= daily_probability <= 1):
+            return jsonify({"error": "daily_probability must be between 0.0 and 1.0"}), 400
+        
+        # Save to Firebase
+        settings = {
+            'daily_probability': daily_probability,
+            'updated_at': datetime.now(pytz.timezone('Europe/Berlin')).isoformat()
+        }
+        
+        firebase.set_document('system_settings', 'global', settings)
+        
+        return jsonify({"message": "Global settings saved successfully"})
+        
+    except Exception as e:
+        print(f"Error saving global settings: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
