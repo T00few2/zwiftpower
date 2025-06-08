@@ -1060,10 +1060,15 @@
                 const preview = message.content.length > 100 ? 
                     message.content.substring(0, 100) + '...' : message.content;
                 
+                // Find channel name
+                const channel = discordChannels.channels ? discordChannels.channels.find(c => c.id === message.channel_id) : null;
+                const channelName = channel ? `#${channel.name}` : message.channel_id || 'No channel set';
+                
                 item.innerHTML = `
                     <div class="message-content">
                         <div class="message-title">${message.title}</div>
                         <div class="message-preview">${preview}</div>
+                        <div class="message-preview">Channel: ${channelName}</div>
                     </div>
                     <span class="message-status ${message.active ? 'status-active' : 'status-inactive'}">
                         ${message.active ? 'Active' : 'Inactive'}
