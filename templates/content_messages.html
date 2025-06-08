@@ -1039,8 +1039,13 @@
         // Update join messages list
         function updateWelcomeList() {
             const list = document.getElementById('join-list');
+            if (!list) {
+                console.error('join-list element not found');
+                return;
+            }
             list.innerHTML = '';
             
+            console.log('Updating welcome list with messages:', welcomeMessages);
             welcomeMessages.forEach(message => {
                 console.log('Rendering welcome message:', message);
                 const messageId = message.id || message.document_id || 'no-id';
@@ -1076,8 +1081,13 @@
         // Update role messages list
         function updateRoleList() {
             const list = document.getElementById('role-list');
+            if (!list) {
+                console.error('role-list element not found');
+                return;
+            }
             list.innerHTML = '';
             
+            console.log('Updating role list with messages:', roleMessages);
             roleMessages.forEach(message => {
                 console.log('Rendering role message:', message);
                 const messageId = message.id || message.document_id || 'no-id';
@@ -1093,8 +1103,8 @@
                     message.content.substring(0, 100) + '...' : message.content;
                 
                 // Find role and channel names
-                const role = discordRoles.find(r => r.id === message.role_id);
-                const channel = discordChannels.find(c => c.id === message.channel_id);
+                const role = discordRoles.roles ? discordRoles.roles.find(r => r.id === message.role_id) : null;
+                const channel = discordChannels.channels ? discordChannels.channels.find(c => c.id === message.channel_id) : null;
                 const roleName = role ? role.name : message.role_id || 'Unknown Role';
                 const channelName = channel ? `#${channel.name}` : message.channel_id || 'Unknown Channel';
                 
@@ -1121,8 +1131,13 @@
         // Update scheduled messages list
         function updateScheduledList() {
             const list = document.getElementById('scheduled-list');
+            if (!list) {
+                console.error('scheduled-list element not found');
+                return;
+            }
             list.innerHTML = '';
             
+            console.log('Updating scheduled list with messages:', scheduledMessages);
             scheduledMessages.forEach(message => {
                 console.log('Rendering scheduled message:', message);
                 const messageId = message.id || message.document_id || 'no-id';
