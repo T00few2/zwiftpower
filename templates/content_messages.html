@@ -334,13 +334,13 @@
 
         <form id="join-form">
             <div class="form-group">
-                <label for="welcome-title">Title:</label>
-                <input type="text" id="welcome-title" name="title" required>
+                <label for="join-title">Title:</label>
+                <input type="text" id="join-title" name="title" required>
             </div>
             
             <div class="form-group">
-                <label for="welcome-content">Message Content:</label>
-                <textarea id="welcome-content" name="content" placeholder="Welcome {username} to {server_name}! Use variables like {username}, {mention}, {server_name}, {member_count}" required></textarea>
+                <label for="join-content">Message Content:</label>
+                <textarea id="join-content" name="content" placeholder="Welcome {username} to {server_name}! Use variables like {username}, {mention}, {server_name}, {member_count}" required></textarea>
             </div>
             
             <div class="form-group">
@@ -351,11 +351,11 @@
             </div>
             
             <div class="variables-help">
-                <h4 onclick="toggleVariables('welcome')" style="cursor: pointer; user-select: none; display: flex; align-items: center; justify-content: space-between;">
+                <h4 onclick="toggleVariables('join')" style="cursor: pointer; user-select: none; display: flex; align-items: center; justify-content: space-between;">
                     📝 Available Variables 
-                    <span id="welcome-variables-arrow" style="transition: transform 0.3s;">▼</span>
+                    <span id="join-variables-arrow" style="transition: transform 0.3s;">▼</span>
                 </h4>
-                <div id="welcome-variables-content" style="display: none;">
+                <div id="join-variables-content" style="display: none;">
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 10px;">
                         <div>
                             <p><strong>👤 User Variables:</strong></p>
@@ -410,16 +410,16 @@
             </div>
             
             <div class="checkbox-group">
-                <input type="checkbox" id="welcome-active" name="active" checked>
-                <label for="welcome-active">Active</label>
+                <input type="checkbox" id="join-active" name="active" checked>
+                <label for="join-active">Active</label>
             </div>
             
             <div class="checkbox-group">
-                <input type="checkbox" id="welcome-has-embed" onchange="toggleEmbedFields()">
-                <label for="welcome-has-embed">Include Embed</label>
+                <input type="checkbox" id="join-has-embed" onchange="toggleEmbedFields()">
+                <label for="join-has-embed">Include Embed</label>
             </div>
             
-            <div id="welcome-embed-fields" class="embed-fields" style="display: none;">
+            <div id="join-embed-fields" class="embed-fields" style="display: none;">
                 <div class="form-group">
                     <label for="embed-title">Embed Title:</label>
                     <input type="text" id="embed-title" name="embed_title">
@@ -442,12 +442,12 @@
                 </div>
             </div>
             
-            <button type="submit" class="button">Create Welcome Message</button>
-            <button type="button" class="button" onclick="clearForm('welcome')">Clear</button>
+            <button type="submit" class="button">Create Join Message</button>
+            <button type="button" class="button" onclick="clearForm('join')">Clear</button>
         </form>
         
         <h3>Existing Join Messages</h3>
-        <div id="welcome-list" class="message-list"></div>
+        <div id="join-list" class="message-list"></div>
     </div>
 
     <!-- Role Messages Tab -->
@@ -760,17 +760,12 @@
             
             document.getElementById(tabName + '-tab').classList.add('active');
             event.target.classList.add('active');
-            
-            // Load data specific to the tab
-            if (tabName === 'role') {
-                loadDiscordData();
-            }
         }
 
-        // Toggle embed fields for welcome messages
+        // Toggle embed fields for join messages
         function toggleEmbedFields() {
-            const embedFields = document.getElementById('welcome-embed-fields');
-            const checkbox = document.getElementById('welcome-has-embed');
+            const embedFields = document.getElementById('join-embed-fields');
+            const checkbox = document.getElementById('join-has-embed');
             embedFields.style.display = checkbox.checked ? 'block' : 'none';
         }
 
@@ -829,30 +824,40 @@
         function clearForm(formType) {
             document.getElementById(formType + '-form').reset();
             if (formType === 'join') {
-                document.getElementById('welcome-embed-fields').style.display = 'none';
-                document.getElementById('welcome-has-embed').checked = false;
+                document.getElementById('join-embed-fields').style.display = 'none';
+                document.getElementById('join-has-embed').checked = false;
             }
         }
 
         // Load Discord data (channels and roles)
         async function loadDiscordData() {
             try {
+                console.log('Loading Discord data...');
+                
                 // Load Discord channels
                 const channelsResponse = await fetch('/api/discord/channels', {
                     headers: { 'Authorization': `Bearer ${API_KEY}` }
                 });
+                console.log('Channels response status:', channelsResponse.status);
                 if (channelsResponse.ok) {
                     discordChannels = await channelsResponse.json();
+                    console.log('Loaded channels:', discordChannels);
                     populateChannelDropdowns();
+                } else {
+                    console.error('Failed to load channels:', channelsResponse.status, channelsResponse.statusText);
                 }
 
                 // Load Discord roles
                 const rolesResponse = await fetch('/api/roles/guild-roles', {
                     headers: { 'Authorization': `Bearer ${API_KEY}` }
                 });
+                console.log('Roles response status:', rolesResponse.status);
                 if (rolesResponse.ok) {
                     discordRoles = await rolesResponse.json();
+                    console.log('Loaded roles:', discordRoles);
                     populateRoleDropdowns();
+                } else {
+                    console.error('Failed to load roles:', rolesResponse.status, rolesResponse.statusText);
                 }
             } catch (error) {
                 console.error('Error loading Discord data:', error);
@@ -861,8 +866,14 @@
 
         // Populate channel dropdowns
         function populateChannelDropdowns() {
+            console.log('Populating channel dropdowns...');
             const joinChannelSelect = document.getElementById('join-channel');
             const roleChannelSelect = document.getElementById('role-channel');
+            
+            if (!joinChannelSelect || !roleChannelSelect) {
+                console.error('Channel select elements not found');
+                return;
+            }
             
             // Clear existing options (except the first placeholder)
             [joinChannelSelect, roleChannelSelect].forEach(select => {
@@ -871,6 +882,7 @@
                 }
             });
 
+            console.log('Processing channels:', discordChannels.length);
             // Add channel options
             discordChannels.forEach(channel => {
                 if (channel.type === 0) { // Text channels only
@@ -885,17 +897,25 @@
                     roleChannelSelect.appendChild(option2);
                 }
             });
+            console.log('Channel dropdowns populated');
         }
 
         // Populate role dropdowns
         function populateRoleDropdowns() {
+            console.log('Populating role dropdowns...');
             const roleSelect = document.getElementById('role-trigger');
+            
+            if (!roleSelect) {
+                console.error('Role select element not found');
+                return;
+            }
             
             // Clear existing options (except the first placeholder)
             while (roleSelect.children.length > 1) {
                 roleSelect.removeChild(roleSelect.lastChild);
             }
 
+            console.log('Processing roles:', discordRoles.length);
             // Add role options (exclude @everyone and managed roles)
             discordRoles.forEach(role => {
                 if (role.name !== '@everyone' && !role.managed) {
@@ -903,8 +923,10 @@
                     option.value = role.id;
                     option.textContent = role.name;
                     roleSelect.appendChild(option);
+                    console.log('Added role:', role.name);
                 }
             });
+            console.log('Role dropdown populated');
         }
 
         // Load data on page load
@@ -1016,9 +1038,9 @@
             updateScheduledList();
         }
 
-        // Update welcome messages list
+        // Update join messages list
         function updateWelcomeList() {
-            const list = document.getElementById('welcome-list');
+            const list = document.getElementById('join-list');
             list.innerHTML = '';
             
             welcomeMessages.forEach(message => {
@@ -1044,8 +1066,8 @@
                         ${message.active ? 'Active' : 'Inactive'}
                     </span>
                     <div class="message-actions">
-                        <button class="button" onclick="editMessage('welcome', '${messageId}')">Edit</button>
-                        <button class="button danger" onclick="deleteMessage('welcome', '${messageId}')">Delete</button>
+                        <button class="button" onclick="editMessage('join', '${messageId}')">Edit</button>
+                        <button class="button danger" onclick="deleteMessage('join', '${messageId}')">Delete</button>
                     </div>
                 `;
                 
@@ -1193,11 +1215,11 @@
                 title: formData.get('title'),
                 content: formData.get('content'),
                 channel_id: formData.get('channel_id'),
-                active: document.getElementById('welcome-active').checked
+                active: document.getElementById('join-active').checked
             };
             
             // Add embed if enabled
-            if (document.getElementById('welcome-has-embed').checked) {
+            if (document.getElementById('join-has-embed').checked) {
                 const colorHex = document.getElementById('embed-color').value;
                 const colorInt = parseInt(colorHex.replace('#', ''), 16);
                 
@@ -1382,14 +1404,14 @@
                 switchTab('join');
                 
                 // Pre-fill the join form
-                document.getElementById('welcome-title').value = message.title || '';
-                document.getElementById('welcome-content').value = message.content || '';
+                document.getElementById('join-title').value = message.title || '';
+                document.getElementById('join-content').value = message.content || '';
                 document.getElementById('join-channel').value = message.channel_id || '';
-                document.getElementById('welcome-active').checked = message.active || false;
+                document.getElementById('join-active').checked = message.active || false;
                 
                 // Handle embeds
                 if (message.embed) {
-                    document.getElementById('welcome-has-embed').checked = true;
+                    document.getElementById('join-has-embed').checked = true;
                     toggleEmbedFields();
                     document.getElementById('embed-title').value = message.embed.title || '';
                     document.getElementById('embed-description').value = message.embed.description || '';
@@ -1400,7 +1422,7 @@
                     document.getElementById('embed-footer').value = message.embed.footer || '';
                     document.getElementById('embed-thumbnail').checked = message.embed.thumbnail || false;
                 } else {
-                    document.getElementById('welcome-has-embed').checked = false;
+                    document.getElementById('join-has-embed').checked = false;
                     toggleEmbedFields();
                 }
                 
