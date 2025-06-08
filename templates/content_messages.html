@@ -883,19 +883,17 @@
             });
 
             console.log('Processing channels:', discordChannels.channels ? discordChannels.channels.length : 'undefined');
-            // Add channel options
+            // Add channel options (all channels returned are already text channels)
             (discordChannels.channels || []).forEach(channel => {
-                if (channel.type === 0) { // Text channels only
-                    const option1 = document.createElement('option');
-                    option1.value = channel.id;
-                    option1.textContent = `#${channel.name}`;
-                    joinChannelSelect.appendChild(option1);
+                const option1 = document.createElement('option');
+                option1.value = channel.id;
+                option1.textContent = `#${channel.name}`;
+                joinChannelSelect.appendChild(option1);
 
-                    const option2 = document.createElement('option');
-                    option2.value = channel.id;
-                    option2.textContent = `#${channel.name}`;
-                    roleChannelSelect.appendChild(option2);
-                }
+                const option2 = document.createElement('option');
+                option2.value = channel.id;
+                option2.textContent = `#${channel.name}`;
+                roleChannelSelect.appendChild(option2);
             });
             console.log('Channel dropdowns populated');
         }
