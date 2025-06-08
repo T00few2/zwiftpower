@@ -882,9 +882,9 @@
                 }
             });
 
-            console.log('Processing channels:', discordChannels.length);
+            console.log('Processing channels:', discordChannels.channels ? discordChannels.channels.length : 'undefined');
             // Add channel options
-            discordChannels.forEach(channel => {
+            (discordChannels.channels || []).forEach(channel => {
                 if (channel.type === 0) { // Text channels only
                     const option1 = document.createElement('option');
                     option1.value = channel.id;
@@ -915,9 +915,9 @@
                 roleSelect.removeChild(roleSelect.lastChild);
             }
 
-            console.log('Processing roles:', discordRoles.length);
+            console.log('Processing roles:', discordRoles.roles ? discordRoles.roles.length : 'undefined');
             // Add role options (exclude @everyone and managed roles)
-            discordRoles.forEach(role => {
+            (discordRoles.roles || []).forEach(role => {
                 if (role.name !== '@everyone' && !role.managed) {
                     const option = document.createElement('option');
                     option.value = role.id;
