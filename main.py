@@ -1176,6 +1176,10 @@ def create_role_message():
             'created_by': 'admin'
         }
         
+        # Add embed if provided
+        if 'embed' in data and data['embed'] is not None:
+            message_data['embed'] = data['embed']
+        
         # Add to Firebase
         doc_ref = firebase.db.collection('role_messages').add(message_data)
         
@@ -1228,6 +1232,11 @@ def update_role_message(message_id):
             "updated_at": datetime.now(timezone.utc),
             "updated_by": "admin"
         }
+        
+        # Handle embed removal - if embed is explicitly set to null, delete the field
+        if 'embed' in update_data and update_data['embed'] is None:
+            from google.cloud.firestore_v1 import DELETE_FIELD
+            update_data['embed'] = DELETE_FIELD
         
         # Update the document
         doc_ref.update(update_data)
