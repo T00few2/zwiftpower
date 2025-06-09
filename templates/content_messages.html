@@ -1236,7 +1236,7 @@
                 active: document.getElementById('join-active').checked
             };
             
-            // Add embed if enabled
+            // Handle embed - include or explicitly set to null for removal
             if (document.getElementById('join-has-embed').checked) {
                 const colorHex = document.getElementById('embed-color').value;
                 const colorInt = parseInt(colorHex.replace('#', ''), 16);
@@ -1248,6 +1248,9 @@
                     footer: formData.get('embed_footer') || '',
                     thumbnail: document.getElementById('embed-thumbnail').checked
                 };
+            } else {
+                // Explicitly set embed to null to remove it when updating
+                data.embed = null;
             }
             
             try {

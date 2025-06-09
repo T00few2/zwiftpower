@@ -1120,6 +1120,11 @@ def update_welcome_message(message_id):
             "updated_by": "admin"
         }
         
+        # Handle embed removal - if embed is explicitly set to null, delete the field
+        if 'embed' in update_data and update_data['embed'] is None:
+            from google.cloud.firestore_v1 import DELETE_FIELD
+            update_data['embed'] = DELETE_FIELD
+        
         # Update the document
         doc_ref.update(update_data)
         
