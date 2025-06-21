@@ -9,12 +9,14 @@ This document describes the new web-based role management system that provides a
 - **Real-time Role Information**: See role colors, positions, and member counts
 - **Status Indicators**: Identify missing/deleted roles at a glance
 - **Channel Mapping**: Clear visual mapping of panels to Discord channels
+- **Role Prerequisites**: Visual indicators showing which roles require other roles first
 
 ### **Advanced Panel Management**
 - **Create Panels**: Easy-to-use form for creating new role panels
 - **Edit Panels**: Modify panel settings, descriptions, and requirements
 - **Delete Panels**: Safe deletion with confirmation prompts
 - **Progressive Access**: Set role requirements for accessing specific panels
+- **Individual Role Prerequisites**: Set specific role requirements for each role within panels
 
 ### **Comprehensive Statistics**
 - **Total Panels**: Number of active role panels
@@ -84,13 +86,25 @@ POST /api/roles/panels/{panelId}/roles
   "roleName": "Member",
   "description": "Basic member role",
   "emoji": "👤",
-  "requiresApproval": false
+  "requiresApproval": false,
+  "requiredRoles": ["987654321098765432"]
 }
 ```
 
 #### Remove Role from Panel
 ```http
 DELETE /api/roles/panels/{panelId}/roles/{roleId}
+```
+
+#### Update Role Prerequisites
+```http
+PUT /api/roles/panels/{panelId}/roles/{roleId}/prerequisites
+```
+**Body:**
+```json
+{
+  "requiredRoles": ["987654321098765432", "123456789012345678"]
+}
 ```
 
 ### **Discord Integration**
@@ -196,6 +210,42 @@ The system validates that your bot has the necessary permissions:
 - **Panel ID Sanitization**: Ensures safe, URL-friendly identifiers
 - **Role Hierarchy**: Validates bot can manage selected roles
 - **Channel Access**: Verifies bot has permissions in target channels
+
+## 🔑 Role Prerequisites
+
+The web interface now supports setting **individual role prerequisites** - specific roles that users must have before they can obtain other roles within a panel.
+
+### **How It Works**
+
+1. **Panel-Level Requirements**: Control who can access the entire panel
+2. **Individual Role Requirements**: Control who can get specific roles within a panel
+
+### **Setting Prerequisites**
+
+#### **When Adding a New Role**
+1. Click **"Add Role"** on any panel
+2. Select the role from the dropdown
+3. Use the **"Required Roles (Prerequisites)"** multi-select field
+4. Hold Ctrl/Cmd to select multiple prerequisite roles
+5. Complete other settings and click **"Add Role"**
+
+#### **When Editing an Existing Role**
+1. Click the **"✏️"** edit button next to any role
+2. Use the **"Required Roles (Prerequisites)"** multi-select field
+3. Select which roles users must have first
+4. Click **"Update Role"** to save changes
+
+### **Visual Indicators**
+
+- **Prerequisites Badge**: Roles with prerequisites show a **"🔑 X Prerequisites"** badge
+- **Tooltip Information**: Hover over any role to see detailed prerequisite information
+- **Color Coding**: Prerequisites are shown with an orange color scheme
+
+### **Example Use Cases**
+
+- **Gaming Community**: Require "Member" role before getting "Pro Player" role
+- **Work Teams**: Require "Employee" role before getting "Team Lead" role
+- **Educational**: Require "Student" role before getting "Advanced" role
 
 ## 🚀 Future Enhancements
 

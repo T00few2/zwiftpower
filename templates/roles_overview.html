@@ -410,6 +410,11 @@
             color: #004085;
         }
         
+        .meta-tag.prerequisites {
+            background: #fff0e6;
+            color: #cc6600;
+        }
+        
         .role-actions {
             display: flex;
             gap: 6px;
@@ -807,6 +812,13 @@
                     </div>
                     
                     <div class="form-group">
+                        <label class="form-label" for="requiredRoles">Required Roles (Prerequisites)</label>
+                        <select class="form-control" id="requiredRoles" multiple style="height: 120px;">
+                        </select>
+                        <div class="form-text">Users must have these roles before they can get this role. Hold Ctrl/Cmd to select multiple roles.</div>
+                    </div>
+                    
+                    <div class="form-group">
                         <label class="form-label">
                             <input type="checkbox" id="requiresApproval" style="margin-right: 8px;">
                             Requires Approval
@@ -873,6 +885,13 @@
                             <option value="Danger">Red (Danger)</option>
                         </select>
                         <div class="form-text">Choose the color of the button users will click in Discord</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="editRequiredRoles">Required Roles (Prerequisites)</label>
+                        <select class="form-control" id="editRequiredRoles" multiple style="height: 120px;">
+                        </select>
+                        <div class="form-text">Users must have these roles before they can get this role. Hold Ctrl/Cmd to select multiple roles.</div>
                     </div>
                     
                     <div class="form-group">
@@ -1015,6 +1034,13 @@
                 if (role.requiresApproval) roleDetails.push('Requires approval');
                 if (role.teamCaptainId) roleDetails.push(`Team Captain: ${role.teamCaptainId}`);
                 if (role.roleApprovalChannelId) roleDetails.push('Has custom approval channel');
+                if (role.requiredRoles && role.requiredRoles.length > 0) {
+                    const prereqNames = role.requiredRoles.map(reqRoleId => {
+                        const prereqRole = guildRoles.find(r => r.id === reqRoleId);
+                        return prereqRole ? prereqRole.name : reqRoleId;
+                    }).join(', ');
+                    roleDetails.push(`Prerequisites: ${prereqNames}`);
+                }
                 
                 const tooltipText = roleDetails.length > 0 ? roleDetails.join(' • ') : 'No additional settings';
                 
@@ -1031,6 +1057,7 @@
                                 ${role.teamCaptainId ? '<span class="meta-tag captain">Has Team Captain</span>' : ''}
                                 ${role.roleApprovalChannelId ? '<span class="meta-tag channel">Custom Channel</span>' : ''}
                                 ${role.buttonColor && role.buttonColor !== 'Secondary' ? `<span class="meta-tag button-color">${role.buttonColor} Button</span>` : ''}
+                                ${role.requiredRoles && role.requiredRoles.length > 0 ? `<span class="meta-tag prerequisites">🔑 ${role.requiredRoles.length} Prerequisites</span>` : ''}
                             </div>
                         </div>
                         <div class="role-actions">
@@ -1230,6 +1257,13 @@
             roleApprovalChannel.innerHTML = '<option value="">Use panel default</option>' +
                 channels.map(channel => `<option value="${channel.id}">#${channel.name}</option>`).join('');
             
+            // Populate required roles dropdown for the selected role
+            const requiredRoles = document.getElementById('requiredRoles');
+            requiredRoles.innerHTML = guildRoles
+                .filter(role => !existingRoleIds.includes(role.id)) // Exclude existing roles in panel
+                .map(role => `<option value="${role.id}">${role.name}</option>`)
+                .join('');
+            
             // Reset form
             document.getElementById('addRoleForm').reset();
             document.getElementById('teamCaptainGroup').style.display = 'none';
@@ -1262,6 +1296,20 @@
             document.getElementById('editButtonColor').value = role.buttonColor || 'Secondary';
             document.getElementById('editRequiresApproval').checked = role.requiresApproval || false;
             document.getElementById('editTeamCaptain').value = role.teamCaptainId || '';
+            
+            // Populate required roles dropdown (exclude current role and already selected roles)
+            const editRequiredRoles = document.getElementById('editRequiredRoles');
+            editRequiredRoles.innerHTML = guildRoles
+                .filter(r => r.id !== roleId) // Exclude current role
+                .map(r => `<option value="${r.id}">${r.name}</option>`)
+                .join('');
+            
+            // Set currently selected required roles
+            if (role.requiredRoles && role.requiredRoles.length > 0) {
+                Array.from(editRequiredRoles.options).forEach(option => {
+                    option.selected = role.requiredRoles.includes(option.value);
+                });
+            }
             
             // Show/hide conditional fields
             const showApprovalFields = role.requiresApproval || false;
@@ -1334,7 +1382,8 @@
                 buttonColor: document.getElementById('buttonColor').value,
                 requiresApproval: document.getElementById('requiresApproval').checked,
                 teamCaptainId: document.getElementById('teamCaptain').value || null,
-                roleApprovalChannelId: document.getElementById('roleApprovalChannel').value || null
+                roleApprovalChannelId: document.getElementById('roleApprovalChannel').value || null,
+                requiredRoles: Array.from(document.getElementById('requiredRoles').selectedOptions).map(o => o.value)
             };
             
             console.log('Submitting role data:', formData);
@@ -1387,7 +1436,8 @@
                 buttonColor: document.getElementById('editButtonColor').value,
                 requiresApproval: document.getElementById('editRequiresApproval').checked,
                 teamCaptainId: document.getElementById('editTeamCaptain').value || null,
-                roleApprovalChannelId: document.getElementById('editRoleApprovalChannel').value || null
+                roleApprovalChannelId: document.getElementById('editRoleApprovalChannel').value || null,
+                requiredRoles: Array.from(document.getElementById('editRequiredRoles').selectedOptions).map(o => o.value)
             };
             
             try {

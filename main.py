@@ -2480,6 +2480,7 @@ def add_role_to_panel(panel_id):
             'teamCaptainId': data.get('teamCaptainId'),
             'roleApprovalChannelId': data.get('roleApprovalChannelId'),
             'buttonColor': data.get('buttonColor', 'Secondary'),
+            'requiredRoles': data.get('requiredRoles', []),
             'addedAt': now.isoformat()
         }
         
@@ -2647,6 +2648,11 @@ def update_role_in_panel(panel_id, role_id):
             valid_colors = ['Primary', 'Secondary', 'Success', 'Danger']
             if data['buttonColor'] in valid_colors:
                 role_to_update['buttonColor'] = data['buttonColor']
+        if 'requiredRoles' in data:
+            # Validate required roles (should be an array of role IDs)
+            required_roles = data['requiredRoles']
+            if isinstance(required_roles, list):
+                role_to_update['requiredRoles'] = required_roles
         
         # Update timestamps
         from datetime import datetime, timezone
@@ -2725,6 +2731,90 @@ def reorder_panel_roles(panel_id):
         
     except Exception as e:
         print(f"Error reordering panel roles: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/roles/panels/<panel_id>/roles/<role_id>/prerequisites', methods=['PUT'])
+@login_required
+def update_role_prerequisites(panel_id, role_id):
+    """Update role prerequisites for a specific role"""
+    try:
+        data = request.get_json()
+        print(f"[DEBUG] Updating prerequisites for role {role_id} in panel {panel_id}: {data}")
+        
+        if 'requiredRoles' not in data:
+            return jsonify({"error": "Missing requiredRoles in request"}), 400
+        
+        required_roles = data['requiredRoles']
+        if not isinstance(required_roles, list):
+            return jsonify({"error": "requiredRoles must be an array"}), 400
+        
+        # Get existing panels document
+        panels_doc = firebase.get_document("selfRoles", DISCORD_GUILD_ID)
+        if not panels_doc or 'panels' not in panels_doc or panel_id not in panels_doc['panels']:
+            return jsonify({"error": "Panel not found"}), 404
+        
+        panel = panels_doc['panels'][panel_id]
+        
+        # Find the role to update
+        role_to_update = None
+        for role in panel['roles']:
+            if role['roleId'] == role_id:
+                role_to_update = role
+                break
+        
+        if not role_to_update:
+            return jsonify({"error": "Role not found in panel"}), 404
+        
+        # Update role prerequisites
+        role_to_update['requiredRoles'] = required_roles
+        
+        # Update timestamps
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
+        
+        role_to_update['updatedAt'] = now.isoformat()
+        panel['updatedAt'] = now.isoformat()
+        panels_doc['updatedAt'] = now.isoformat()
+        
+        # Save to Firebase
+        result = firebase.set_document("selfRoles", DISCORD_GUILD_ID, panels_doc)
+        print(f"[DEBUG] Firebase save result: {result}")
+        
+        prerequisite_names = []
+        if required_roles:
+            # Try to get role names for better response
+            try:
+                discord_api = DiscordAPI(DISCORD_BOT_TOKEN, DISCORD_GUILD_ID)
+                headers = {
+                    'Authorization': f'Bot {discord_api.bot_token}',
+                    'Content-Type': 'application/json'
+                }
+                
+                response = requests.get(
+                    f'https://discord.com/api/v10/guilds/{DISCORD_GUILD_ID}/roles',
+                    headers=headers
+                )
+                
+                if response.status_code == 200:
+                    guild_roles = response.json()
+                    role_name_map = {role['id']: role['name'] for role in guild_roles}
+                    prerequisite_names = [role_name_map.get(req_role_id, req_role_id) for req_role_id in required_roles]
+            except Exception as role_fetch_error:
+                print(f"Warning: Could not fetch role names: {role_fetch_error}")
+                prerequisite_names = required_roles
+        
+        message = f"Prerequisites updated for role '{role_to_update['roleName']}'"
+        if prerequisite_names:
+            message += f". Required roles: {', '.join(prerequisite_names)}"
+        else:
+            message += ". No prerequisites required."
+        
+        return jsonify({"success": True, "message": message})
+        
+    except Exception as e:
+        print(f"Error updating role prerequisites: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
