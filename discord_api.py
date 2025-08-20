@@ -175,6 +175,50 @@ class DiscordAPI:
             if "discordID" in user and "zwiftID" in user:
                 zwift_lookup[user["discordID"]] = user["zwiftID"]
         
+        # NEW: Build a rider stats lookup from the latest club_stats
+        rider_stats_lookup: Dict[str, Dict[str, Any]] = {}
+        try:
+            club_stats_docs = firebase.get_latest_document('club_stats')
+            if club_stats_docs and len(club_stats_docs) > 0:
+                stats_doc = club_stats_docs[0]
+                riders = stats_doc.get('data', {}).get('riders', []) if isinstance(stats_doc, dict) else []
+                for rider in riders:
+                    try:
+                        rider_id = rider.get('riderId')
+                        if rider_id is None:
+                            continue
+                        rider_key = str(rider_id)
+                        entry: Dict[str, Any] = {}
+                        # Pace group from ZP
+                        if 'zpCategory' in rider:
+                            entry['zpCategory'] = rider.get('zpCategory')
+                        # Racing score (ZRS) and derived category
+                        score = rider.get('racingScore')
+                        if isinstance(score, (int, float)):
+                            entry['racingScore'] = score
+                            # Compute ZRS category using helper
+                            try:
+                                entry['zrsCategory'] = firebase.get_zrs_category(score)
+                            except Exception:
+                                pass
+                        # vELO (Zwift Racing current mixed tier/score)
+                        mixed = rider.get('race', {}).get('current', {}).get('mixed') if isinstance(rider.get('race'), dict) else None
+                        if isinstance(mixed, dict):
+                            mixed_number = mixed.get('number')
+                            if isinstance(mixed_number, (int, float)):
+                                entry['veloScore'] = mixed_number
+                            mixed_letter = mixed.get('letter')
+                            if isinstance(mixed_letter, str):
+                                entry['veloCategory'] = mixed_letter
+                        if entry:
+                            rider_stats_lookup[rider_key] = entry
+                    except Exception:
+                        # Skip problematic rider entries
+                        continue
+        except Exception as rider_stats_err:
+            # Fail gracefully; stats are optional enrichments
+            print(f"Error building rider stats lookup: {rider_stats_err}")
+        
         # Merge the data
         merged_data = []
         for member in discord_members:
@@ -184,6 +228,11 @@ class DiscordAPI:
             if discord_id and discord_id in zwift_lookup:
                 member["zwiftID"] = zwift_lookup[discord_id]
                 member["has_zwift_id"] = True
+                # Enrich with stats when available
+                stats = rider_stats_lookup.get(str(member.get("zwiftID")))
+                if isinstance(stats, dict):
+                    # Use update to add only known keys
+                    member.update(stats)
             else:
                 member["has_zwift_id"] = False
             

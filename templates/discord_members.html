@@ -226,6 +226,24 @@
                     <div class="zwift-info">
                         <strong>Zwift ID:</strong> {{ member.zwiftID }}
                         <button class="assign-btn" onclick="selectMemberForAssignment('{{ member.discordID }}')">Reassign</button>
+                        
+                        <div style="margin-top: 8px; font-size: 14px;">
+                            {% if member.racingScore is defined or member.zrsCategory is defined %}
+                            <div><strong>ZRS:</strong>
+                                {% if member.zrsCategory is defined %}{{ member.zrsCategory }}{% endif %}
+                                {% if member.racingScore is defined %}({{ member.racingScore }}){% endif %}
+                            </div>
+                            {% endif %}
+                            {% if member.zpCategory is defined %}
+                            <div><strong>Pace group:</strong> {{ member.zpCategory }}</div>
+                            {% endif %}
+                            {% if member.veloCategory is defined or member.veloScore is defined %}
+                            <div><strong>vELO:</strong>
+                                {% if member.veloCategory is defined %}{{ member.veloCategory }}{% endif %}
+                                {% if member.veloScore is defined %}({{ member.veloScore }}){% endif %}
+                            </div>
+                            {% endif %}
+                        </div>
                     </div>
                     {% else %}
                     <button class="assign-btn" onclick="selectMemberForAssignment('{{ member.discordID }}')">Assign Zwift ID</button>
