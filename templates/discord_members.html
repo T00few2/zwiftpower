@@ -388,7 +388,13 @@
                 // Category filters
                 let matchesCats = true;
                 if (zrsCat !== 'all' && rowZrsCat !== zrsCat) matchesCats = false;
-                if (zpCat !== 'all' && rowZpCat !== zpCat) matchesCats = false;
+                if (zpCat !== 'all') {
+                    if (zpCat === 'A/A+') {
+                        if (!(rowZpCat === 'A' || rowZpCat === 'A+')) matchesCats = false;
+                    } else if (rowZpCat !== zpCat) {
+                        matchesCats = false;
+                    }
+                }
                 if (veloCat !== 'all' && rowVeloCat !== veloCat) matchesCats = false;
                 
                 // Show or hide based on all conditions
@@ -573,11 +579,15 @@
             const veloPrev = veloSel.value;
             // repopulate
             zrsSel.innerHTML = '<option value="all">All ZRS</option>' + Array.from(zrsSet).sort().map(v=>`<option value="${v}">${v}</option>`).join('');
-            zpSel.innerHTML = '<option value="all">All Pace Groups</option>' + Array.from(zpSet).sort().map(v=>`<option value="${v}">${v}</option>`).join('');
+            const zpOptions = Array.from(zpSet).sort();
+            // Always include combined A/A+ option if either A or A+ exists
+            const includeCombined = zpSet.has('A') || zpSet.has('A+');
+            const zpHtml = zpOptions.map(v=>`<option value="${v}">${v}</option>`).join('') + (includeCombined ? '<option value="A/A+">A/A+</option>' : '');
+            zpSel.innerHTML = '<option value="all">All Pace Groups</option>' + zpHtml;
             veloSel.innerHTML = '<option value="all">All vELO Categories</option>' + Array.from(veloSet).sort().map(v=>`<option value="${v}">${v}</option>`).join('');
             // restore selection if still valid
             if ([...zrsSet].includes(zrsPrev)) zrsSel.value = zrsPrev; else zrsSel.value = 'all';
-            if ([...zpSet].includes(zpPrev)) zpSel.value = zpPrev; else zpSel.value = 'all';
+            if ([...zpSet].includes(zpPrev) || (zpPrev === 'A/A+' && includeCombined)) zpSel.value = zpPrev; else zpSel.value = 'all';
             if ([...veloSet].includes(veloPrev)) veloSel.value = veloPrev; else veloSel.value = 'all';
         }
     </script>
