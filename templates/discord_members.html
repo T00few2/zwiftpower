@@ -203,53 +203,60 @@
             </div>
 
             <div id="members-container">
-                {% for member in members %}
-                <div class="member-card {% if member.has_zwift_id %}has-zwift{% else %}no-zwift{% endif %}" 
-                     data-has-zwift="{{ member.has_zwift_id|lower }}"
-                     data-discord-id="{{ member.discordID }}"
-                     data-username="{{ member.username }}"
-                     data-display-name="{{ member.display_name }}">
-                    <div class="member-name">{{ member.display_name }}</div>
-                    <div class="member-info">@{{ member.username }} ({{ member.discordID }})</div>
-                    
-                    {% if member.roles %}
-                    <div class="member-roles">
-                        {% for role in member.roles %}
-                        <span class="role-tag" style="background-color: #{{ '%06x' % role.color if role.color > 0 else 'dddddd' }}">
-                            {{ role.name }}
-                        </span>
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr>
+                            <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Name</th>
+                            <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Discord</th>
+                            <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Roles</th>
+                            <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Zwift ID</th>
+                            <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">ZRS</th>
+                            <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Pace group</th>
+                            <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">vELO</th>
+                            <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for member in members %}
+                        <tr class="member-row {% if member.has_zwift_id %}has-zwift{% else %}no-zwift{% endif %}"
+                            data-has-zwift="{{ member.has_zwift_id|lower }}"
+                            data-discord-id="{{ member.discordID }}"
+                            data-username="{{ member.username }}"
+                            data-display-name="{{ member.display_name }}">
+                            <td style="padding: 8px; border-bottom: 1px solid #f0f0f0; font-weight: 600;">{{ member.display_name }}</td>
+                            <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">@{{ member.username }} ({{ member.discordID }})</td>
+                            <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">
+                                {% if member.roles %}
+                                    {% for role in member.roles %}
+                                    <span class="role-tag" style="background-color: #{{ '%06x' % role.color if role.color > 0 else 'dddddd' }}">{{ role.name }}</span>
+                                    {% endfor %}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">{% if member.has_zwift_id %}{{ member.zwiftID }}{% else %}-{% endif %}</td>
+                            <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">
+                                {% if member.racingScore is defined or member.zrsCategory is defined %}
+                                    {% if member.zrsCategory is defined %}{{ member.zrsCategory }}{% endif %}{% if member.racingScore is defined %} ({{ member.racingScore }}){% endif %}
+                                {% else %}-{% endif %}
+                            </td>
+                            <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">{% if member.zpCategory is defined %}{{ member.zpCategory }}{% else %}-{% endif %}</td>
+                            <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">
+                                {% if member.veloCategoryName is defined or member.veloScore is defined or member.veloCategory is defined %}
+                                    {% if member.veloCategoryName is defined %}{{ member.veloCategoryName }}{% elif member.veloCategory is defined %}{{ member.veloCategory }}{% endif %}{% if member.veloScore is defined %} ({{ member.veloScore }}){% endif %}
+                                {% else %}-{% endif %}
+                            </td>
+                            <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">
+                                {% if member.has_zwift_id %}
+                                <button class="assign-btn" onclick="selectMemberForAssignment('{{ member.discordID }}')">Reassign</button>
+                                {% else %}
+                                <button class="assign-btn" onclick="selectMemberForAssignment('{{ member.discordID }}')">Assign</button>
+                                {% endif %}
+                            </td>
+                        </tr>
                         {% endfor %}
-                    </div>
-                    {% endif %}
-                    
-                    {% if member.has_zwift_id %}
-                    <div class="zwift-info">
-                        <strong>Zwift ID:</strong> {{ member.zwiftID }}
-                        <button class="assign-btn" onclick="selectMemberForAssignment('{{ member.discordID }}')">Reassign</button>
-                        
-                        <div style="margin-top: 8px; font-size: 14px;">
-                            {% if member.racingScore is defined or member.zrsCategory is defined %}
-                            <div><strong>ZRS:</strong>
-                                {% if member.zrsCategory is defined %}{{ member.zrsCategory }}{% endif %}
-                                {% if member.racingScore is defined %}({{ member.racingScore }}){% endif %}
-                            </div>
-                            {% endif %}
-                            {% if member.zpCategory is defined %}
-                            <div><strong>Pace group:</strong> {{ member.zpCategory }}</div>
-                            {% endif %}
-                            {% if member.veloCategory is defined or member.veloScore is defined %}
-                            <div><strong>vELO:</strong>
-                                {% if member.veloCategoryName is defined %}{{ member.veloCategoryName }}{% elif member.veloCategory is defined %}{{ member.veloCategory }}{% endif %}
-                                {% if member.veloScore is defined %}({{ member.veloScore }}){% endif %}
-                            </div>
-                            {% endif %}
-                        </div>
-                    </div>
-                    {% else %}
-                    <button class="assign-btn" onclick="selectMemberForAssignment('{{ member.discordID }}')">Assign Zwift ID</button>
-                    {% endif %}
-                </div>
-                {% endfor %}
+                    </tbody>
+                </table>
             </div>
         </div>
 
@@ -328,14 +335,13 @@
             const filterType = document.getElementById('filter-type').value;
             const filterMemberRole = document.getElementById('filter-member-role').checked;
             
-            Array.from(document.getElementsByClassName('member-card')).forEach(card => {
-                const displayName = card.dataset.displayName.toLowerCase();
-                const username = card.dataset.username.toLowerCase();
-                const hasZwift = card.dataset.hasZwift;
+            document.querySelectorAll('tr.member-row').forEach(row => {
+                const displayName = (row.dataset.displayName || '').toLowerCase();
+                const username = (row.dataset.username || '').toLowerCase();
+                const hasZwift = row.dataset.hasZwift;
                 
                 // Match search term
-                const matchesSearch = displayName.includes(searchTerm) || 
-                                     username.includes(searchTerm);
+                const matchesSearch = displayName.includes(searchTerm) || username.includes(searchTerm);
                 
                 // Match filter type
                 let matchesFilter = true;
@@ -348,17 +354,15 @@
                 // Match member role filter
                 let matchesMemberRole = true;
                 if (filterMemberRole) {
-                    const roleTags = card.querySelectorAll('.role-tag');
-                    const hasMemberRole = Array.from(roleTags).some(tag => 
-                        tag.textContent.trim().toLowerCase() === 'member');
-                    
+                    const roleTags = row.querySelectorAll('.role-tag');
+                    const hasMemberRole = Array.from(roleTags).some(tag => tag.textContent.trim().toLowerCase() === 'member');
                     if (!hasMemberRole) {
                         matchesMemberRole = false;
                     }
                 }
                 
                 // Show or hide based on all conditions
-                card.style.display = (matchesSearch && matchesFilter && matchesMemberRole) ? 'block' : 'none';
+                row.style.display = (matchesSearch && matchesFilter && matchesMemberRole) ? 'table-row' : 'none';
             });
         }
         
@@ -371,10 +375,10 @@
             // Store the selected Discord ID
             selectedDiscordId = discordId;
             
-            // Find the member card
-            const memberCard = document.querySelector(`[data-discord-id="${discordId}"]`);
-            const memberName = memberCard.querySelector('.member-name').textContent;
-            const memberUsername = memberCard.dataset.username;
+            // Find the member row
+            const row = document.querySelector(`tr.member-row[data-discord-id="${discordId}"]`);
+            const memberName = row ? row.dataset.displayName : '';
+            const memberUsername = row ? row.dataset.username : '';
             
             // Update the assignment panel
             document.getElementById('selected-member-name').textContent = memberName;
@@ -424,8 +428,8 @@
             const zwiftName = select.options[select.selectedIndex].text.split(' (ID:')[0];
             
             // Get the username from the member card
-            const memberCard = document.querySelector(`[data-discord-id="${selectedDiscordId}"]`);
-            const username = memberCard.dataset.username;
+            const memberRow = document.querySelector(`tr.member-row[data-discord-id="${selectedDiscordId}"]`);
+            const username = memberRow ? memberRow.dataset.username : '';
             
             // Show loading indicator
             document.getElementById('loading').style.display = 'block';
@@ -451,17 +455,19 @@
                     showSuccess(`Successfully assigned Zwift ID ${zwiftId} (${zwiftName}) to Discord member.`);
                     
                     // Update the UI to reflect the change
-                    const memberCard = document.querySelector(`[data-discord-id="${selectedDiscordId}"]`);
-                    memberCard.classList.remove('no-zwift');
-                    memberCard.classList.add('has-zwift');
-                    memberCard.dataset.hasZwift = 'true';
+                    const memberRow = document.querySelector(`tr.member-row[data-discord-id="${selectedDiscordId}"]`);
+                    if (memberRow) {
+                        memberRow.classList.remove('no-zwift');
+                        memberRow.classList.add('has-zwift');
+                        memberRow.dataset.hasZwift = 'true';
+                    }
                     
                     // Add Zwift info
-                    let zwiftInfo = memberCard.querySelector('.zwift-info');
+                    let zwiftInfo = memberRow.querySelector('.zwift-info');
                     if (!zwiftInfo) {
                         zwiftInfo = document.createElement('div');
                         zwiftInfo.className = 'zwift-info';
-                        memberCard.appendChild(zwiftInfo);
+                        memberRow.appendChild(zwiftInfo);
                     }
                     
                     zwiftInfo.innerHTML = `
@@ -470,16 +476,16 @@
                     `;
                     
                     // Remove the assign button if it exists
-                    const assignBtn = memberCard.querySelector('.assign-btn:not(.zwift-info .assign-btn)');
+                    const assignBtn = memberRow.querySelector('.assign-btn:not(.zwift-info .assign-btn)');
                     if (assignBtn) {
                         assignBtn.remove();
                     }
                     
                     // Reset the form after a short delay to show the success message
                     setTimeout(() => {
-                        // Check if we're viewing "unlinked" and if so, hide this member card
+                        // Check if we're viewing "unlinked" and if so, hide this member row
                         if (document.getElementById('filter-type').value === 'unlinked') {
-                            memberCard.style.display = 'none';
+                            memberRow.style.display = 'none';
                         }
                         
                         // Clear search fields
