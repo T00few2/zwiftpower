@@ -201,18 +201,21 @@ class DiscordAPI:
                                 entry['zrsCategory'] = firebase.get_zrs_category(score)
                             except Exception:
                                 pass
-                        # vELO (Zwift Racing current mixed tier/score)
-                        mixed = rider.get('race', {}).get('current', {}).get('mixed') if isinstance(rider.get('race'), dict) else None
+                        # vELO (Zwift Racing mixed category and rating)
+                        current = rider.get('race', {}).get('current') if isinstance(rider.get('race'), dict) else None
+                        mixed = None
+                        if isinstance(current, dict):
+                            mixed = current.get('mixed')
                         if isinstance(mixed, dict):
-                            mixed_number = mixed.get('number')
-                            if isinstance(mixed_number, (int, float)):
-                                entry['veloScore'] = mixed_number
-                            mixed_letter = mixed.get('letter')
-                            if isinstance(mixed_letter, str):
-                                entry['veloCategory'] = mixed_letter
-                            mixed_name = mixed.get('name')
-                            if isinstance(mixed_name, str) and mixed_name:
-                                entry['veloCategoryName'] = mixed_name
+                            score = mixed.get('rating')
+                            if isinstance(score, (int, float)):
+                                entry['veloScore'] = score
+                            category_name = mixed.get('category')
+                            if isinstance(category_name, str) and category_name:
+                                entry['veloCategoryName'] = category_name
+                            letter = mixed.get('letter')
+                            if isinstance(letter, str):
+                                entry['veloCategory'] = letter
                         if entry:
                             rider_stats_lookup[rider_key] = entry
                     except Exception:
