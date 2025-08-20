@@ -207,12 +207,19 @@ class DiscordAPI:
                         if isinstance(current, dict):
                             mixed = current.get('mixed')
                         if isinstance(mixed, dict):
+                            # Score fallbacks: mixed.rating -> current.rating -> mixed.number
                             score = mixed.get('rating')
+                            if not isinstance(score, (int, float)) and isinstance(current, dict):
+                                score = current.get('rating')
+                            if not isinstance(score, (int, float)):
+                                score = mixed.get('number')
                             if isinstance(score, (int, float)):
                                 entry['veloScore'] = score
-                            category_name = mixed.get('category')
+                            # Category name fallbacks: mixed.category -> mixed.name
+                            category_name = mixed.get('category') or mixed.get('name')
                             if isinstance(category_name, str) and category_name:
                                 entry['veloCategoryName'] = category_name
+                            # Letter (if available)
                             letter = mixed.get('letter')
                             if isinstance(letter, str):
                                 entry['veloCategory'] = letter
