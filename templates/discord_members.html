@@ -221,15 +221,15 @@
                 <table style="width: 100%; border-collapse: collapse;">
                     <thead>
                         <tr>
-                            <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Name</th>
-                            <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Discord</th>
-                            <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Roles</th>
-                            <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Zwift ID</th>
-                            <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">ZRS Cat</th>
-                            <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">ZRS Score</th>
-                            <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Pace group</th>
-                            <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">vELO Cat</th>
-                            <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">vELO Score</th>
+                            <th data-sort-key="name" style="cursor: pointer; text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Name <span class="sort-indicator"></span></th>
+                            <th data-sort-key="discord" style="cursor: pointer; text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Discord <span class="sort-indicator"></span></th>
+                            <th data-sort-key="roles" style="cursor: pointer; text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Roles <span class="sort-indicator"></span></th>
+                            <th data-sort-key="zwiftId" style="cursor: pointer; text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Zwift ID <span class="sort-indicator"></span></th>
+                            <th data-sort-key="zrsCat" style="cursor: pointer; text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">ZRS Cat <span class="sort-indicator"></span></th>
+                            <th data-sort-key="zrsScore" style="cursor: pointer; text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">ZRS Score <span class="sort-indicator"></span></th>
+                            <th data-sort-key="zpCat" style="cursor: pointer; text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Pace group <span class="sort-indicator"></span></th>
+                            <th data-sort-key="veloCat" style="cursor: pointer; text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">vELO Cat <span class="sort-indicator"></span></th>
+                            <th data-sort-key="veloScore" style="cursor: pointer; text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">vELO Score <span class="sort-indicator"></span></th>
                             <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Action</th>
                         </tr>
                     </thead>
@@ -242,7 +242,10 @@
                             data-display-name="{{ member.display_name }}"
                             data-zrs-cat="{{ member.zrsCategory|default('') }}"
                             data-zp-cat="{{ member.zpCategory|default('') }}"
-                            data-velo-cat="{{ member.veloCategoryName|default(member.veloCategory)|default('') }}">
+                            data-velo-cat="{{ member.veloCategoryName|default(member.veloCategory)|default('') }}"
+                            data-zrs-score="{{ member.racingScore|default('') }}"
+                            data-velo-score="{{ member.veloScore|default('') }}"
+                            data-zwift-id="{{ member.zwiftID|default('') }}">
                             <td style="padding: 8px; border-bottom: 1px solid #f0f0f0; font-weight: 600;">{{ member.display_name }}</td>
                             <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">@{{ member.username }} ({{ member.discordID }})</td>
                             <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">
@@ -336,7 +339,26 @@
             document.getElementById('filter-zp-cat').addEventListener('change', applyFilters);
             document.getElementById('filter-velo-cat').addEventListener('change', applyFilters);
             document.getElementById('filter-role').addEventListener('change', applyFilters);
-            
+
+            // Add sorting handlers
+            document.querySelectorAll('th[data-sort-key]').forEach(th => {
+                th.addEventListener('click', function() {
+                    const key = this.dataset.sortKey;
+                    if (window.currentSortKey === key) {
+                        window.currentSortDir = (window.currentSortDir === 'asc') ? 'desc' : 'asc';
+                    } else {
+                        window.currentSortKey = key;
+                        window.currentSortDir = 'asc';
+                    }
+                    updateSortIndicators();
+                    sortRows();
+                    applyFilters();
+                });
+            });
+            // Initialize sort state
+            window.currentSortKey = null;
+            window.currentSortDir = 'asc';
+        
             // Setup Zwift rider search
             document.getElementById('zwift-search').addEventListener('input', function() {
                 const searchTerm = this.value.toLowerCase();
@@ -612,6 +634,68 @@
             if ([...zpSet].includes(zpPrev) || (zpPrev === 'A/A+' && includeCombined)) zpSel.value = zpPrev; else zpSel.value = 'all';
             if ([...veloSet].includes(veloPrev)) veloSel.value = veloPrev; else veloSel.value = 'all';
             if ([...roleSet].includes(rolePrev)) roleSel.value = rolePrev; else roleSel.value = 'all';
+        }
+
+        function getSortValue(row, key) {
+            switch (key) {
+                case 'name':
+                    return (row.dataset.displayName || '').toLowerCase();
+                case 'discord':
+                    return (row.dataset.username || '').toLowerCase();
+                case 'roles': {
+                    const roles = Array.from(row.querySelectorAll('.role-tag')).map(t => t.textContent.trim().toLowerCase());
+                    return roles[0] || '';
+                }
+                case 'zwiftId': {
+                    const v = row.dataset.zwiftId || '';
+                    const n = parseFloat(v);
+                    return isNaN(n) ? -Infinity : n;
+                }
+                case 'zrsCat':
+                    return (row.dataset.zrsCat || '').toUpperCase();
+                case 'zrsScore': {
+                    const v = row.dataset.zrsScore || '';
+                    const n = parseFloat(v);
+                    return isNaN(n) ? -Infinity : n;
+                }
+                case 'zpCat':
+                    return (row.dataset.zpCat || '').toUpperCase();
+                case 'veloCat':
+                    return (row.dataset.veloCat || '').toUpperCase();
+                case 'veloScore': {
+                    const v = row.dataset.veloScore || '';
+                    const n = parseFloat(v);
+                    return isNaN(n) ? -Infinity : n;
+                }
+                default:
+                    return '';
+            }
+        }
+
+        function sortRows() {
+            const tbody = document.querySelector('#members-container tbody');
+            const rows = Array.from(document.querySelectorAll('tr.member-row'));
+            if (!window.currentSortKey) {
+                // No sort; keep original order
+                return;
+            }
+            const key = window.currentSortKey;
+            const dir = window.currentSortDir === 'asc' ? 1 : -1;
+            rows.sort((a, b) => {
+                const va = getSortValue(a, key);
+                const vb = getSortValue(b, key);
+                if (va < vb) return -1 * dir;
+                if (va > vb) return 1 * dir;
+                return 0;
+            });
+            rows.forEach(r => tbody.appendChild(r));
+        }
+
+        function updateSortIndicators() {
+            document.querySelectorAll('th[data-sort-key] .sort-indicator').forEach(span => { span.textContent = ''; });
+            if (!window.currentSortKey) return;
+            const th = document.querySelector(`th[data-sort-key="${window.currentSortKey}"] .sort-indicator`);
+            if (th) th.textContent = window.currentSortDir === 'asc' ? '▲' : '▼';
         }
     </script>
 </body>
