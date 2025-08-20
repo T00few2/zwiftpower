@@ -212,6 +212,9 @@
                 <select id="filter-velo-cat">
                     <option value="all">All vELO Categories</option>
                 </select>
+                <select id="filter-role">
+                    <option value="all">All Roles</option>
+                </select>
             </div>
 
             <div id="members-container">
@@ -332,6 +335,7 @@
             document.getElementById('filter-zrs-cat').addEventListener('change', applyFilters);
             document.getElementById('filter-zp-cat').addEventListener('change', applyFilters);
             document.getElementById('filter-velo-cat').addEventListener('change', applyFilters);
+            document.getElementById('filter-role').addEventListener('change', applyFilters);
             
             // Setup Zwift rider search
             document.getElementById('zwift-search').addEventListener('input', function() {
@@ -355,6 +359,7 @@
             const zrsCat = document.getElementById('filter-zrs-cat').value;
             const zpCat = document.getElementById('filter-zp-cat').value;
             const veloCat = document.getElementById('filter-velo-cat').value;
+            const roleFilter = document.getElementById('filter-role').value;
             
             document.querySelectorAll('tr.member-row').forEach(row => {
                 const displayName = (row.dataset.displayName || '').toLowerCase();
@@ -384,6 +389,15 @@
                         matchesMemberRole = false;
                     }
                 }
+                // Match selected role from dropdown
+                let matchesSelectedRole = true;
+                if (roleFilter !== 'all') {
+                    const roleTags = row.querySelectorAll('.role-tag');
+                    const hasWantedRole = Array.from(roleTags).some(tag => tag.textContent.trim() === roleFilter);
+                    if (!hasWantedRole) {
+                        matchesSelectedRole = false;
+                    }
+                }
 
                 // Category filters
                 let matchesCats = true;
@@ -398,7 +412,7 @@
                 if (veloCat !== 'all' && rowVeloCat !== veloCat) matchesCats = false;
                 
                 // Show or hide based on all conditions
-                row.style.display = (matchesSearch && matchesFilter && matchesMemberRole && matchesCats) ? 'table-row' : 'none';
+                row.style.display = (matchesSearch && matchesFilter && matchesMemberRole && matchesSelectedRole && matchesCats) ? 'table-row' : 'none';
             });
         }
         
@@ -562,6 +576,7 @@
             const zrsSet = new Set();
             const zpSet = new Set();
             const veloSet = new Set();
+            const roleSet = new Set();
             document.querySelectorAll('tr.member-row').forEach(row => {
                 const zrs = (row.dataset.zrsCat || '').trim();
                 const zp = (row.dataset.zpCat || '').trim();
@@ -569,14 +584,20 @@
                 if (zrs) zrsSet.add(zrs);
                 if (zp) zpSet.add(zp);
                 if (velo) veloSet.add(velo);
+                row.querySelectorAll('.role-tag').forEach(tag => {
+                    const t = tag.textContent.trim();
+                    if (t) roleSet.add(t);
+                });
             });
             const zrsSel = document.getElementById('filter-zrs-cat');
             const zpSel = document.getElementById('filter-zp-cat');
             const veloSel = document.getElementById('filter-velo-cat');
+            const roleSel = document.getElementById('filter-role');
             // preserve selection
             const zrsPrev = zrsSel.value;
             const zpPrev = zpSel.value;
             const veloPrev = veloSel.value;
+            const rolePrev = roleSel.value;
             // repopulate
             zrsSel.innerHTML = '<option value="all">All ZRS</option>' + Array.from(zrsSet).sort().map(v=>`<option value="${v}">${v}</option>`).join('');
             const zpOptions = Array.from(zpSet).sort();
@@ -585,10 +606,12 @@
             const zpHtml = zpOptions.map(v=>`<option value="${v}">${v}</option>`).join('') + (includeCombined ? '<option value="A/A+">A/A+</option>' : '');
             zpSel.innerHTML = '<option value="all">All Pace Groups</option>' + zpHtml;
             veloSel.innerHTML = '<option value="all">All vELO Categories</option>' + Array.from(veloSet).sort().map(v=>`<option value="${v}">${v}</option>`).join('');
+            roleSel.innerHTML = '<option value="all">All Roles</option>' + Array.from(roleSet).sort().map(v=>`<option value="${v}">${v}</option>`).join('');
             // restore selection if still valid
             if ([...zrsSet].includes(zrsPrev)) zrsSel.value = zrsPrev; else zrsSel.value = 'all';
             if ([...zpSet].includes(zpPrev) || (zpPrev === 'A/A+' && includeCombined)) zpSel.value = zpPrev; else zpSel.value = 'all';
             if ([...veloSet].includes(veloPrev)) veloSel.value = veloPrev; else veloSel.value = 'all';
+            if ([...roleSet].includes(rolePrev)) roleSel.value = rolePrev; else roleSel.value = 'all';
         }
     </script>
 </body>
