@@ -202,6 +202,18 @@
                 </label>
             </div>
 
+            <div class="filters" style="align-items: center;">
+                <select id="filter-zrs-cat">
+                    <option value="all">All ZRS</option>
+                </select>
+                <select id="filter-zp-cat">
+                    <option value="all">All Pace Groups</option>
+                </select>
+                <select id="filter-velo-cat">
+                    <option value="all">All vELO Categories</option>
+                </select>
+            </div>
+
             <div id="members-container">
                 <table style="width: 100%; border-collapse: collapse;">
                     <thead>
@@ -210,9 +222,11 @@
                             <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Discord</th>
                             <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Roles</th>
                             <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Zwift ID</th>
-                            <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">ZRS</th>
+                            <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">ZRS Cat</th>
+                            <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">ZRS Score</th>
                             <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Pace group</th>
-                            <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">vELO</th>
+                            <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">vELO Cat</th>
+                            <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">vELO Score</th>
                             <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Action</th>
                         </tr>
                     </thead>
@@ -222,7 +236,10 @@
                             data-has-zwift="{{ member.has_zwift_id|lower }}"
                             data-discord-id="{{ member.discordID }}"
                             data-username="{{ member.username }}"
-                            data-display-name="{{ member.display_name }}">
+                            data-display-name="{{ member.display_name }}"
+                            data-zrs-cat="{{ member.zrsCategory|default('') }}"
+                            data-zp-cat="{{ member.zpCategory|default('') }}"
+                            data-velo-cat="{{ member.veloCategoryName|default(member.veloCategory)|default('') }}">
                             <td style="padding: 8px; border-bottom: 1px solid #f0f0f0; font-weight: 600;">{{ member.display_name }}</td>
                             <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">@{{ member.username }} ({{ member.discordID }})</td>
                             <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">
@@ -235,17 +252,11 @@
                                 {% endif %}
                             </td>
                             <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">{% if member.has_zwift_id %}{{ member.zwiftID }}{% else %}-{% endif %}</td>
-                            <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">
-                                {% if member.racingScore is defined or member.zrsCategory is defined %}
-                                    {% if member.zrsCategory is defined %}{{ member.zrsCategory }}{% endif %}{% if member.racingScore is defined %} ({{ member.racingScore }}){% endif %}
-                                {% else %}-{% endif %}
-                            </td>
+                            <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">{% if member.zrsCategory is defined %}{{ member.zrsCategory }}{% else %}-{% endif %}</td>
+                            <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">{% if member.racingScore is defined %}{{ member.racingScore|round(0)|int }}{% else %}-{% endif %}</td>
                             <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">{% if member.zpCategory is defined %}{{ member.zpCategory }}{% else %}-{% endif %}</td>
-                            <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">
-                                {% if member.veloCategoryName is defined or member.veloScore is defined or member.veloCategory is defined %}
-                                    {% if member.veloCategoryName is defined %}{{ member.veloCategoryName }}{% elif member.veloCategory is defined %}{{ member.veloCategory }}{% endif %}{% if member.veloScore is defined %} ({{ member.veloScore }}){% endif %}
-                                {% else %}-{% endif %}
-                            </td>
+                            <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">{% if member.veloCategoryName is defined or member.veloCategory is defined %}{% if member.veloCategoryName is defined %}{{ member.veloCategoryName }}{% else %}{{ member.veloCategory }}{% endif %}{% else %}-{% endif %}</td>
+                            <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">{% if member.veloScore is defined %}{{ member.veloScore|round(0)|int }}{% else %}-{% endif %}</td>
                             <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">
                                 {% if member.has_zwift_id %}
                                 <button class="assign-btn" onclick="selectMemberForAssignment('{{ member.discordID }}')">Reassign</button>
@@ -314,6 +325,13 @@
             document.getElementById('filter-member-role').addEventListener('change', function() {
                 applyFilters();
             });
+
+            // Build category filter options dynamically
+            buildCategoryFilters();
+            // Category filter listeners
+            document.getElementById('filter-zrs-cat').addEventListener('change', applyFilters);
+            document.getElementById('filter-zp-cat').addEventListener('change', applyFilters);
+            document.getElementById('filter-velo-cat').addEventListener('change', applyFilters);
             
             // Setup Zwift rider search
             document.getElementById('zwift-search').addEventListener('input', function() {
@@ -334,11 +352,17 @@
             const searchTerm = document.getElementById('member-search').value.toLowerCase();
             const filterType = document.getElementById('filter-type').value;
             const filterMemberRole = document.getElementById('filter-member-role').checked;
+            const zrsCat = document.getElementById('filter-zrs-cat').value;
+            const zpCat = document.getElementById('filter-zp-cat').value;
+            const veloCat = document.getElementById('filter-velo-cat').value;
             
             document.querySelectorAll('tr.member-row').forEach(row => {
                 const displayName = (row.dataset.displayName || '').toLowerCase();
                 const username = (row.dataset.username || '').toLowerCase();
                 const hasZwift = row.dataset.hasZwift;
+                const rowZrsCat = row.dataset.zrsCat || '';
+                const rowZpCat = row.dataset.zpCat || '';
+                const rowVeloCat = row.dataset.veloCat || '';
                 
                 // Match search term
                 const matchesSearch = displayName.includes(searchTerm) || username.includes(searchTerm);
@@ -360,9 +384,15 @@
                         matchesMemberRole = false;
                     }
                 }
+
+                // Category filters
+                let matchesCats = true;
+                if (zrsCat !== 'all' && rowZrsCat !== zrsCat) matchesCats = false;
+                if (zpCat !== 'all' && rowZpCat !== zpCat) matchesCats = false;
+                if (veloCat !== 'all' && rowVeloCat !== veloCat) matchesCats = false;
                 
                 // Show or hide based on all conditions
-                row.style.display = (matchesSearch && matchesFilter && matchesMemberRole) ? 'table-row' : 'none';
+                row.style.display = (matchesSearch && matchesFilter && matchesMemberRole && matchesCats) ? 'table-row' : 'none';
             });
         }
         
@@ -520,6 +550,35 @@
             errorEl.textContent = message;
             errorEl.style.display = 'block';
             document.getElementById('success-message').style.display = 'none';
+        }
+
+        function buildCategoryFilters() {
+            const zrsSet = new Set();
+            const zpSet = new Set();
+            const veloSet = new Set();
+            document.querySelectorAll('tr.member-row').forEach(row => {
+                const zrs = (row.dataset.zrsCat || '').trim();
+                const zp = (row.dataset.zpCat || '').trim();
+                const velo = (row.dataset.veloCat || '').trim();
+                if (zrs) zrsSet.add(zrs);
+                if (zp) zpSet.add(zp);
+                if (velo) veloSet.add(velo);
+            });
+            const zrsSel = document.getElementById('filter-zrs-cat');
+            const zpSel = document.getElementById('filter-zp-cat');
+            const veloSel = document.getElementById('filter-velo-cat');
+            // preserve selection
+            const zrsPrev = zrsSel.value;
+            const zpPrev = zpSel.value;
+            const veloPrev = veloSel.value;
+            // repopulate
+            zrsSel.innerHTML = '<option value="all">All ZRS</option>' + Array.from(zrsSet).sort().map(v=>`<option value="${v}">${v}</option>`).join('');
+            zpSel.innerHTML = '<option value="all">All Pace Groups</option>' + Array.from(zpSet).sort().map(v=>`<option value="${v}">${v}</option>`).join('');
+            veloSel.innerHTML = '<option value="all">All vELO Categories</option>' + Array.from(veloSet).sort().map(v=>`<option value="${v}">${v}</option>`).join('');
+            // restore selection if still valid
+            if ([...zrsSet].includes(zrsPrev)) zrsSel.value = zrsPrev; else zrsSel.value = 'all';
+            if ([...zpSet].includes(zpPrev)) zpSel.value = zpPrev; else zpSel.value = 'all';
+            if ([...veloSet].includes(veloPrev)) veloSel.value = veloPrev; else veloSel.value = 'all';
         }
     </script>
 </body>
