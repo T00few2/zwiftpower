@@ -210,6 +210,9 @@ class DiscordAPI:
                             mixed_letter = mixed.get('letter')
                             if isinstance(mixed_letter, str):
                                 entry['veloCategory'] = mixed_letter
+                            mixed_name = mixed.get('name')
+                            if isinstance(mixed_name, str) and mixed_name:
+                                entry['veloCategoryName'] = mixed_name
                         if entry:
                             rider_stats_lookup[rider_key] = entry
                     except Exception:

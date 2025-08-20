@@ -239,7 +239,7 @@
                             {% endif %}
                             {% if member.veloCategory is defined or member.veloScore is defined %}
                             <div><strong>vELO:</strong>
-                                {% if member.veloCategory is defined %}{{ member.veloCategory }}{% endif %}
+                                {% if member.veloCategoryName is defined %}{{ member.veloCategoryName }}{% elif member.veloCategory is defined %}{{ member.veloCategory }}{% endif %}
                                 {% if member.veloScore is defined %}({{ member.veloScore }}){% endif %}
                             </div>
                             {% endif %}
