@@ -189,6 +189,9 @@ class DiscordAPI:
                             continue
                         rider_key = str(rider_id)
                         entry: Dict[str, Any] = {}
+                        # Real rider name from club_stats
+                        if 'name' in rider and isinstance(rider.get('name'), str):
+                            entry['riderName'] = rider.get('name')
                         # Pace group from ZP
                         if 'zpCategory' in rider:
                             entry['zpCategory'] = rider.get('zpCategory')

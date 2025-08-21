@@ -221,8 +221,8 @@
                 <table style="width: 100%; border-collapse: collapse;">
                     <thead>
                         <tr>
-                            <th data-sort-key="name" style="cursor: pointer; text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Name <span class="sort-indicator"></span></th>
-                            <th data-sort-key="discord" style="cursor: pointer; text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Discord <span class="sort-indicator"></span></th>
+                            <th data-sort-key="riderName" style="cursor: pointer; text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Name <span class="sort-indicator"></span></th>
+                            <th data-sort-key="discord" style="cursor: pointer; text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Username <span class="sort-indicator"></span></th>
                             <th data-sort-key="roles" style="cursor: pointer; text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Roles <span class="sort-indicator"></span></th>
                             <th data-sort-key="zwiftId" style="cursor: pointer; text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Zwift ID <span class="sort-indicator"></span></th>
                             <th data-sort-key="zrsCat" style="cursor: pointer; text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">ZRS Cat <span class="sort-indicator"></span></th>
@@ -240,13 +240,14 @@
                             data-discord-id="{{ member.discordID }}"
                             data-username="{{ member.username }}"
                             data-display-name="{{ member.display_name }}"
+                            data-rider-name="{{ member.riderName|default('') }}"
                             data-zrs-cat="{{ member.zrsCategory|default('') }}"
                             data-zp-cat="{{ member.zpCategory|default('') }}"
                             data-velo-cat="{{ member.veloCategoryName|default(member.veloCategory)|default('') }}"
                             data-zrs-score="{{ member.racingScore|default('') }}"
                             data-velo-score="{{ member.veloScore|default('') }}"
                             data-zwift-id="{{ member.zwiftID|default('') }}">
-                            <td style="padding: 8px; border-bottom: 1px solid #f0f0f0; font-weight: 600;">{{ member.display_name }}</td>
+                            <td style="padding: 8px; border-bottom: 1px solid #f0f0f0; font-weight: 600;">{% if member.riderName is defined %}{{ member.riderName }}{% else %}-{% endif %}</td>
                             <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">@{{ member.username }} ({{ member.discordID }})</td>
                             <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">
                                 {% if member.roles %}
@@ -638,6 +639,8 @@
 
         function getSortValue(row, key) {
             switch (key) {
+                case 'riderName':
+                    return (row.dataset.riderName || '').toLowerCase();
                 case 'name':
                     return (row.dataset.displayName || '').toLowerCase();
                 case 'discord':
