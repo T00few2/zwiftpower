@@ -29,13 +29,16 @@ class ZwiftAPI:
         response = requests.post(self.token_url, data=data)
         if response.status_code == 200:
             self.auth_token = response.json()
-            self.refresh_token = self.auth_token['refresh_token']
-            # Calculate token expiry time (with 60-second buffer)
-            self.token_expiry_time = time.time() + self.auth_token['expires_in'] - 60
             logger.info("Authenticated successfully.")
-            logger.debug(f"Token will expire in {self.auth_token['expires_in']} seconds.")
+            logger.debug(f"Access token payload: {self.auth_token}")
         else:
             raise Exception(f"Authentication failed: {response.text}")
+
+        expires_in = self.auth_token['expires_in']
+        self.refresh_token = self.auth_token['refresh_token']
+        logger.info(f"Token will expire in {expires_in} seconds.")
+        # Calculate token expiry time (with 60-second buffer)
+        self.token_expiry_time = time.time() + expires_in - 60
         
     def refresh_auth_token(self):
         logger.info("Refreshing auth token...")
@@ -47,10 +50,10 @@ class ZwiftAPI:
         response = requests.post(self.token_url, data=data)
         if response.status_code == 200:
             self.auth_token = response.json()
-            self.refresh_token = self.auth_token['refresh_token']
-            # Update token expiry time (with 60-second buffer)
-            self.token_expiry_time = time.time() + self.auth_token['expires_in'] - 60
             logger.info("Token refreshed successfully.")
+            # Update refresh token and expiry time when present
+            self.refresh_token = self.auth_token.get('refresh_token', self.refresh_token)
+            self.token_expiry_time = time.time() + self.auth_token.get('expires_in', 60) - 60
         else:
             logger.error(f"Token refresh failed: {response.text}")
             # If refresh fails, try to authenticate again
@@ -70,30 +73,51 @@ class ZwiftAPI:
         return self.auth_token is not None and 'access_token' in self.auth_token
     
     def fetch_json_with_retry(self, url, headers, params):
-        """Fetch JSON data with retries, handling both request and JSON parsing errors."""
+        """Fetch JSON data with retries and tolerant parsing.
+        - Ensures Accept/User-Agent headers are present
+        - Handles 204/empty body
+        - Validates content-type before parsing JSON
+        """
+        req_headers = dict(headers or {})
+        req_headers.setdefault('Accept', 'application/json, text/plain, */*')
+        req_headers.setdefault('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)')
+
         @backoff.on_exception(backoff.expo, (RequestException, ValueError), max_tries=5)
         def _fetch():
-            response = requests.get(url, headers=headers, params=params, timeout=20)
+            response = requests.get(url, headers=req_headers, params=params, timeout=20)
             response.raise_for_status()
-            return response.json()
-     
+
+            # Handle no content / empty body
+            if response.status_code == 204 or not response.content or not response.text.strip():
+                return None
+
+            content_type = (response.headers.get('Content-Type') or '').lower()
+            text = response.text.strip()
+
+            # Prefer JSON when content-type indicates JSON or payload looks like JSON
+            if 'application/json' in content_type or text.startswith('{') or text.startswith('['):
+                return response.json()
+
+            # If not JSON, raise a descriptive error so caller can adjust
+            snippet = text[:200]
+            raise ValueError(f"Expected JSON but got Content-Type='{content_type}'. Body starts with: {snippet}")
+
         return _fetch()
             
     def get_profile(self, id):
-        # Ensure we have a valid token before making the request
-        self.ensure_valid_token()
+        if not self.is_authenticated():
+            raise Exception("Not authenticated. Please authenticate first.")
         
         headers = {
-            'Authorization': f"Bearer {self.auth_token['access_token']}",
-            'Content-Type': 'application/json'
+            'Authorization': f"Bearer {self.auth_token['access_token']}"
         }
   
-        url = f'https://us-or-rly101.zwift.com//api/profiles/{id}'
+        # Avoid double slash and use tolerant fetcher
+        url = f'https://us-or-rly101.zwift.com/api/profiles/{id}'
         try:
-            return self.fetch_json_with_retry(url, headers=headers, params=None)
-        except RequestException as e:
-            if isinstance(e, requests.HTTPError) and e.response.status_code == 404:
-                logger.warning(f"Profile with ID {id} not found")
+            data = self.fetch_json_with_retry(url, headers=headers, params=None)
+            return data or {}
+        except requests.HTTPError as e:
+            if getattr(e, 'response', None) is not None and e.response.status_code == 404:
                 return None
-            logger.error(f"Error fetching profile: {e}")
             raise
