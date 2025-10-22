@@ -167,7 +167,8 @@ class DiscordAPI:
         discord_members = self.get_all_members(include_role_names=include_role_names)
         
         # Get all discord_users from Firebase that have ZwiftIDs
-        firebase_users = firebase.get_collection("discord_users")
+        # Use a high limit to ensure we get all users (default is only 100)
+        firebase_users = firebase.get_collection("discord_users", limit=10000)
         
         # Create a lookup dictionary of discordID to zwiftID
         zwift_lookup = {}

@@ -127,7 +127,8 @@ Stil
         """
 
         # Get Discord users from Firebase
-        discord_users = fb.get_collection("discord_users")
+        # Use a high limit to ensure we get all users (default is only 100)
+        discord_users = fb.get_collection("discord_users", limit=10000)
          
         # Create a lookup dictionary of ZwiftIDs to Discord IDs
         zwiftid_to_discord = {}
