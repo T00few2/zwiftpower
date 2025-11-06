@@ -2481,7 +2481,17 @@ def add_role_to_panel(panel_id):
             'roleApprovalChannelId': data.get('roleApprovalChannelId'),
             'buttonColor': data.get('buttonColor', 'Secondary'),
             'requiredRoles': data.get('requiredRoles', []),
-            'addedAt': now.isoformat()
+            'addedAt': now.isoformat(),
+            # Team metadata (optional; only for team roles)
+            'isTeamRole': bool(data.get('isTeamRole', False)),
+            'teamName': data.get('teamName'),
+            'raceSeries': data.get('raceSeries'),
+            'division': data.get('division'),
+            'rideTime': data.get('rideTime'),
+            'lookingForRiders': bool(data.get('lookingForRiders', False)),
+            'sortIndex': data.get('sortIndex', 0),
+            'visibility': data.get('visibility', 'public'),
+            'captainDisplayName': data.get('captainDisplayName')
         }
         
         print(f"[DEBUG] New role to add: {new_role}")
@@ -2607,6 +2617,38 @@ def debug_roles():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/roles/team-roles', methods=['GET'])
+@login_required
+def list_team_roles():
+    """List roles marked as team roles, with team metadata."""
+    try:
+        panels_doc = firebase.get_document("selfRoles", DISCORD_GUILD_ID)
+        roles = []
+        if panels_doc and 'panels' in panels_doc:
+            for panel_id, panel in panels_doc['panels'].items():
+                for role in panel.get('roles', []):
+                    if role.get('isTeamRole'):
+                        roles.append({
+                            'panelId': panel_id,
+                            'roleId': role.get('roleId'),
+                            'roleName': role.get('roleName'),
+                            'teamName': role.get('teamName') or role.get('roleName'),
+                            'raceSeries': role.get('raceSeries'),
+                            'division': role.get('division'),
+                            'rideTime': role.get('rideTime'),
+                            'lookingForRiders': role.get('lookingForRiders', False),
+                            'sortIndex': role.get('sortIndex', 0),
+                            'visibility': role.get('visibility', 'public'),
+                            'teamCaptainId': role.get('teamCaptainId'),
+                            'captainDisplayName': role.get('captainDisplayName')
+                        })
+        # Optional sort by sortIndex then by teamName
+        roles.sort(key=lambda r: (r.get('sortIndex') or 0, (r.get('teamName') or '').lower()))
+        return jsonify({ 'roles': roles })
+    except Exception as e:
+        print(f"Error listing team roles: {e}")
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/roles/panels/<panel_id>/roles/<role_id>', methods=['PUT'])
 @login_required
 def update_role_in_panel(panel_id, role_id):
@@ -2653,6 +2695,25 @@ def update_role_in_panel(panel_id, role_id):
             required_roles = data['requiredRoles']
             if isinstance(required_roles, list):
                 role_to_update['requiredRoles'] = required_roles
+        # Team metadata fields (optional)
+        if 'isTeamRole' in data:
+            role_to_update['isTeamRole'] = bool(data['isTeamRole'])
+        if 'teamName' in data:
+            role_to_update['teamName'] = data['teamName']
+        if 'raceSeries' in data:
+            role_to_update['raceSeries'] = data['raceSeries']
+        if 'division' in data:
+            role_to_update['division'] = data['division']
+        if 'rideTime' in data:
+            role_to_update['rideTime'] = data['rideTime']
+        if 'lookingForRiders' in data:
+            role_to_update['lookingForRiders'] = bool(data['lookingForRiders'])
+        if 'sortIndex' in data:
+            role_to_update['sortIndex'] = data['sortIndex']
+        if 'visibility' in data:
+            role_to_update['visibility'] = data['visibility']
+        if 'captainDisplayName' in data:
+            role_to_update['captainDisplayName'] = data['captainDisplayName']
         
         # Update timestamps
         from datetime import datetime, timezone

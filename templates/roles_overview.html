@@ -840,6 +840,61 @@
                         <div class="form-text">Override the panel's approval channel for this specific role</div>
                     </div>
                     
+                    <!-- Team Role Toggle & Fields -->
+                    <div class="form-group">
+                        <label class="form-label">
+                            <input type="checkbox" id="isTeamRole" style="margin-right: 8px;">
+                            Is Team Role
+                        </label>
+                        <div class="form-text">Enable to add team metadata used on the website</div>
+                    </div>
+
+                    <div id="teamRoleFields" style="display: none;">
+                        <div class="form-group">
+                            <label class="form-label" for="teamName">Team Name</label>
+                            <input type="text" class="form-control" id="teamName" placeholder="e.g., DZR A1">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="raceSeries">Race Series</label>
+                            <select class="form-control" id="raceSeries">
+                                <option value="">Select series...</option>
+                                <option>WTRL ZRL</option>
+                                <option>WTRL TTT</option>
+                                <option>DRS</option>
+                                <option>Club Ladder</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="division">Division</label>
+                            <input type="text" class="form-control" id="division" placeholder="e.g., A1 / Doppio / Diamond">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="rideTime">Ride Time (HH:MM)</label>
+                            <input type="text" class="form-control" id="rideTime" placeholder="19:30">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">
+                                <input type="checkbox" id="lookingForRiders" style="margin-right: 8px;">
+                                Looking for riders
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="sortIndex">Sort Index</label>
+                            <input type="number" class="form-control" id="sortIndex" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="visibility">Visibility</label>
+                            <select class="form-control" id="visibility">
+                                <option value="public">Public</option>
+                                <option value="hidden">Hidden</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="captainDisplayName">Captain Display Name (optional)</label>
+                            <input type="text" class="form-control" id="captainDisplayName" placeholder="Shown on website">
+                        </div>
+                    </div>
+                    
                     <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 30px;">
                         <button type="button" class="btn btn-secondary" onclick="closeModal('addRoleModal')">Cancel</button>
                         <button type="submit" class="btn btn-primary">Add Role</button>
@@ -914,6 +969,59 @@
                             <option value="">Use panel default</option>
                         </select>
                         <div class="form-text">Override the panel's approval channel for this specific role</div>
+                    </div>
+
+                    <!-- Edit: Team Role Toggle & Fields -->
+                    <div class="form-group">
+                        <label class="form-label">
+                            <input type="checkbox" id="editIsTeamRole" style="margin-right: 8px;">
+                            Is Team Role
+                        </label>
+                    </div>
+                    <div id="editTeamRoleFields" style="display: none;">
+                        <div class="form-group">
+                            <label class="form-label" for="editTeamName">Team Name</label>
+                            <input type="text" class="form-control" id="editTeamName">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="editRaceSeries">Race Series</label>
+                            <select class="form-control" id="editRaceSeries">
+                                <option value="">Select series...</option>
+                                <option>WTRL ZRL</option>
+                                <option>WTRL TTT</option>
+                                <option>DRS</option>
+                                <option>Club Ladder</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="editDivision">Division</label>
+                            <input type="text" class="form-control" id="editDivision">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="editRideTime">Ride Time (HH:MM)</label>
+                            <input type="text" class="form-control" id="editRideTime">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">
+                                <input type="checkbox" id="editLookingForRiders" style="margin-right: 8px;">
+                                Looking for riders
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="editSortIndex">Sort Index</label>
+                            <input type="number" class="form-control" id="editSortIndex" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="editVisibility">Visibility</label>
+                            <select class="form-control" id="editVisibility">
+                                <option value="public">Public</option>
+                                <option value="hidden">Hidden</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="editCaptainDisplayName">Captain Display Name (optional)</label>
+                            <input type="text" class="form-control" id="editCaptainDisplayName">
+                        </div>
                     </div>
                     
                     <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 30px;">
@@ -1058,7 +1166,17 @@
                                 ${role.roleApprovalChannelId ? '<span class="meta-tag channel">Custom Channel</span>' : ''}
                                 ${role.buttonColor && role.buttonColor !== 'Secondary' ? `<span class="meta-tag button-color">${role.buttonColor} Button</span>` : ''}
                                 ${role.requiredRoles && role.requiredRoles.length > 0 ? `<span class="meta-tag prerequisites">🔑 ${role.requiredRoles.length} Prerequisites</span>` : ''}
+                                ${role.isTeamRole ? '<span class="meta-tag">Team Role</span>' : ''}
                             </div>
+                            ${role.isTeamRole ? `
+                              <div class="role-meta" style="margin-top:6px;">
+                                <span class="meta-tag">Team: ${escapeHtml(role.teamName || role.roleName)}</span>
+                                ${role.raceSeries ? `<span class="meta-tag">Series: ${escapeHtml(role.raceSeries)}</span>` : ''}
+                                ${role.division ? `<span class="meta-tag">Division: ${escapeHtml(role.division)}</span>` : ''}
+                                ${role.rideTime ? `<span class="meta-tag">Time: ${escapeHtml(role.rideTime)}</span>` : ''}
+                                ${role.lookingForRiders ? `<span class="meta-tag" style="background:#fff3cd;color:#856404;">Looking for riders</span>` : ''}
+                              </div>
+                            ` : ''}
                         </div>
                         <div class="role-actions">
                             <button class="role-action-btn edit-btn" onclick="editRole('${panel.panelId}', '${role.roleId}')" title="Edit Role">✏️</button>
@@ -1268,6 +1386,7 @@
             document.getElementById('addRoleForm').reset();
             document.getElementById('teamCaptainGroup').style.display = 'none';
             document.getElementById('roleApprovalChannelGroup').style.display = 'none';
+            document.getElementById('teamRoleFields').style.display = 'none';
             
             document.getElementById('addRoleModal').style.display = 'block';
         }
@@ -1296,6 +1415,18 @@
             document.getElementById('editButtonColor').value = role.buttonColor || 'Secondary';
             document.getElementById('editRequiresApproval').checked = role.requiresApproval || false;
             document.getElementById('editTeamCaptain').value = role.teamCaptainId || '';
+            // Team role fields
+            const isTeam = !!role.isTeamRole;
+            document.getElementById('editIsTeamRole').checked = isTeam;
+            document.getElementById('editTeamRoleFields').style.display = isTeam ? 'block' : 'none';
+            document.getElementById('editTeamName').value = role.teamName || '';
+            document.getElementById('editRaceSeries').value = role.raceSeries || '';
+            document.getElementById('editDivision').value = role.division || '';
+            document.getElementById('editRideTime').value = role.rideTime || '';
+            document.getElementById('editLookingForRiders').checked = !!role.lookingForRiders;
+            document.getElementById('editSortIndex').value = (role.sortIndex != null ? role.sortIndex : 0);
+            document.getElementById('editVisibility').value = role.visibility || 'public';
+            document.getElementById('editCaptainDisplayName').value = role.captainDisplayName || '';
             
             // Populate required roles dropdown (exclude current role and already selected roles)
             const editRequiredRoles = document.getElementById('editRequiredRoles');
@@ -1357,6 +1488,17 @@
             }
         });
 
+        // Toggle team role fields (add)
+        document.getElementById('isTeamRole').addEventListener('change', function(e) {
+            document.getElementById('teamRoleFields').style.display = e.target.checked ? 'block' : 'none';
+        });
+        // Toggle team role fields (edit)
+        document.addEventListener('change', function(e) {
+            if (e.target && e.target.id === 'editIsTeamRole') {
+                document.getElementById('editTeamRoleFields').style.display = e.target.checked ? 'block' : 'none';
+            }
+        });
+
         // Handle add role form submission
         document.getElementById('addRoleForm').addEventListener('submit', async function(e) {
             e.preventDefault();
@@ -1383,7 +1525,16 @@
                 requiresApproval: document.getElementById('requiresApproval').checked,
                 teamCaptainId: document.getElementById('teamCaptain').value || null,
                 roleApprovalChannelId: document.getElementById('roleApprovalChannel').value || null,
-                requiredRoles: Array.from(document.getElementById('requiredRoles').selectedOptions).map(o => o.value)
+                requiredRoles: Array.from(document.getElementById('requiredRoles').selectedOptions).map(o => o.value),
+                isTeamRole: document.getElementById('isTeamRole').checked,
+                teamName: document.getElementById('teamName').value || null,
+                raceSeries: document.getElementById('raceSeries').value || null,
+                division: document.getElementById('division').value || null,
+                rideTime: document.getElementById('rideTime').value || null,
+                lookingForRiders: document.getElementById('lookingForRiders').checked,
+                sortIndex: parseInt(document.getElementById('sortIndex').value || '0'),
+                visibility: document.getElementById('visibility').value || 'public',
+                captainDisplayName: document.getElementById('captainDisplayName').value || null
             };
             
             console.log('Submitting role data:', formData);
@@ -1437,7 +1588,16 @@
                 requiresApproval: document.getElementById('editRequiresApproval').checked,
                 teamCaptainId: document.getElementById('editTeamCaptain').value || null,
                 roleApprovalChannelId: document.getElementById('editRoleApprovalChannel').value || null,
-                requiredRoles: Array.from(document.getElementById('editRequiredRoles').selectedOptions).map(o => o.value)
+                requiredRoles: Array.from(document.getElementById('editRequiredRoles').selectedOptions).map(o => o.value),
+                isTeamRole: document.getElementById('editIsTeamRole').checked,
+                teamName: document.getElementById('editTeamName').value || null,
+                raceSeries: document.getElementById('editRaceSeries').value || null,
+                division: document.getElementById('editDivision').value || null,
+                rideTime: document.getElementById('editRideTime').value || null,
+                lookingForRiders: document.getElementById('editLookingForRiders').checked,
+                sortIndex: parseInt(document.getElementById('editSortIndex').value || '0'),
+                visibility: document.getElementById('editVisibility').value || 'public',
+                captainDisplayName: document.getElementById('editCaptainDisplayName').value || null
             };
             
             try {
