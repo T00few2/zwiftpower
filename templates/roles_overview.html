@@ -500,6 +500,51 @@
             margin-bottom: 20px;
             opacity: 0.5;
         }
+
+        /* --- New Two-Pane Layout --- */
+        .layout {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            gap: 20px;
+        }
+        .sidebar {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 16px;
+            height: 100%;
+            align-self: start;
+        }
+        .sidebar h3 { margin: 0 0 10px; font-size: 1.1em; }
+        .sidebar .filter-group { margin-bottom: 14px; }
+        .sidebar .filter-group label { display:block; font-size: .85em; color:#666; margin-bottom:6px; }
+        .sidebar .filter-group input[type="text"] { width:100%; padding:8px; border:1px solid #ddd; border-radius:6px; }
+        .sidebar .checkbox-row { display:flex; align-items:center; gap:8px; margin:6px 0; font-size:.9em; }
+        .panel-list { list-style:none; padding:0; margin:0; max-height: 520px; overflow:auto; }
+        .panel-item { display:flex; align-items:center; gap:10px; padding:8px; border-radius:6px; cursor:pointer; }
+        .panel-item:hover { background:#f6f7fb; }
+        .panel-item input { margin:0; }
+        .panel-item .name { flex:1; font-weight:500; }
+        .panel-item .meta { font-size:.8em; color:#777; }
+
+        .main { min-height: 300px; }
+        .panel-section { background: white; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .panel-section summary { cursor: pointer; padding: 12px 16px; background:#f8f9fb; border-bottom:1px solid #eee; display:flex; align-items:center; justify-content:space-between; }
+        .panel-title-row { display:flex; gap:10px; align-items:center; }
+        .panel-title-row .panel-name { font-weight:600; }
+        .panel-title-row .panel-badge { background:#e3f2fd; color:#1976d2; padding:2px 8px; border-radius:12px; font-size:.8em; }
+        .panel-actions-inline button { margin-left: 8px; }
+
+        .roles-table { width:100%; border-collapse: separate; border-spacing:0; }
+        .roles-table th, .roles-table td { padding: 8px 10px; border-bottom:1px solid #eee; vertical-align: middle; }
+        .roles-table thead th { position: sticky; top: 0; background:#f8f9fb; z-index: 1; text-align:left; font-weight:600; font-size:.9em; }
+        .roles-table .drag-handle { cursor: grab; color:#999; font-size:1.1em; user-select:none; }
+        .roles-table .drag-handle:active { cursor: grabbing; }
+        .roles-table .w-1 { width: 36px; }
+        .roles-table .w-10 { width: 72px; }
+        .inline-input { width: 100%; padding:6px 8px; border:1px solid #e1e5e9; border-radius:6px; font-size:.9em; }
+        .inline-input:focus, .roles-table select:focus { outline:none; border-color:#667eea; box-shadow: 0 0 0 2px rgba(102,126,234,.15); }
+        .inline-select { padding:6px 8px; border:1px solid #e1e5e9; border-radius:6px; background:white; }
         
         /* Modal Styles */
         .modal {
@@ -697,6 +742,28 @@
         </div>
 
         <div id="panelsContainer">
+            <div id="layoutRoot" class="layout" style="display:none;">
+                <aside class="sidebar">
+                    <h3>Panels</h3>
+                    <div class="filter-group">
+                        <label for="panelSearch">Search panels</label>
+                        <input type="text" id="panelSearch" placeholder="Search...">
+                    </div>
+                    <div class="checkbox-row">
+                        <input type="checkbox" id="filterOnlyTeams">
+                        <label for="filterOnlyTeams">Show team roles only</label>
+                    </div>
+                    <div class="checkbox-row">
+                        <input type="checkbox" id="selectAllPanels" checked>
+                        <label for="selectAllPanels">Select all</label>
+                    </div>
+                    <ul id="panelList" class="panel-list"></ul>
+                </aside>
+                <section class="main">
+                    <div id="tablesContainer"></div>
+                </section>
+            </div>
+
             <div class="no-panels" id="noPanels">
                 <div class="icon">🎭</div>
                 <h3>No Role Panels Found</h3>
@@ -704,10 +771,6 @@
                 <button class="btn btn-primary" onclick="openCreatePanelModal()">
                     ➕ Create First Panel
                 </button>
-            </div>
-            
-            <div class="panels-grid" id="panelsGrid" style="display: none;">
-                <!-- Panels will be loaded here -->
             </div>
         </div>
     </div>
@@ -1107,25 +1170,31 @@
             document.getElementById('totalRoles').textContent = totalRoles;
             document.getElementById('activeChannels').textContent = activeChannels;
         }
+        // Two-pane layout state and renderers
+        let selectedPanelIds = [];
+        let uiFilters = { search: '', onlyTeams: false };
 
         function renderPanels() {
-            const container = document.getElementById('panelsContainer');
-            const noPanels = document.getElementById('noPanels');
-            const panelsGrid = document.getElementById('panelsGrid');
-            
-            if (panels.length === 0) {
-                noPanels.style.display = 'block';
-                panelsGrid.style.display = 'none';
+            const layout = document.getElementById('layoutRoot');
+            const noPanelsEl = document.getElementById('noPanels');
+
+            if (!panels || panels.length === 0) {
+                if (noPanelsEl) noPanelsEl.nextSibling ? noPanelsEl.style.display = 'block' : null;
+                if (layout) layout.style.display = 'none';
                 return;
             }
-            
-            noPanels.style.display = 'none';
-            panelsGrid.style.display = 'grid';
-            
-            panelsGrid.innerHTML = panels.map(panel => createPanelCard(panel)).join('');
-            
-            // Initialize drag and drop after rendering
-            setTimeout(initializeDragAndDrop, 100);
+
+            if (noPanelsEl) noPanelsEl.style.display = 'none';
+            if (layout) layout.style.display = 'grid';
+
+            if (selectedPanelIds.length === 0) {
+                selectedPanelIds = panels.map(p => p.panelId); // default select all
+                const selAll = document.getElementById('selectAllPanels');
+                if (selAll) selAll.checked = true;
+            }
+
+            renderSidebar();
+            renderMain();
         }
 
         function createPanelCard(panel) {
@@ -1660,20 +1729,16 @@
 
         // Initialize drag and drop functionality
         function initializeDragAndDrop() {
-            // Find all role lists and make them sortable
             const roleLists = document.querySelectorAll('.sortable-roles');
-            
             roleLists.forEach(roleList => {
                 const panelId = roleList.dataset.panelId;
-                
                 new Sortable(roleList, {
                     handle: '.drag-handle',
+                    draggable: 'tr',
                     animation: 150,
                     ghostClass: 'sortable-ghost',
                     chosenClass: 'sortable-chosen',
                     dragClass: 'sortable-drag',
-                    filter: '.add-role-btn',
-                    preventOnFilter: false,
                     onEnd: function(evt) {
                         handleRoleReorder(panelId, evt);
                     }
@@ -1685,54 +1750,240 @@
         async function handleRoleReorder(panelId, evt) {
             try {
                 const roleList = evt.to;
-                const roleItems = roleList.querySelectorAll('.role-item[data-role-id]');
+                const rowItems = roleList.querySelectorAll('tr[data-role-id]');
+                const newOrder = Array.from(rowItems).map(item => item.dataset.roleId);
                 
-                // Get the new order of role IDs
-                const newOrder = Array.from(roleItems).map(item => item.dataset.roleId);
-                
-                console.log(`[DEBUG] Reordering panel ${panelId} roles to:`, newOrder);
-                
-                // Send the new order to the backend
                 const response = await fetch(`/api/roles/panels/${panelId}/reorder`, {
                     method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        roleOrder: newOrder
-                    })
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ roleOrder: newOrder })
                 });
-                
                 if (!response.ok) {
                     const error = await response.json();
                     throw new Error(error.error || 'Failed to reorder roles');
                 }
-                
                 const result = await response.json();
-                console.log(`[DEBUG] Reorder successful:`, result);
-                
-                // Show success message briefly
                 showSuccess('Role order updated successfully!');
-                
-                // Update the local panels data to reflect the new order
+
                 const panel = panels.find(p => p.panelId === panelId);
                 if (panel) {
                     const roleMap = {};
-                    panel.roles.forEach(role => {
-                        roleMap[role.roleId] = role;
-                    });
-                    
-                    // Reorder the local data
-                    panel.roles = newOrder.map(roleId => roleMap[roleId]);
+                    panel.roles.forEach(role => { roleMap[role.roleId] = role; });
+                    panel.roles = newOrder.map(roleId => roleMap[roleId]).filter(Boolean);
                 }
-                
             } catch (error) {
                 console.error('Error reordering roles:', error);
                 showError(error.message);
-                
-                // Revert the visual change by reloading data
                 loadData();
             }
+        }
+
+        function renderSidebar() {
+            const listEl = document.getElementById('panelList');
+            if (!listEl) return;
+            const searchInput = document.getElementById('panelSearch');
+            const onlyTeams = document.getElementById('filterOnlyTeams');
+
+            const searchVal = ((searchInput && searchInput.value) || '').toLowerCase();
+            const filtered = panels.filter(p => {
+                if (!searchVal) return true;
+                return (String(p.name||'').toLowerCase().includes(searchVal) || String(p.panelId||'').toLowerCase().includes(searchVal));
+            });
+
+            listEl.innerHTML = filtered.map(p => {
+                const checked = selectedPanelIds.includes(p.panelId) ? 'checked' : '';
+                const roleCount = (p.roles||[]).length;
+                const channel = (channels.find(c => c.id === p.channelId)?.name) || 'unknown';
+                return `
+                    <li class="panel-item" data-panel-id="${p.panelId}">
+                        <input type="checkbox" class="panel-select" ${checked}>
+                        <div class="name">${escapeHtml(p.name||p.panelId)}</div>
+                        <div class="meta">#${escapeHtml(channel)} · ${roleCount}</div>
+                    </li>`;
+            }).join('');
+
+            // Event wiring (delegated)
+            listEl.addEventListener('change', function(ev) {
+                const tgt = ev.target;
+                if (tgt && tgt.classList.contains('panel-select')) {
+                    const li = tgt.closest('.panel-item');
+                    const pid = li?.dataset.panelId;
+                    if (!pid) return;
+                    if (tgt.checked) {
+                        if (!selectedPanelIds.includes(pid)) selectedPanelIds.push(pid);
+                    } else {
+                        selectedPanelIds = selectedPanelIds.filter(x => x !== pid);
+                        const selAll = document.getElementById('selectAllPanels');
+                        if (selAll) selAll.checked = false;
+                    }
+                    renderMain();
+                }
+            });
+
+            if (searchInput && !searchInput._bound) {
+                searchInput.addEventListener('input', function(){
+                    renderSidebar();
+                });
+                searchInput._bound = true;
+            }
+            if (onlyTeams && !onlyTeams._bound) {
+                onlyTeams.addEventListener('change', function(){
+                    uiFilters.onlyTeams = !!this.checked;
+                    renderMain();
+                });
+                onlyTeams._bound = true;
+            }
+            const selAll = document.getElementById('selectAllPanels');
+            if (selAll && !selAll._bound) {
+                selAll.addEventListener('change', function(){
+                    if (this.checked) {
+                        selectedPanelIds = panels.map(p => p.panelId);
+                    } else {
+                        selectedPanelIds = [];
+                    }
+                    renderSidebar();
+                    renderMain();
+                });
+                selAll._bound = true;
+            }
+        }
+
+        function renderMain() {
+            const container = document.getElementById('tablesContainer');
+            if (!container) return;
+            const chosen = panels.filter(p => selectedPanelIds.includes(p.panelId));
+            const panelsToRender = chosen.length ? chosen : panels.slice(0, 1);
+
+            const html = panelsToRender.map(p => buildPanelSection(p)).join('');
+            container.innerHTML = html;
+
+            // After render, wire up drag
+            initializeDragAndDrop();
+            ensureInlineHandlersBound();
+        }
+
+        function buildPanelSection(panel) {
+            const panelRoles = (panel.roles || []).filter(r => uiFilters.onlyTeams ? !!r.isTeamRole : true);
+            const channelName = (channels.find(c => c.id === panel.channelId)?.name) || 'unknown';
+            const rows = panelRoles.map(r => buildRoleRow(panel.panelId, r, channelName)).join('');
+            const count = panelRoles.length;
+            return `
+                <details class="panel-section" open>
+                    <summary>
+                        <div class="panel-title-row">
+                            <span class="panel-name">${escapeHtml(panel.name || panel.panelId)}</span>
+                            <span class="panel-badge">#${escapeHtml(channelName)}</span>
+                            <span class="panel-badge">${count} roles</div>
+                        </div>
+                        <div class="panel-actions-inline">
+                            <button class="btn btn-secondary" onclick="addRoleToPanel('${panel.panelId}')">➕ Add Role</button>
+                        </div>
+                    </summary>
+                    <div style="padding:12px 16px;">
+                        <table class="roles-table">
+                            <thead>
+                                <tr>
+                                    <th class="w-1">⇅</th>
+                                    <th>Role / Team</th>
+                                    <th>Series</th>
+                                    <th>Division</th>
+                                    <th>Time</th>
+                                    <th>LF</th>
+                                    <th>Captain</th>
+                                    <th>Prereqs</th>
+                                    <th>Channel</th>
+                                    <th>Vis</th>
+                                    <th class="w-10">Order</th>
+                                    <th class="w-10">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="sortable-roles" data-panel-id="${panel.panelId}">
+                                ${rows}
+                            </tbody>
+                        </table>
+                    </div>
+                </details>`;
+        }
+
+        function buildRoleRow(panelId, role, channelName) {
+            const color = role.roleColor ? `#${Number(role.roleColor).toString(16).padStart(6, '0')}` : '#6c757d';
+            const prereqCount = (role.requiredRoles || []).length || 0;
+            const teamName = role.teamName || role.roleName || role.roleId;
+            const captain = role.captainDisplayName || role.teamCaptainId || '';
+            return `
+                <tr data-role-id="${role.roleId}">
+                    <td class="drag-handle">⋮⋮</td>
+                    <td>
+                        <span class="role-badge" style="background-color:${color};color:#fff;">${role.emoji ? role.emoji + ' ' : ''}${escapeHtml(teamName)}</span>
+                        ${role.isTeamRole ? '' : '<span class="meta-tag" style="margin-left:6px;">Non-team</span>'}
+                    </td>
+                    <td>${escapeHtml(role.raceSeries || '') || '—'}</td>
+                    <td><input class="inline-input inline-field" data-field="division" value="${escapeHtml(role.division || '')}"></td>
+                    <td><input class="inline-input inline-field" data-field="rideTime" placeholder="HH:MM" value="${escapeHtml(role.rideTime || '')}"></td>
+                    <td style="text-align:center"><input type="checkbox" class="inline-field" data-field="lookingForRiders" ${role.lookingForRiders ? 'checked' : ''}></td>
+                    <td>${escapeHtml(captain || '—')}</td>
+                    <td>${prereqCount}</td>
+                    <td>#${escapeHtml(channelName)}</td>
+                    <td>
+                        <select class="inline-select inline-field" data-field="visibility">
+                            <option value="public" ${role.visibility==='public'?'selected':''}>public</option>
+                            <option value="hidden" ${role.visibility==='hidden'?'selected':''}>hidden</option>
+                        </select>
+                    </td>
+                    <td><input class="inline-input inline-field" data-field="sortIndex" type="number" value="${Number.isFinite(role.sortIndex)? role.sortIndex : 0}"></td>
+                    <td>
+                        <button class="role-action-btn" onclick="editRole('${panelId}','${role.roleId}')" title="Edit Role">✏️</button>
+                        <button class="role-action-btn remove-btn" onclick="removeRoleFromPanel('${panelId}','${role.roleId}')" title="Remove Role">🗑️</button>
+                    </td>
+                </tr>`;
+        }
+
+        let inlineHandlersBound = false;
+        function ensureInlineHandlersBound() {
+            if (inlineHandlersBound) return;
+            const container = document.getElementById('tablesContainer');
+            if (!container) return;
+
+            container.addEventListener('change', async function(ev) {
+                const t = ev.target;
+                if (!t.classList || !t.classList.contains('inline-field')) return;
+                const tr = t.closest('tr[data-role-id]');
+                const tbody = t.closest('tbody[data-panel-id]');
+                if (!tr || !tbody) return;
+                const roleId = tr.dataset.roleId;
+                const panelId = tbody.dataset.panelId;
+                const field = t.getAttribute('data-field');
+                if (!field) return;
+
+                let value;
+                if (t.type === 'checkbox') {
+                    value = !!t.checked;
+                } else if (t.type === 'number') {
+                    value = Number(t.value || 0);
+                } else {
+                    value = t.value;
+                }
+                const patch = {};
+                patch[field] = value;
+                try {
+                    const resp = await fetch(`/api/roles/panels/${panelId}/roles/${roleId},`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(patch)
+                    });
+                    const data = await resp.json().catch(()=>({}));
+                    if (!resp.ok) throw new Error(data.error || 'Update failed');
+                    showSuccess('Updated');
+                    const p = panels.find(x => x.panelId === panelId);
+                    if (p) {
+                        const rr = (p.roles||[]).find(r => r.roleId === roleId);
+                        if (rr) { rr[field] = value; }
+                    }
+                } catch (e) {
+                    showError(e.message || 'Update failed');
+                }
+            });
+            inlineHandlersBound = true;
         }
     </script>
 </body>
