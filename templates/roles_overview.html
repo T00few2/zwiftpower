@@ -1944,45 +1944,74 @@
             const container = document.getElementById('tablesContainer');
             if (!container) return;
 
-            container.addEventListener('change', async function(ev) {
-                const t = ev.target;
-                if (!t.classList || !t.classList.contains('inline-field')) return;
-                const tr = t.closest('tr[data-role-id]');
-                const tbody = t.closest('tbody[data-panel-id]');
+            // Debounced input updates
+            const pendingTimers = new Map(); // key: element -> timeout id
+
+            function queueUpdate(el) {
+                const tr = el.closest('tr[data-role-id]');
+                const tbody = el.closest('tbody[data-panel-id]');
                 if (!tr || !tbody) return;
                 const roleId = tr.dataset.roleId;
                 const panelId = tbody.dataset.panelId;
-                const field = t.getAttribute('data-field');
+                const field = el.getAttribute('data-field');
                 if (!field) return;
 
-                let value;
-                if (t.type === 'checkbox') {
-                    value = !!t.checked;
-                } else if (t.type === 'number') {
-                    value = Number(t.value || 0);
-                } else {
-                    value = t.value;
+                const key = el;
+                if (pendingTimers.has(key)) {
+                    clearTimeout(pendingTimers.get(key));
                 }
-                const patch = {};
-                patch[field] = value;
-                try {
-                    const resp = await fetch(`/api/roles/panels/${panelId}/roles/${roleId},`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(patch)
-                    });
-                    const data = await resp.json().catch(()=>({}));
-                    if (!resp.ok) throw new Error(data.error || 'Update failed');
-                    showSuccess('Updated');
-                    const p = panels.find(x => x.panelId === panelId);
-                    if (p) {
-                        const rr = (p.roles||[]).find(r => r.roleId === roleId);
-                        if (rr) { rr[field] = value; }
+                const timer = setTimeout(async () => {
+                    pendingTimers.delete(key);
+                    let value;
+                    if (el.type === 'checkbox') value = !!el.checked; else if (el.type === 'number') value = Number(el.value || 0); else value = el.value;
+                    const patch = {}; patch[field] = value;
+                    try {
+                        const resp = await fetch(`/api/roles/panels/${panelId}/roles/${roleId}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(patch)
+                        });
+                        const data = await resp.json().catch(()=>({}));
+                        if (!resp.ok) throw new Error(data.error || 'Update failed');
+                        showSuccess('Updated');
+                        const p = panels.find(x => x.panelId === panelId);
+                        if (p) {
+                            const rr = (p.roles||[]).find(r => r.roleId === roleId);
+                            if (rr) { rr[field] = value; }
+                        }
+                    } catch (e) {
+                        showError(e.message || 'Update failed');
                     }
-                } catch (e) {
-                    showError(e.message || 'Update failed');
+                }, 600);
+                pendingTimers.set(key, timer);
+            }
+
+            // Change (commit on blur/toggle)
+            container.addEventListener('change', function(ev) {
+                const t = ev.target;
+                if (!t.classList || !t.classList.contains('inline-field')) return;
+                queueUpdate(t);
+            });
+
+            // Live input debounce for text/number
+            container.addEventListener('input', function(ev) {
+                const t = ev.target;
+                if (!t.classList || !t.classList.contains('inline-field')) return;
+                if (t.type === 'text' || t.type === 'number') {
+                    queueUpdate(t);
                 }
             });
+
+            // Commit on Enter for text/number inputs
+            container.addEventListener('keydown', function(ev){
+                const t = ev.target;
+                if (!t.classList || !t.classList.contains('inline-input')) return;
+                if (ev.key === 'Enter') {
+                    ev.preventDefault();
+                    t.blur(); // triggers change -> queueUpdate
+                }
+            }, true);
+
             inlineHandlersBound = true;
         }
     </script>
