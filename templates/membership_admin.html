@@ -67,6 +67,11 @@
         <button class="btn" id="saveSettingsBtn">Save settings</button>
         <span id="settingsStatus" class="muted"></span>
       </div>
+
+      <div class="actions" style="margin-top:12px;">
+        <button class="btn" id="reconcileBtn" type="button">Reconcile roles now</button>
+        <span id="reconcileStatus" class="muted"></span>
+      </div>
     </div>
 
     <div class="card">
@@ -215,11 +220,30 @@
       }
     }
 
+    async function reconcileNow() {
+      try {
+        $('#reconcileBtn').disabled = true;
+        $('#reconcileStatus').textContent = 'Reconciling...';
+        const res = await fetch('/api/membership/reconcile-roles', { method: 'POST' });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data.error || 'Reconcile failed');
+        }
+        $('#reconcileStatus').textContent = `Updated: ${data.updated_memberships || 0}, Added: ${data.roles_added || 0}, Removed: ${data.roles_removed || 0}, Errors: ${data.errors || 0}`;
+        setTimeout(() => $('#reconcileStatus').textContent = '', 4000);
+      } catch (e) {
+        $('#reconcileStatus').textContent = e.message || 'Error';
+      } finally {
+        $('#reconcileBtn').disabled = false;
+      }
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
       $('#saveSettingsBtn').addEventListener('click', saveSettings);
       $('#refreshPaymentsBtn').addEventListener('click', loadPayments);
       $('#refreshRolesBtn').addEventListener('click', loadRoles);
       $('#roleSelect').addEventListener('change', syncInputFromSelect);
+      $('#reconcileBtn').addEventListener('click', reconcileNow);
       // Load roles first so the select can reflect saved roleId when settings load
       loadRoles().then(loadSettings);
       loadPayments();

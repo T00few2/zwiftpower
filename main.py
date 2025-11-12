@@ -1558,6 +1558,103 @@ def membership_payments_list():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/membership/reconcile-roles', methods=['POST'])
+@login_required
+def membership_reconcile_roles():
+    """
+    Recalculate membership coverage for all users based on successful payments and
+    add/remove the configured Club Member role on Discord accordingly.
+    Also updates memberships/{userId} with computed status and coverage.
+    """
+    try:
+        # Load settings to get role id
+        settings = firebase.get_document('system_settings', 'global') or {}
+        membership = settings.get('membership', {}) if isinstance(settings, dict) else {}
+        role_id = str(membership.get('clubMemberRoleId') or '').strip()
+        if not role_id:
+            return jsonify({"error": "Club Member Role ID not configured in settings"}), 400
+
+        # Gather payments (large limit for safety)
+        payments = firebase.get_collection('payments', limit=100000, include_id=True) or []
+        current_year = datetime.utcnow().year
+
+        # Compute max coveredThroughYear per user
+        user_to_max_cover = {}
+        for p in payments:
+            try:
+                if str(p.get('status', '')).lower() != 'succeeded':
+                    continue
+                user_id = str(p.get('userId') or '').strip()
+                covered = p.get('coveredThroughYear', None)
+                if not user_id or not isinstance(covered, int):
+                    continue
+                if user_id not in user_to_max_cover or covered > user_to_max_cover[user_id]:
+                    user_to_max_cover[user_id] = covered
+            except Exception:
+                continue
+
+        # Build the reconciliation set from memberships + payments
+        existing_memberships = firebase.get_collection('memberships', limit=100000, include_id=True) or []
+        user_ids = set([str(m.get('userId') or '').strip() for m in existing_memberships if m.get('userId')]) | set(user_to_max_cover.keys())
+
+        # Discord env
+        guild_id = os.environ.get('DISCORD_GUILD_ID')
+        bot_token = os.environ.get('DISCORD_BOT_TOKEN')
+        if not guild_id or not bot_token:
+            return jsonify({"error": "Discord env not configured (DISCORD_GUILD_ID/DISCORD_BOT_TOKEN)"}), 500
+        headers = {'Authorization': f'Bot {bot_token}'}
+
+        result = {"updated_memberships": 0, "roles_added": 0, "roles_removed": 0, "errors": 0, "total_users": len(user_ids)}
+
+        for uid in user_ids:
+            if not uid:
+                continue
+            covered = user_to_max_cover.get(uid, None)
+            status = 'club' if (isinstance(covered, int) and covered >= current_year) else 'community'
+
+            # Update membership summary
+            try:
+                firebase.set_document('memberships', uid, {
+                    "userId": uid,
+                    "currentStatus": status,
+                    "coveredThroughYear": covered if isinstance(covered, int) else None,
+                    "updatedAt": datetime.utcnow().isoformat()
+                }, merge=True)
+                result["updated_memberships"] += 1
+            except Exception:
+                result["errors"] += 1
+
+            # Role reconciliation
+            try:
+                if status == 'club':
+                    # Add role
+                    r = requests.put(
+                        f'https://discord.com/api/v10/guilds/{guild_id}/members/{uid}/roles/{role_id}',
+                        headers=headers
+                    )
+                    if 200 <= r.status_code < 300:
+                        result["roles_added"] += 1
+                    else:
+                        # Still count as not-an-error if user not in guild
+                        if r.status_code not in (403, 404):
+                            result["errors"] += 1
+                else:
+                    # Remove role
+                    r = requests.delete(
+                        f'https://discord.com/api/v10/guilds/{guild_id}/members/{uid}/roles/{role_id}',
+                        headers=headers
+                    )
+                    # 204 expected; 404 if user not in guild or role missing - treat as ok
+                    if r.status_code in (200, 202, 204, 404):
+                        result["roles_removed"] += 1
+                    else:
+                        result["errors"] += 1
+            except Exception:
+                result["errors"] += 1
+
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 @app.route('/login')
 def login():
     """Discord OAuth login page"""
