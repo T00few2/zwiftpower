@@ -1470,6 +1470,94 @@ def debug_scheduled_messages():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# -------------------- Membership Admin (Settings + Payments) --------------------
+@app.route('/membership', methods=['GET'])
+@login_required
+def membership_admin():
+    """
+    Admin UI for managing Club Membership settings and viewing payments.
+    """
+    try:
+        return render_template('membership_admin.html', user=session.get('user', {}))
+    except Exception as e:
+        flash(f'Error loading membership admin: {str(e)}', 'error')
+        return render_template('membership_admin.html', user=session.get('user', {}))
+
+
+@app.route('/api/membership/settings', methods=['GET'])
+@login_required
+def membership_settings_get():
+    """
+    Get membership settings stored under system_settings/global.membership
+    """
+    try:
+        settings = firebase.get_document('system_settings', 'global') or {}
+        membership = settings.get('membership', {}) if isinstance(settings, dict) else {}
+        out = {
+            "minAmountDkk": int(membership.get('minAmountDkk', 10)),
+            "maxAmountDkk": int(membership.get('maxAmountDkk', 100)),
+            "dualYearMode": bool(membership.get('dualYearMode', True)),
+            "clubMemberRoleId": str(membership.get('clubMemberRoleId', '') or '')
+        }
+        return jsonify(out)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/membership/settings', methods=['POST'])
+@login_required
+def membership_settings_post():
+    """
+    Update membership settings under system_settings/global.membership
+    """
+    try:
+        data = request.get_json(force=True) or {}
+        min_amount = int(data.get('minAmountDkk', 10))
+        max_amount = int(data.get('maxAmountDkk', 100))
+        dual_year = bool(data.get('dualYearMode', True))
+        role_id = str(data.get('clubMemberRoleId') or '')
+
+        if min_amount <= 0 or max_amount <= 0 or min_amount > max_amount:
+            return jsonify({"error": "Invalid range: ensure min > 0, max > 0 and min <= max"}), 400
+
+        settings = firebase.get_document('system_settings', 'global') or {}
+        if not isinstance(settings, dict):
+            settings = {}
+        settings['membership'] = {
+            "minAmountDkk": min_amount,
+            "maxAmountDkk": max_amount,
+            "dualYearMode": dual_year,
+            "clubMemberRoleId": role_id,
+            "updatedAt": datetime.now().isoformat()
+        }
+        firebase.set_document('system_settings', 'global', settings, merge=True)
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/membership/payments', methods=['GET'])
+@login_required
+def membership_payments_list():
+    """
+    List recent membership payments from 'payments' collection.
+    Optional query params:
+      - limit: number of records (default 100)
+    """
+    try:
+        limit = int(request.args.get('limit', 100))
+        docs = firebase.get_collection('payments', limit=limit, include_id=True) or []
+        # Sort by paidAt desc if present
+        def parse_paid_at(x):
+            try:
+                return datetime.fromisoformat(x.get('paidAt', ''))
+            except Exception:
+                return datetime.min
+        docs.sort(key=parse_paid_at, reverse=True)
+        return jsonify({"payments": docs})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/login')
 def login():
     """Discord OAuth login page"""
