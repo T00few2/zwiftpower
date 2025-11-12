@@ -18,6 +18,7 @@
     .btn { background:#111827; color:#fff; border:none; border-radius:8px; padding:8px 12px; cursor:pointer; }
     .btn.secondary { background:#6b7280; }
     .btn:disabled { opacity:.6; cursor:not-allowed; }
+    select { width: 100%; padding: 8px; border:1px solid #e5e7eb; border-radius:8px; background:#fff; }
     table { width:100%; border-collapse: collapse; }
     th, td { padding:8px; border-bottom:1px solid #f0f0f0; font-size: 13px; text-align:left; }
     th { background:#f9fafb; font-weight:600; }
@@ -53,6 +54,13 @@
         <div>
           <label>Club Member Role ID (Discord)</label>
           <input type="text" id="roleId" placeholder="e.g. 123456789012345678" />
+          <div style="height:8px;"></div>
+          <label>Choose existing role</label>
+          <div class="actions" style="gap:8px;">
+            <select id="roleSelect"></select>
+            <button class="btn secondary" id="refreshRolesBtn" type="button">Refresh</button>
+          </div>
+          <div class="muted" style="margin-top:6px;">Selecting a role fills the Role ID field.</div>
         </div>
       </div>
       <div class="actions" style="margin-top:12px;">
@@ -91,6 +99,40 @@
 
   <script>
     const $ = (sel) => document.querySelector(sel);
+    let guildRoles = [];
+
+    function syncSelectFromInput() {
+      const currentId = ($('#roleId').value || '').trim();
+      const sel = $('#roleSelect');
+      if (!sel) return;
+      const idx = guildRoles.findIndex(r => String(r.id) === String(currentId));
+      sel.value = idx >= 0 ? String(currentId) : '';
+    }
+
+    function syncInputFromSelect() {
+      const sel = $('#roleSelect');
+      if (!sel) return;
+      const val = sel.value;
+      if (val) $('#roleId').value = val;
+    }
+
+    async function loadRoles() {
+      try {
+        const res = await fetch('/api/roles/guild-roles', { headers: { 'Accept': 'application/json' } });
+        if (!res.ok) throw new Error('Failed to load roles');
+        const data = await res.json();
+        guildRoles = Array.isArray(data.roles) ? data.roles : [];
+        const sel = $('#roleSelect');
+        if (sel) {
+          const opts = ['<option value="">-- Select a role --</option>']
+            .concat(guildRoles.map(r => `<option value="${String(r.id)}">${String(r.name || r.id)}</option>`));
+          sel.innerHTML = opts.join('');
+        }
+        syncSelectFromInput();
+      } catch (e) {
+        console.error(e);
+      }
+    }
 
     async function loadSettings() {
       try {
@@ -101,6 +143,7 @@
         $('#maxAmount').value = data.maxAmountDkk ?? 100;
         $('#dualYear').checked = !!data.dualYearMode;
         $('#roleId').value = data.clubMemberRoleId || '';
+        syncSelectFromInput();
         $('#settingsStatus').textContent = 'Loaded';
         setTimeout(() => $('#settingsStatus').textContent = '', 1200);
       } catch (e) {
@@ -175,7 +218,10 @@
     document.addEventListener('DOMContentLoaded', () => {
       $('#saveSettingsBtn').addEventListener('click', saveSettings);
       $('#refreshPaymentsBtn').addEventListener('click', loadPayments);
-      loadSettings();
+      $('#refreshRolesBtn').addEventListener('click', loadRoles);
+      $('#roleSelect').addEventListener('change', syncInputFromSelect);
+      // Load roles first so the select can reflect saved roleId when settings load
+      loadRoles().then(loadSettings);
       loadPayments();
     });
   </script>
