@@ -1558,6 +1558,53 @@ def membership_payments_list():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/membership/payments.csv', methods=['GET'])
+@login_required
+def membership_payments_csv():
+    """
+    Download payments as CSV.
+    """
+    try:
+        import io, csv
+        # Large limit to include all
+        payments = firebase.get_collection('payments', limit=100000, include_id=True) or []
+        # Sort by paidAt desc
+        def parse_paid_at(x):
+            try:
+                return datetime.fromisoformat(x.get('paidAt', ''))
+            except Exception:
+                return datetime.min
+        payments.sort(key=parse_paid_at, reverse=True)
+
+        buffer = io.StringIO()
+        writer = csv.writer(buffer)
+        writer.writerow([
+            'paidAt','userId','fullName','userEmail','amountDkk','currency','status',
+            'coveredThroughYear','coversYears','paymentIntentId','receiptUrl'
+        ])
+        for p in payments:
+            stripe = p.get('stripe') or {}
+            writer.writerow([
+                p.get('paidAt',''),
+                p.get('userId',''),
+                p.get('fullName',''),
+                p.get('userEmail',''),
+                p.get('amountDkk',''),
+                p.get('currency',''),
+                p.get('status',''),
+                p.get('coveredThroughYear',''),
+                ','.join(map(str, p.get('coversYears') or [])),
+                stripe.get('paymentIntentId',''),
+                stripe.get('receiptUrl',''),
+            ])
+        csv_data = buffer.getvalue()
+        from flask import make_response
+        resp = make_response(csv_data)
+        resp.headers['Content-Type'] = 'text/csv; charset=utf-8'
+        resp.headers['Content-Disposition'] = 'attachment; filename="payments.csv"'
+        return resp
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 @app.route('/api/membership/reconcile-roles', methods=['POST'])
 @login_required
 def membership_reconcile_roles():

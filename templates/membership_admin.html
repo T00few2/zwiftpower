@@ -6,16 +6,16 @@
   <title>🏷️ Membership Admin</title>
   <style>
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:#f6f7fb; margin:0; }
-    header { background:#111827; color:#fff; padding:14px 20px; display:flex; align-items:center; justify-content:space-between; }
-    .container { padding: 20px; max-width: 1100px; margin: 0 auto; }
-    .card { background:#fff; border-radius:10px; box-shadow:0 2px 10px rgba(0,0,0,0.08); padding:16px; margin-bottom:16px; }
+    header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color:#fff; padding:16px 20px; display:flex; align-items:center; justify-content:space-between; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    .container { padding: 24px; max-width: 1200px; margin: 0 auto; }
+    .card { background:#fff; border-radius:12px; box-shadow:0 2px 12px rgba(0,0,0,0.08); padding:18px; margin-bottom:18px; }
     h1 { font-size: 20px; margin: 0; }
     h2 { margin: 0 0 10px; font-size: 18px; }
     label { display:block; font-size: 13px; color:#374151; margin-bottom:6px; }
     input[type="text"], input[type="number"] { width: 100%; padding: 8px; border:1px solid #e5e7eb; border-radius:8px; }
     .row { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
     .switch { display:flex; align-items:center; gap:8px; }
-    .btn { background:#111827; color:#fff; border:none; border-radius:8px; padding:8px 12px; cursor:pointer; }
+    .btn { background:#667eea; color:#fff; border:none; border-radius:8px; padding:10px 14px; cursor:pointer; }
     .btn.secondary { background:#6b7280; }
     .btn:disabled { opacity:.6; cursor:not-allowed; }
     select { width: 100%; padding: 8px; border:1px solid #e5e7eb; border-radius:8px; background:#fff; }
@@ -24,6 +24,10 @@
     th { background:#f9fafb; font-weight:600; }
     .actions { display:flex; gap:8px; }
     .muted { color:#6b7280; }
+    .layout { display:grid; grid-template-columns: 320px 1fr; gap:20px; align-items:start; }
+    .sidebar { position: sticky; top: 16px; }
+    .section-title { display:flex; align-items:center; gap:8px; font-weight:600; }
+    .section-title .badge { background:#e3f2fd; color:#1976d2; padding:2px 8px; border-radius:12px; font-size:.8em; }
   </style>
 </head>
 <body>
@@ -34,92 +38,102 @@
     </div>
   </header>
   <div class="container">
-    <div class="card">
-      <h2>Settings</h2>
-      <div class="row">
-        <div>
-          <label>Min amount (DKK)</label>
-          <input type="number" id="minAmount" min="1" value="10" />
-        </div>
-        <div>
-          <label>Max amount (DKK)</label>
-          <input type="number" id="maxAmount" min="1" value="100" />
-        </div>
+    <div class="card" style="margin-top:0;">
+      <div class="section-title">
+        <span>🏷️</span><span>Membership Administration</span><span class="badge">DZR</span>
       </div>
-      <div class="row" style="margin-top:10px;">
-        <div class="switch">
-          <input type="checkbox" id="dualYear" checked />
-          <label for="dualYear">Dual year mode (cover current + next year)</label>
-        </div>
-        <div>
-          <label>Club Member Role ID (Discord)</label>
-          <input type="text" id="roleId" placeholder="e.g. 123456789012345678" />
-          <div style="height:8px;"></div>
-          <label>Choose existing role</label>
-          <div class="actions" style="gap:8px;">
-            <select id="roleSelect"></select>
-            <button class="btn secondary" id="refreshRolesBtn" type="button">Refresh</button>
-          </div>
-          <div class="muted" style="margin-top:6px;">Selecting a role fills the Role ID field.</div>
-        </div>
-      </div>
-      <div class="actions" style="margin-top:12px;">
-        <button class="btn" id="saveSettingsBtn">Save settings</button>
-        <span id="settingsStatus" class="muted"></span>
-      </div>
-
-      <div class="actions" style="margin-top:12px;">
-        <button class="btn" id="reconcileBtn" type="button">Reconcile roles now</button>
-        <span id="reconcileStatus" class="muted"></span>
-      </div>
+      <p class="muted" style="margin:8px 0 0 0;">
+        Administrér medlemskabsindstillinger og se betalinger. Vælg den korrekte Discord‑rolle til klubmedlemmer,
+        sæt kontingentets minimum og maksimum, og kør “Reconcile” for at opdatere roller for alle brugere.
+      </p>
     </div>
 
-    <div class="card">
-      <h2>Recent Payments</h2>
-      <div class="actions" style="margin-bottom:8px;">
-        <button class="btn secondary" id="refreshPaymentsBtn">Refresh</button>
-        <span id="paymentsStatus" class="muted"></span>
-      </div>
-      <div style="overflow:auto;">
-        <table>
-          <thead>
-            <tr>
-              <th>Paid at</th>
-              <th>User ID</th>
-              <th>Full name</th>
-              <th>Email</th>
-              <th>Amount (DKK)</th>
-              <th>Years</th>
-              <th>Through</th>
-              <th>PI</th>
-            </tr>
-          </thead>
-          <tbody id="paymentsTbody">
-            <tr><td colspan="8" class="muted">No data</td></tr>
-          </tbody>
-        </table>
-      </div>
+    <div class="layout">
+      <aside class="sidebar">
+        <div class="card">
+          <h2>Settings</h2>
+          <div class="row">
+            <div>
+              <label>Min amount (DKK)</label>
+              <input type="number" id="minAmount" min="1" value="10" />
+            </div>
+            <div>
+              <label>Max amount (DKK)</label>
+              <input type="number" id="maxAmount" min="1" value="100" />
+            </div>
+          </div>
+          <div class="row" style="margin-top:10px;">
+            <div style="grid-column: 1 / -1;">
+              <label style="display:block; margin-bottom:6px;">Dual year mode</label>
+              <p class="muted" style="margin:0 0 6px 0;">
+                Når den er slået til, gælder medlemskabet for resten af indeværende år og hele næste år.
+                Når den er slået fra, gælder medlemskabet for hele indeværende år.
+              </p>
+              <div class="switch">
+                <input type="checkbox" id="dualYear" checked />
+                <label for="dualYear">Slå til/fra</label>
+              </div>
+            </div>
+            <div style="grid-column: 1 / -1;">
+              <label>Vælg Discord‑rolle for “Club member”</label>
+              <div class="actions" style="gap:8px;">
+                <select id="roleSelect"></select>
+                <button class="btn secondary" id="refreshRolesBtn" type="button">Opdater roller</button>
+              </div>
+              <div class="muted" style="margin-top:6px;">Denne rolle tildeles automatisk ved aktivt klubmedlemskab.</div>
+            </div>
+          </div>
+          <div class="actions" style="margin-top:12px;">
+            <button class="btn" id="saveSettingsBtn">Save settings</button>
+            <span id="settingsStatus" class="muted"></span>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Reconcile</h2>
+          <p class="muted" style="margin:0 0 8px 0;">Opdater Discord‑roller ud fra seneste betalinger for alle brugere.</p>
+          <div class="actions">
+            <button class="btn" id="reconcileBtn" type="button">Reconcile roles now</button>
+            <span id="reconcileStatus" class="muted"></span>
+          </div>
+        </div>
+      </aside>
+
+      <section class="main">
+        <div class="card">
+          <h2>Recent Payments</h2>
+          <div class="actions" style="margin-bottom:8px;">
+            <button class="btn secondary" id="refreshPaymentsBtn">Refresh</button>
+            <a class="btn" href="/api/membership/payments.csv">Download CSV</a>
+            <span id="paymentsStatus" class="muted"></span>
+          </div>
+          <div style="overflow:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Paid at</th>
+                  <th>User ID</th>
+                  <th>Full name</th>
+                  <th>Email</th>
+                  <th>Amount (DKK)</th>
+                  <th>Years</th>
+                  <th>Through</th>
+                  <th>PI</th>
+                </tr>
+              </thead>
+              <tbody id="paymentsTbody">
+                <tr><td colspan="8" class="muted">No data</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
     </div>
   </div>
 
   <script>
     const $ = (sel) => document.querySelector(sel);
     let guildRoles = [];
-
-    function syncSelectFromInput() {
-      const currentId = ($('#roleId').value || '').trim();
-      const sel = $('#roleSelect');
-      if (!sel) return;
-      const idx = guildRoles.findIndex(r => String(r.id) === String(currentId));
-      sel.value = idx >= 0 ? String(currentId) : '';
-    }
-
-    function syncInputFromSelect() {
-      const sel = $('#roleSelect');
-      if (!sel) return;
-      const val = sel.value;
-      if (val) $('#roleId').value = val;
-    }
 
     async function loadRoles() {
       try {
@@ -133,7 +147,6 @@
             .concat(guildRoles.map(r => `<option value="${String(r.id)}">${String(r.name || r.id)}</option>`));
           sel.innerHTML = opts.join('');
         }
-        syncSelectFromInput();
       } catch (e) {
         console.error(e);
       }
@@ -147,8 +160,20 @@
         $('#minAmount').value = data.minAmountDkk ?? 10;
         $('#maxAmount').value = data.maxAmountDkk ?? 100;
         $('#dualYear').checked = !!data.dualYearMode;
-        $('#roleId').value = data.clubMemberRoleId || '';
-        syncSelectFromInput();
+        // Set select to saved role if present
+        const sel = $('#roleSelect');
+        if (sel) {
+          const saved = data.clubMemberRoleId || '';
+          sel.value = saved;
+          // If role not in list (e.g., permissions), keep blank
+          if (saved && sel.value !== saved) {
+            const opt = document.createElement('option');
+            opt.value = saved;
+            opt.textContent = saved;
+            sel.appendChild(opt);
+            sel.value = saved;
+          }
+        }
         $('#settingsStatus').textContent = 'Loaded';
         setTimeout(() => $('#settingsStatus').textContent = '', 1200);
       } catch (e) {
@@ -164,7 +189,7 @@
           minAmountDkk: parseInt($('#minAmount').value, 10),
           maxAmountDkk: parseInt($('#maxAmount').value, 10),
           dualYearMode: !!$('#dualYear').checked,
-          clubMemberRoleId: ($('#roleId').value || '').trim()
+          clubMemberRoleId: ($('#roleSelect').value || '').trim()
         };
         const res = await fetch('/api/membership/settings', {
           method: 'POST',
@@ -242,7 +267,6 @@
       $('#saveSettingsBtn').addEventListener('click', saveSettings);
       $('#refreshPaymentsBtn').addEventListener('click', loadPayments);
       $('#refreshRolesBtn').addEventListener('click', loadRoles);
-      $('#roleSelect').addEventListener('change', syncInputFromSelect);
       $('#reconcileBtn').addEventListener('click', reconcileNow);
       // Load roles first so the select can reflect saved roleId when settings load
       loadRoles().then(loadSettings);
