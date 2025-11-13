@@ -80,23 +80,20 @@
           </div>
           <div class="row" style="margin-top:10px;">
             <div style="grid-column: 1 / -1;">
-              <label style="display:block; margin-bottom:6px;">Dual year mode</label>
-              <p class="muted" style="margin:0 0 6px 0;">
-                Når den er slået til, gælder medlemskabet for resten af indeværende år og hele næste år.
-                Når den er slået fra, gælder medlemskabet for hele indeværende år.
-              </p>
-              <div class="switch">
-                <input type="checkbox" id="dualYear" checked />
-                <label for="dualYear">Slå til/fra</label>
-              </div>
-            </div>
-            <div style="grid-column: 1 / -1;">
               <label>Vælg Discord‑rolle for “Club member”</label>
               <div class="actions" style="gap:8px;">
                 <select id="roleSelect"></select>
                 <button class="btn secondary" id="refreshRolesBtn" type="button">Opdater roller</button>
               </div>
               <div class="muted" style="margin-top:6px;">Denne rolle tildeles automatisk ved aktivt klubmedlemskab.</div>
+            </div>
+
+            <div style="grid-column: 1 / -1;">
+              <label>Tilgængelige betalingsmuligheder</label>
+              <p class="muted" style="margin:0 0 6px 0;">Vælg hvilke år medlemmer kan betale for.</p>
+              <div class="switch"><input type="checkbox" id="poCurrent" /> <label for="poCurrent">Indeværende år (<span id="poCurrentLabel"></span>)</label></div>
+              <div class="switch"><input type="checkbox" id="poNext" /> <label for="poNext">Næste år (<span id="poNextLabel"></span>)</label></div>
+              <div class="switch"><input type="checkbox" id="poCurrentNext" /> <label for="poCurrentNext">Indeværende + næste år (<span id="poBothLabel"></span>)</label></div>
             </div>
           </div>
           <div class="actions" style="margin-top:12px;">
@@ -173,9 +170,13 @@
         const res = await fetch('/api/membership/settings', { headers: { 'Accept': 'application/json' } });
         if (!res.ok) throw new Error('Failed to load settings');
         const data = await res.json();
+        const nowY = new Date().getUTCFullYear();
+        $('#poCurrentLabel').textContent = String(nowY);
+        $('#poNextLabel').textContent = String(nowY + 1);
+        $('#poBothLabel').textContent = `${nowY}/${nowY + 1}`;
+
         $('#minAmount').value = data.minAmountDkk ?? 10;
         $('#maxAmount').value = data.maxAmountDkk ?? 100;
-        $('#dualYear').checked = !!data.dualYearMode;
         // Set select to saved role if present
         const sel = $('#roleSelect');
         if (sel) {
@@ -190,10 +191,17 @@
             sel.value = saved;
           }
         }
-        try {
-          const po = Array.isArray(data.paymentOptions) ? data.paymentOptions : [];
-          $('#paymentOptions').value = JSON.stringify(po, null, 2);
-        } catch {}
+        // Reflect payment options into toggles
+        const po = Array.isArray(data.paymentOptions) ? data.paymentOptions : [];
+        const hasExactYears = (arr, years) => {
+          if (!Array.isArray(arr)) return false;
+          const a = [...arr].sort().join(',');
+          const b = [...years].sort().join(',');
+          return a === b;
+        };
+        $('#poCurrent').checked = po.some(o => hasExactYears(o.coversYears, [nowY]));
+        $('#poNext').checked = po.some(o => hasExactYears(o.coversYears, [nowY + 1]));
+        $('#poCurrentNext').checked = po.some(o => hasExactYears(o.coversYears, [nowY, nowY + 1]));
         $('#settingsStatus').textContent = 'Loaded';
         setTimeout(() => $('#settingsStatus').textContent = '', 1200);
       } catch (e) {
@@ -205,18 +213,14 @@
       try {
         $('#saveSettingsBtn').disabled = true;
         $('#settingsStatus').textContent = 'Saving...';
-        let paymentOptions = [];
-        try {
-          const raw = ($('#paymentOptions').value || '').trim();
-          paymentOptions = raw ? JSON.parse(raw) : [];
-          if (!Array.isArray(paymentOptions)) paymentOptions = [];
-        } catch (e) {
-          throw new Error('Ugyldigt JSON-format for betalingsmuligheder');
-        }
+        const nowY = new Date().getUTCFullYear();
+        const paymentOptions = [];
+        if ($('#poCurrent').checked) paymentOptions.push({ id: 'current', label: String(nowY), coversYears: [nowY] });
+        if ($('#poNext').checked) paymentOptions.push({ id: 'next', label: String(nowY + 1), coversYears: [nowY + 1] });
+        if ($('#poCurrentNext').checked) paymentOptions.push({ id: 'current-next', label: `${nowY}/${nowY + 1}`, coversYears: [nowY, nowY + 1] });
         const payload = {
           minAmountDkk: parseInt($('#minAmount').value, 10),
           maxAmountDkk: parseInt($('#maxAmount').value, 10),
-          dualYearMode: !!$('#dualYear').checked,
           clubMemberRoleId: ($('#roleSelect').value || '').trim(),
           paymentOptions
         };

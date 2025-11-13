@@ -1496,8 +1496,8 @@ def membership_settings_get():
         out = {
             "minAmountDkk": int(membership.get('minAmountDkk', 10)),
             "maxAmountDkk": int(membership.get('maxAmountDkk', 100)),
-            "dualYearMode": bool(membership.get('dualYearMode', True)),
-            "clubMemberRoleId": str(membership.get('clubMemberRoleId', '') or '')
+            "clubMemberRoleId": str(membership.get('clubMemberRoleId', '') or ''),
+            "paymentOptions": membership.get('paymentOptions', []) if isinstance(membership.get('paymentOptions', []), list) else []
         }
         return jsonify(out)
     except Exception as e:
@@ -1514,7 +1514,6 @@ def membership_settings_post():
         data = request.get_json(force=True) or {}
         min_amount = int(data.get('minAmountDkk', 10))
         max_amount = int(data.get('maxAmountDkk', 100))
-        dual_year = bool(data.get('dualYearMode', True))
         role_id = str(data.get('clubMemberRoleId') or '')
         payment_options = data.get('paymentOptions') or []
         if not isinstance(payment_options, list):
@@ -1529,7 +1528,6 @@ def membership_settings_post():
         settings['membership'] = {
             "minAmountDkk": min_amount,
             "maxAmountDkk": max_amount,
-            "dualYearMode": dual_year,
             "clubMemberRoleId": role_id,
             "paymentOptions": payment_options,
             "updatedAt": datetime.now().isoformat()
