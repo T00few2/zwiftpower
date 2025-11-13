@@ -1516,6 +1516,9 @@ def membership_settings_post():
         max_amount = int(data.get('maxAmountDkk', 100))
         dual_year = bool(data.get('dualYearMode', True))
         role_id = str(data.get('clubMemberRoleId') or '')
+        payment_options = data.get('paymentOptions') or []
+        if not isinstance(payment_options, list):
+            payment_options = []
 
         if min_amount <= 0 or max_amount <= 0 or min_amount > max_amount:
             return jsonify({"error": "Invalid range: ensure min > 0, max > 0 and min <= max"}), 400
@@ -1528,6 +1531,7 @@ def membership_settings_post():
             "maxAmountDkk": max_amount,
             "dualYearMode": dual_year,
             "clubMemberRoleId": role_id,
+            "paymentOptions": payment_options,
             "updatedAt": datetime.now().isoformat()
         }
         firebase.set_document('system_settings', 'global', settings, merge=True)

@@ -62,6 +62,22 @@
               <input type="number" id="maxAmount" min="1" value="100" />
             </div>
           </div>
+
+          <div class="row" style="margin-top:10px;">
+            <div style="grid-column: 1 / -1;">
+              <label>Betalingsmuligheder (år)</label>
+              <p class="muted" style="margin:0 0 6px 0;">
+                Angiv hvilke år der kan vælges ved betaling. Brug formatet JSON, f.eks.:
+              </p>
+              <pre class="muted" style="background:#f8f9fb; padding:8px; border-radius:6px; overflow:auto; margin:6px 0;">
+[
+  { "id": "2025", "label": "2025", "coversYears": [2025] },
+  { "id": "2025-2026", "label": "2025/2026", "coversYears": [2025, 2026] }
+]
+              </pre>
+              <textarea id="paymentOptions" style="width:100%; min-height:160px; padding:8px; border:1px solid #e5e7eb; border-radius:8px;"></textarea>
+            </div>
+          </div>
           <div class="row" style="margin-top:10px;">
             <div style="grid-column: 1 / -1;">
               <label style="display:block; margin-bottom:6px;">Dual year mode</label>
@@ -174,6 +190,10 @@
             sel.value = saved;
           }
         }
+        try {
+          const po = Array.isArray(data.paymentOptions) ? data.paymentOptions : [];
+          $('#paymentOptions').value = JSON.stringify(po, null, 2);
+        } catch {}
         $('#settingsStatus').textContent = 'Loaded';
         setTimeout(() => $('#settingsStatus').textContent = '', 1200);
       } catch (e) {
@@ -185,11 +205,20 @@
       try {
         $('#saveSettingsBtn').disabled = true;
         $('#settingsStatus').textContent = 'Saving...';
+        let paymentOptions = [];
+        try {
+          const raw = ($('#paymentOptions').value || '').trim();
+          paymentOptions = raw ? JSON.parse(raw) : [];
+          if (!Array.isArray(paymentOptions)) paymentOptions = [];
+        } catch (e) {
+          throw new Error('Ugyldigt JSON-format for betalingsmuligheder');
+        }
         const payload = {
           minAmountDkk: parseInt($('#minAmount').value, 10),
           maxAmountDkk: parseInt($('#maxAmount').value, 10),
           dualYearMode: !!$('#dualYear').checked,
-          clubMemberRoleId: ($('#roleSelect').value || '').trim()
+          clubMemberRoleId: ($('#roleSelect').value || '').trim(),
+          paymentOptions
         };
         const res = await fetch('/api/membership/settings', {
           method: 'POST',
