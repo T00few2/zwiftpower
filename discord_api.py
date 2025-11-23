@@ -351,6 +351,56 @@ class DiscordAPI:
             print(f"Error fetching Discord member {discord_id}: {e}")
             return None
 
+    def _create_dm_channel(self, user_id: str) -> Optional[str]:
+        """
+        Create (or fetch) a DM channel with a user.
+
+        Args:
+            user_id (str): Discord user ID
+
+        Returns:
+            Optional[str]: DM channel ID or None on failure
+        """
+        try:
+            response = requests.post(
+                f"{self.api_base_url}/users/@me/channels",
+                headers=self.headers,
+                json={"recipient_id": user_id},
+            )
+            response.raise_for_status()
+            data = response.json()
+            return data.get("id")
+        except requests.RequestException as e:
+            print(f"Error creating DM channel for {user_id}: {e}")
+            return None
+
+    def send_direct_message(self, user_id: str, content: str) -> bool:
+        """
+        Send a direct message to a Discord user.
+
+        Args:
+            user_id (str): Discord user ID
+            content (str): Message content
+
+        Returns:
+            bool: True if the message was sent successfully, False otherwise
+        """
+        channel_id = self._create_dm_channel(user_id)
+        if not channel_id:
+            return False
+
+        try:
+            response = requests.post(
+                f"{self.api_base_url}/channels/{channel_id}/messages",
+                headers=self.headers,
+                json={"content": content},
+            )
+            response.raise_for_status()
+            return True
+        except requests.RequestException as e:
+            print(f"Error sending DM to {user_id}: {e}")
+            return False
+
 
 # Example usage:
 # discord_api = DiscordAPI()

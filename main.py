@@ -56,6 +56,14 @@ DISCORD_BOT_URL = os.getenv("DISCORD_BOT_URL", "your_discord_bot_url")
 DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN", "your_discord_bot_token")
 DISCORD_GUILD_ID = os.getenv("DISCORD_GUILD_ID", "your_discord_guild_id")
 
+# Role IDs for filtering community/verified members (can be overridden via environment)
+COMMUNITY_MEMBER_ROLE_ID = os.getenv(
+    "DISCORD_COMMUNITY_MEMBER_ROLE_ID", "1195878123795910736"
+)
+VERIFIED_MEMBER_ROLE_ID = os.getenv(
+    "DISCORD_VERIFIED_MEMBER_ROLE_ID", "1385216556166025347"
+)
+
 CONTENT_API_KEY = os.getenv("CONTENT_API_KEY", "your_content_api_key")
 
 def login_required(f):
@@ -407,6 +415,77 @@ def get_discord_members():
             return f"<h1>Error</h1><p>{str(e)}</p>", 500
         return jsonify({"error": str(e)}), 500
 
+
+@app.route('/discord/member-outreach', methods=['GET'])
+@login_required
+def member_outreach_view():
+    """
+    Admin view: Member outreach via DM, currently focused on community members without linked Zwift IDs.
+    """
+    try:
+        # Only render HTML for now (no JSON API needed yet)
+        is_html_request = request.headers.get('Accept', '').find('text/html') >= 0
+
+        discord_api = DiscordAPI(DISCORD_BOT_TOKEN, DISCORD_GUILD_ID)
+
+        # Start from all members without Zwift IDs
+        members = discord_api.find_unlinked_members(include_role_names=True)
+
+        # Filter to community members (have community role, do NOT have verified role)
+        community_role_id = COMMUNITY_MEMBER_ROLE_ID
+        verified_role_id = VERIFIED_MEMBER_ROLE_ID
+
+        filtered_members = []
+        for m in members:
+            role_ids = m.get("role_ids", [])
+            if community_role_id in role_ids and verified_role_id not in role_ids:
+                filtered_members.append(m)
+
+        # Load reminder metadata from Firestore
+        reminder_docs = firebase.get_collection(
+            "discord_zwift_reminders", limit=10000, include_id=True
+        )
+        reminder_lookup = {doc.get("id"): doc for doc in reminder_docs}
+
+        # Attach reminder info to members
+        from datetime import datetime
+
+        def format_ts(ts):
+            if not ts:
+                return None
+            # Firestore returns datetime objects directly via client library
+            if isinstance(ts, datetime):
+                return ts.strftime("%Y-%m-%d %H:%M")
+            return str(ts)
+
+        for m in filtered_members:
+            doc = reminder_lookup.get(m.get("discordID"))
+            if doc:
+                m["last_reminder_at"] = format_ts(doc.get("lastReminderAt"))
+                m["reminder_count"] = doc.get("reminderCount", 0)
+            else:
+                m["last_reminder_at"] = None
+                m["reminder_count"] = 0
+
+        if is_html_request:
+            return render_template(
+                "member_outreach.html",
+                members=filtered_members,
+                total=len(filtered_members),
+            )
+
+        # Fallback JSON (not the primary use case)
+        return jsonify(
+            {
+                "members": filtered_members,
+                "count": len(filtered_members),
+            }
+        )
+    except Exception as e:
+        if request.headers.get('Accept', '').find('text/html') >= 0:
+            return f"<h1>Error</h1><p>{str(e)}</p>", 500
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/assign_zwift_id', methods=['POST'])
 def assign_zwift_id():
     """Assign a ZwiftID to a Discord user"""
@@ -435,6 +514,90 @@ def assign_zwift_id():
             "username": username,
             "operation": result.get("status", "updated")
         })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/member_outreach/send', methods=['POST'])
+@login_required
+def send_member_outreach():
+    """
+    Send DM messages to selected members and record reminder/ outreach metadata.
+
+    Expected JSON body:
+    {
+      "members": [{ "discord_id": "...", "username": "..." }, ...],
+      "messageTemplate": "Hej {{username}} ..."
+    }
+    """
+    try:
+        data = request.get_json(silent=True) or {}
+        members = data.get("members") or []
+        message_template = data.get("messageTemplate") or ""
+
+        if not members:
+            return jsonify({"status": "error", "message": "No members provided"}), 400
+
+        if not message_template.strip():
+            return jsonify({"status": "error", "message": "Message template is empty"}), 400
+
+        discord_api = DiscordAPI(DISCORD_BOT_TOKEN, DISCORD_GUILD_ID)
+
+        sent = 0
+        skipped = 0
+        updated_entries = []
+
+        from datetime import datetime
+
+        # Preload existing reminder docs to avoid per-user queries
+        existing_docs = firebase.get_collection(
+            "discord_zwift_reminders", limit=10000, include_id=True
+        )
+        existing_lookup = {doc.get("id"): doc for doc in existing_docs}
+
+        for item in members:
+            discord_id = (item or {}).get("discord_id")
+            username = (item or {}).get("username") or ""
+            if not discord_id:
+                skipped += 1
+                continue
+
+            # Personalize message
+            msg = message_template.replace("{{username}}", username)
+
+            ok = discord_api.send_direct_message(discord_id, msg)
+            if not ok:
+                skipped += 1
+                continue
+
+            sent += 1
+
+            # Update Firestore reminder doc
+            existing = existing_lookup.get(discord_id) or {}
+            new_count = int(existing.get("reminderCount", 0) or 0) + 1
+            doc_data = {
+                "discordID": discord_id,
+                "lastReminderAt": datetime.utcnow(),
+                "reminderCount": new_count,
+                "lastReminderMessage": msg,
+            }
+            firebase.set_document(
+                "discord_zwift_reminders", discord_id, doc_data, merge=False
+            )
+            existing_lookup[discord_id] = doc_data
+
+            updated_entries.append(
+                {"discord_id": discord_id, "reminder_count": new_count}
+            )
+
+        return jsonify(
+            {
+                "status": "success",
+                "sent": sent,
+                "skipped": skipped,
+                "updated": updated_entries,
+            }
+        )
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
