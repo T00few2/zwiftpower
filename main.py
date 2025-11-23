@@ -2035,6 +2035,66 @@ def api_overview():
     """Protected API Endpoint Overview"""
     return index_content()
 
+
+@app.route('/bot-knowledge', methods=['GET', 'POST'])
+@login_required
+def bot_knowledge():
+    """
+    Manage admin-provided knowledge snippets used by the Discord AI assistant.
+    """
+    from datetime import datetime
+    try:
+        if request.method == 'POST':
+            action = request.form.get('action', 'save')
+            key = (request.form.get('key') or '').strip()
+            title = (request.form.get('title') or '').strip()
+            content = (request.form.get('content') or '').strip()
+            tags_raw = (request.form.get('tags') or '').strip()
+
+            if not key:
+                flash('Key is required.', 'error')
+            else:
+                if action == 'delete':
+                    ok = firebase.delete_document('bot_knowledge', key)
+                    if ok:
+                        flash(f'Deleted knowledge entry "{key}".', 'success')
+                    else:
+                        flash(f'Failed to delete knowledge entry "{key}".', 'error')
+                else:
+                    tags = [t.strip() for t in tags_raw.split(',') if t.strip()]
+                    data = {
+                        'key': key,
+                        'title': title or key,
+                        'content': content,
+                        'tags': tags,
+                        'updatedAt': datetime.utcnow(),
+                    }
+                    ok = firebase.set_document('bot_knowledge', key, data, merge=False)
+                    if ok:
+                        flash(f'Saved knowledge entry "{key}".', 'success')
+                    else:
+                        flash(f'Failed to save knowledge entry "{key}".', 'error')
+
+            return redirect(url_for('bot_knowledge'))
+
+        # GET: list all entries
+        entries = firebase.get_collection('bot_knowledge', limit=200, include_id=True)
+        # Sort by key
+        entries.sort(key=lambda e: e.get('key') or e.get('id') or '')
+
+        return render_template(
+            'bot_knowledge.html',
+            entries=entries,
+            user=session.get('user', {})
+        )
+    except Exception as e:
+        flash(f'Error loading bot knowledge: {str(e)}', 'error')
+        return render_template(
+            'bot_knowledge.html',
+            entries=[],
+            user=session.get('user', {})
+        )
+
 # Discord stats endpoints
 
 @app.route('/api/discord/stats/summary', methods=['GET'])

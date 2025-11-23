@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🤖 Bot Knowledge - DZR Admin</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+            min-height: 100vh;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .logo {
+            font-size: 2em;
+        }
+        .header-title {
+            margin: 0;
+            font-size: 1.5em;
+            font-weight: 300;
+        }
+        .breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-left: 20px;
+            opacity: 0.8;
+        }
+        .breadcrumb a {
+            color: white;
+            text-decoration: none;
+            opacity: 0.8;
+        }
+        .breadcrumb a:hover {
+            opacity: 1;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 30px 20px;
+        }
+        .flash-messages {
+            margin-bottom: 20px;
+        }
+        .flash-message {
+            padding: 10px 14px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+        }
+        .flash-success {
+            background-color: #c6f6d5;
+            color: #22543d;
+            border: 1px solid #9ae6b4;
+        }
+        .flash-error {
+            background-color: #fed7d7;
+            color: #742a2a;
+            border: 1px solid #feb2b2;
+        }
+        .flash-info {
+            background-color: #bee3f8;
+            color: #2c5282;
+            border: 1px solid #90cdf4;
+        }
+        .layout {
+            display: grid;
+            grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+            gap: 20px;
+            align-items: flex-start;
+        }
+        .card {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .card-header {
+            margin-bottom: 15px;
+        }
+        .card-title {
+            margin: 0;
+            font-size: 1.2em;
+            font-weight: 500;
+        }
+        .card-subtitle {
+            margin: 4px 0 0 0;
+            color: #666;
+            font-size: 0.9em;
+        }
+        .form-group {
+            margin-bottom: 12px;
+        }
+        .form-label {
+            display: block;
+            font-weight: 500;
+            font-size: 0.9em;
+            margin-bottom: 4px;
+        }
+        .form-control {
+            width: 100%;
+            padding: 8px 10px;
+            border-radius: 6px;
+            border: 1px solid #ddd;
+            font-size: 0.9em;
+            box-sizing: border-box;
+        }
+        .form-text {
+            font-size: 0.8em;
+            color: #718096;
+            margin-top: 2px;
+        }
+        .textarea-control {
+            min-height: 160px;
+            resize: vertical;
+        }
+        .btn-row {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .btn {
+            padding: 8px 16px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-size: 0.9em;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .btn-primary {
+            background-color: #667eea;
+            color: white;
+        }
+        .btn-secondary {
+            background-color: #edf2f7;
+            color: #4a5568;
+        }
+        .btn-danger {
+            background-color: #f56565;
+            color: white;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            padding: 8px 10px;
+            border-bottom: 1px solid #eee;
+            font-size: 0.9em;
+            text-align: left;
+            vertical-align: middle;
+        }
+        th {
+            background-color: #f7fafc;
+            font-weight: 600;
+        }
+        tr:nth-child(even) td {
+            background-color: #fafafa;
+        }
+        .tag-pill {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            background-color: #edf2f7;
+            color: #4a5568;
+            font-size: 0.75em;
+            margin-right: 4px;
+            margin-bottom: 2px;
+        }
+        .small {
+            font-size: 0.8em;
+        }
+        .text-muted {
+            color: #a0aec0;
+        }
+        @media (max-width: 900px) {
+            .layout {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <div class="header-left">
+                <div class="logo">🤖</div>
+                <div>
+                    <h1 class="header-title">Bot Knowledge</h1>
+                    <div class="breadcrumb">
+                        <a href="/">Dashboard</a>
+                        <span>›</span>
+                        <span>AI Knowledge Base</span>
+                    </div>
+                </div>
+            </div>
+            <div class="user-info">
+                {% if user and user.username %}
+                    <span>{{ user.username }}</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for category, message in messages %}
+                        <div class="flash-message flash-{{ category }}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <div class="layout">
+            <!-- Edit / Create form -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Create / Edit Knowledge Item</h2>
+                    <p class="card-subtitle">
+                        Brug dette til at give AI‑botten baggrundsviden – fx “Hvor finder jeg mit ZwiftID?”, onboarding‑tips, vigtige links osv.
+                    </p>
+                </div>
+
+                <form method="POST" id="knowledge-form">
+                    <input type="hidden" name="action" id="form-action" value="save">
+
+                    <div class="form-group">
+                        <label class="form-label" for="key">Key (unik ID)</label>
+                        <input type="text" class="form-control" id="key" name="key" required>
+                        <div class="form-text">
+                            Brug korte, stabile nøgler – fx <code>zwiftid_help</code>, <code>membership_overview</code>, <code>notifications_guide</code>.
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="title">Title</label>
+                        <input type="text" class="form-control" id="title" name="title" placeholder="Fx: Hvor finder jeg mit ZwiftID?">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="tags">Tags (komma‑separeret)</label>
+                        <input type="text" class="form-control" id="tags" name="tags" placeholder="zwiftid, onboarding, help">
+                        <div class="form-text">
+                            Brug stikord du forventer botten vil koble til dette (fx <code>zwiftid</code>, <code>link</code>, <code>onboarding</code>).
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="content">Content</label>
+                        <textarea class="form-control textarea-control" id="content" name="content" placeholder="Skriv forklaring og indsæt evt. links."></textarea>
+                        <div class="form-text">
+                            Skriv kort, konkret tekst som botten kan citere eller parafrasere. Du kan inkludere Markdown‑links.
+                        </div>
+                    </div>
+
+                    <div class="btn-row">
+                        <button type="submit" class="btn btn-primary">💾 Save</button>
+                        <button type="button" id="reset-btn" class="btn btn-secondary">➕ New</button>
+                        <button type="button" id="delete-btn" class="btn btn-danger">🗑️ Delete</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Existing entries -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Existing Items</h2>
+                    <p class="card-subtitle">
+                        Klik “Load” for at redigere en item. Botten ser alle entries når den svarer.
+                    </p>
+                </div>
+
+                {% if entries %}
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width: 120px;">Key</th>
+                                <th>Title</th>
+                                <th>Tags</th>
+                                <th style="width: 140px;">Updated</th>
+                                <th style="width: 80px;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for e in entries %}
+                            <tr data-key="{{ e.key or e.id }}"
+                                data-title="{{ e.title or '' }}"
+                                data-tags="{{ (e.tags or []) | join(', ') }}"
+                                data-content="{{ (e.content or '') | replace('\n', '&#10;') }}">
+                                <td><code>{{ e.key or e.id }}</code></td>
+                                <td>{{ e.title or '' }}</td>
+                                <td>
+                                    {% if e.tags %}
+                                        {% for tag in e.tags %}
+                                            <span class="tag-pill">{{ tag }}</span>
+                                        {% endfor %}
+                                    {% else %}
+                                        <span class="text-muted small">–</span>
+                                    {% endif %}
+                                </td>
+                                <td class="small text-muted">
+                                    {% if e.updatedAt %}
+                                        {{ e.updatedAt }}
+                                    {% else %}
+                                        –
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <button type="button" class="btn btn-secondary small load-btn">Load</button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p class="text-muted small">No knowledge items yet. Create your first one using the form.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            const form = document.getElementById('knowledge-form');
+            const actionInput = document.getElementById('form-action');
+            const keyInput = document.getElementById('key');
+            const titleInput = document.getElementById('title');
+            const tagsInput = document.getElementById('tags');
+            const contentInput = document.getElementById('content');
+            const resetBtn = document.getElementById('reset-btn');
+            const deleteBtn = document.getElementById('delete-btn');
+
+            function clearForm() {
+                actionInput.value = 'save';
+                keyInput.value = '';
+                titleInput.value = '';
+                tagsInput.value = '';
+                contentInput.value = '';
+            }
+
+            function loadFromRow(row) {
+                const key = row.dataset.key || '';
+                const title = row.dataset.title || '';
+                const tags = row.dataset.tags || '';
+                const content = (row.dataset.content || '').replace(/&#10;/g, '\n');
+
+                keyInput.value = key;
+                titleInput.value = title;
+                tagsInput.value = tags;
+                contentInput.value = content;
+                actionInput.value = 'save';
+            }
+
+            document.querySelectorAll('.load-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const row = btn.closest('tr');
+                    if (row) {
+                        loadFromRow(row);
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }
+                });
+            });
+
+            resetBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                clearForm();
+            });
+
+            deleteBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const key = keyInput.value.trim();
+                if (!key) {
+                    alert('No key selected to delete.');
+                    return;
+                }
+                if (!confirm(`Delete knowledge entry "${key}"?`)) {
+                    return;
+                }
+                actionInput.value = 'delete';
+                form.submit();
+            });
+        })();
+    </script>
+</body>
+</html>
+
+

@@ -128,6 +128,24 @@ def set_document(collection: str, doc_id: str, data: Dict[str, Any], merge: bool
         print(f"Error setting document: {e}")
         return False
 
+def delete_document(collection: str, doc_id: str) -> bool:
+    """
+    Delete a document from Firestore.
+
+    Args:
+        collection: The collection name
+        doc_id: The document ID
+
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        db.collection(collection).document(doc_id).delete()
+        return True
+    except Exception as e:
+        print(f"Error deleting document: {e}")
+        return False
+
 def update_discord_zwift_link(discord_id: str, zwift_id: str, username: str = None) -> Dict[str, Any]:
     """
     Update or create a Discord user with a ZwiftID.
