@@ -277,6 +277,12 @@ Hvis du vil, kan jeg hjælpe dig med at få det på plads her i DM. Du kan svare
                     <input type="checkbox" id="select-all">
                     Select all on page
                 </label>
+                <select id="outreach-filter" style="max-width: 220px;">
+                    <option value="all">All outreach statuses</option>
+                    <option value="never">Never contacted</option>
+                    <option value="older_30">Last outreach > 30 days ago (incl. never)</option>
+                    <option value="older_7">Last outreach > 7 days ago (incl. never)</option>
+                </select>
                 <button id="send-reminders" class="btn btn-primary" disabled>
                     ✉️ Send DM to selected
                 </button>
@@ -296,7 +302,7 @@ Hvis du vil, kan jeg hjælpe dig med at få det på plads her i DM. Du kan svare
                 </thead>
                 <tbody>
                     {% for member in members %}
-                    <tr data-discord-id="{{ member.discordID }}" data-username="{{ member.username }}" data-display-name="{{ member.display_name }}">
+                    <tr data-discord-id="{{ member.discordID }}" data-username="{{ member.username }}" data-display-name="{{ member.display_name }}" data-last-reminder-iso="{{ member.last_reminder_iso|default('') }}">
                         <td><input type="checkbox" class="row-select"></td>
                         <td>
                             <div>{{ member.display_name }}</div>
@@ -341,6 +347,7 @@ Hvis du vil, kan jeg hjælpe dig med at få det på plads her i DM. Du kan svare
             const searchInput = document.getElementById('search');
             const selectAll = document.getElementById('select-all');
             const selectAllHeader = document.getElementById('select-all-header');
+            const outreachFilter = document.getElementById('outreach-filter');
             const sendButton = document.getElementById('send-reminders');
             const selectionCount = document.getElementById('selection-count');
             const successAlert = document.getElementById('alert-success');
@@ -349,6 +356,57 @@ Hvis du vil, kan jeg hjælpe dig med at få det på plads her i DM. Du kan svare
 
             function getRows() {
                 return Array.from(table.querySelectorAll('tbody tr'));
+            }
+
+            function rowMatchesFilters(row) {
+                const term = (searchInput.value || '').toLowerCase();
+                const outreachValue = outreachFilter.value || 'all';
+
+                const name = (row.dataset.displayName || '').toLowerCase();
+                const username = (row.dataset.username || '').toLowerCase();
+                const id = (row.dataset.discordId || '').toLowerCase();
+
+                // Search filter
+                const matchesSearch = !term || name.includes(term) || username.includes(term) || id.includes(term);
+                if (!matchesSearch) return false;
+
+                // Outreach filter
+                const iso = row.dataset.lastReminderIso || '';
+                const hasNever = !iso;
+
+                if (outreachValue === 'all') {
+                    return true;
+                }
+                if (outreachValue === 'never') {
+                    return hasNever;
+                }
+
+                const now = new Date();
+                let diffDays = Infinity;
+                if (!hasNever) {
+                    const last = new Date(iso);
+                    if (!isNaN(last.getTime())) {
+                        diffDays = (now.getTime() - last.getTime()) / (1000 * 60 * 60 * 24);
+                    }
+                }
+
+                if (outreachValue === 'older_30') {
+                    // Include never-contacted and >=30 days
+                    return hasNever || diffDays >= 30;
+                }
+                if (outreachValue === 'older_7') {
+                    // Include never-contacted and >=7 days
+                    return hasNever || diffDays >= 7;
+                }
+
+                return true;
+            }
+
+            function applyFilters() {
+                getRows().forEach(row => {
+                    row.style.display = rowMatchesFilters(row) ? '' : 'none';
+                });
+                updateSelectionState();
             }
 
             function updateSelectionState() {
@@ -371,15 +429,11 @@ Hvis du vil, kan jeg hjælpe dig med at få det på plads her i DM. Du kan svare
             }
 
             searchInput.addEventListener('input', function() {
-                const term = this.value.toLowerCase();
-                getRows().forEach(row => {
-                    const name = (row.dataset.displayName || '').toLowerCase();
-                    const username = (row.dataset.username || '').toLowerCase();
-                    const id = (row.dataset.discordId || '').toLowerCase();
-                    const match = !term || name.includes(term) || username.includes(term) || id.includes(term);
-                    row.style.display = match ? '' : 'none';
-                });
-                updateSelectionState();
+                applyFilters();
+            });
+
+            outreachFilter.addEventListener('change', function() {
+                applyFilters();
             });
 
             table.addEventListener('change', function(e) {
@@ -423,54 +477,71 @@ Hvis du vil, kan jeg hjælpe dig med at få det på plads her i DM. Du kan svare
                     username: row.dataset.username
                 }));
 
+                const BATCH_SIZE = 20;
+                let sentTotal = 0;
+                let skippedTotal = 0;
+
                 sendButton.disabled = true;
-                sendButton.textContent = 'Sending…';
-
                 try {
-                    const response = await fetch('/api/member_outreach/send', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            members: payload,
-                            messageTemplate: rawMessage
-                        })
-                    });
+                    for (let i = 0; i < payload.length; i += BATCH_SIZE) {
+                        const batch = payload.slice(i, i + BATCH_SIZE);
+                        const batchIndex = Math.floor(i / BATCH_SIZE) + 1;
+                        const totalBatches = Math.ceil(payload.length / BATCH_SIZE);
+                        sendButton.textContent = `Sending… (${batchIndex}/${totalBatches})`;
 
-                    const data = await response.json();
-                    if (!response.ok || data.status !== 'success') {
-                        throw new Error(data.error || data.message || 'Failed to send messages');
-                    }
-
-                    showAlert(successAlert, `Sent ${data.sent} message(s). ${data.skipped} skipped.`);
-
-                    // Update table cells for last outreach and count
-                    if (data.updated && Array.isArray(data.updated)) {
-                        const now = new Date();
-                        const ts = now.getFullYear() + '-' +
-                            String(now.getMonth() + 1).padStart(2, '0') + '-' +
-                            String(now.getDate()).padStart(2, '0') + ' ' +
-                            String(now.getHours()).padStart(2, '0') + ':' +
-                            String(now.getMinutes()).padStart(2, '0');
-
-                        data.updated.forEach(entry => {
-                            const row = table.querySelector(`tr[data-discord-id="${entry.discord_id}"]`);
-                            if (!row) return;
-                            // last outreach col is 5th, count is 6th
-                            const cells = row.querySelectorAll('td');
-                            const lastCell = cells[4];
-                            const countCell = cells[5];
-                            if (lastCell) {
-                                lastCell.textContent = ts;
-                            }
-                            if (countCell) {
-                                countCell.textContent = entry.reminder_count;
-                            }
+                        const response = await fetch('/api/member_outreach/send', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                members: batch,
+                                messageTemplate: rawMessage
+                            })
                         });
+
+                        const data = await response.json();
+                        if (!response.ok || data.status !== 'success') {
+                            throw new Error(data.error || data.message || 'Failed to send messages');
+                        }
+
+                        sentTotal += data.sent || 0;
+                        skippedTotal += data.skipped || 0;
+
+                        // Update table cells for last outreach and count for this batch
+                        if (data.updated && Array.isArray(data.updated)) {
+                            const now = new Date();
+                            const ts = now.getFullYear() + '-' +
+                                String(now.getMonth() + 1).padStart(2, '0') + '-' +
+                                String(now.getDate()).padStart(2, '0') + ' ' +
+                                String(now.getHours()).padStart(2, '0') + ':' +
+                                String(now.getMinutes()).padStart(2, '0');
+
+                            data.updated.forEach(entry => {
+                                const row = table.querySelector(`tr[data-discord-id="${entry.discord_id}"]`);
+                                if (!row) return;
+                                // last outreach col is 5th, count is 6th
+                                const cells = row.querySelectorAll('td');
+                                const lastCell = cells[4];
+                                const countCell = cells[5];
+                                if (lastCell) {
+                                    lastCell.textContent = ts;
+                                }
+                                if (countCell) {
+                                    countCell.textContent = entry.reminder_count;
+                                }
+                                // keep ISO timestamp in dataset for future filters
+                                row.dataset.lastReminderIso = ts;
+                            });
+                        }
+
+                        // Small delay between batches to be kind to rate limits
+                        await new Promise((resolve) => setTimeout(resolve, 500));
                     }
 
-                    // Clear selection
+                    showAlert(successAlert, `Sent ${sentTotal} message(s). ${skippedTotal} skipped.`);
+
+                    // Clear selection after all batches
                     getRows().forEach(row => {
                         row.querySelector('.row-select').checked = false;
                     });
@@ -487,7 +558,7 @@ Hvis du vil, kan jeg hjælpe dig med at få det på plads her i DM. Du kan svare
             });
 
             // Initial state
-            updateSelectionState();
+            applyFilters();
         })();
     </script>
 </body>

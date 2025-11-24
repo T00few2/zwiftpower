@@ -452,19 +452,27 @@ def member_outreach_view():
 
         def format_ts(ts):
             if not ts:
-                return None
+                return None, None
             # Firestore returns datetime objects directly via client library
             if isinstance(ts, datetime):
-                return ts.strftime("%Y-%m-%d %H:%M")
-            return str(ts)
+                return ts.strftime("%Y-%m-%d %H:%M"), ts.isoformat()
+            # Fallback: best-effort string
+            try:
+                parsed = datetime.fromisoformat(str(ts))
+                return parsed.strftime("%Y-%m-%d %H:%M"), parsed.isoformat()
+            except Exception:
+                return str(ts), None
 
         for m in filtered_members:
             doc = reminder_lookup.get(m.get("discordID"))
             if doc:
-                m["last_reminder_at"] = format_ts(doc.get("lastReminderAt"))
+                human, iso = format_ts(doc.get("lastReminderAt"))
+                m["last_reminder_at"] = human
+                m["last_reminder_iso"] = iso
                 m["reminder_count"] = doc.get("reminderCount", 0)
             else:
                 m["last_reminder_at"] = None
+                m["last_reminder_iso"] = None
                 m["reminder_count"] = 0
 
         if is_html_request:
