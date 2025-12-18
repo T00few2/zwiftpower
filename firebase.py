@@ -148,7 +148,7 @@ def delete_document(collection: str, doc_id: str) -> bool:
 
 def update_discord_zwift_link(discord_id: str, zwift_id: str, username: str = None) -> Dict[str, Any]:
     """
-    Update or create a Discord user with a ZwiftID.
+    Update or create a user with a ZwiftID link.
     
     Args:
         discord_id: The Discord user ID
@@ -159,29 +159,29 @@ def update_discord_zwift_link(discord_id: str, zwift_id: str, username: str = No
         Dict with operation status
     """
     # Check if user exists
-    existing_docs = query_collection("discord_users", "discordID", "==", discord_id, limit=1)
+    doc_ref = db.collection("users").document(discord_id)
+    existing_doc = doc_ref.get()
     
     # Prepare data
     now = datetime.now()
     data = {
-        "discordID": discord_id,
-        "zwiftID": zwift_id,
-        "linkedAt": now
+        "discordId": discord_id,
+        "zwiftId": zwift_id,
+        "zwiftLinkedAt": now,
+        "updatedAt": now
     }
     
     # Add username if provided
     if username:
         data["username"] = username
     
-    # Use the discord_id as the document ID
-    doc_ref = db.collection("discord_users").document(discord_id)
-    
-    if existing_docs:
-        # Update existing document
-        doc_ref.update(data)
+    if existing_doc.exists:
+        # Update existing document (merge to preserve other fields)
+        doc_ref.set(data, merge=True)
         return {"status": "updated", "discord_id": discord_id, "zwift_id": zwift_id}
     else:
-        # Create new document with discord_id as document ID
+        # Create new document
+        data["createdAt"] = now
         doc_ref.set(data)
         return {"status": "created", "discord_id": discord_id, "zwift_id": zwift_id} 
     

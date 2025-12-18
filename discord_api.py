@@ -166,15 +166,15 @@ class DiscordAPI:
         # Get all Discord members
         discord_members = self.get_all_members(include_role_names=include_role_names)
         
-        # Get all discord_users from Firebase that have ZwiftIDs
+        # Get all users from Firebase that have ZwiftIDs
         # Use a high limit to ensure we get all users (default is only 100)
-        firebase_users = firebase.get_collection("discord_users", limit=10000)
+        firebase_users = firebase.get_collection("users", limit=10000)
         
-        # Create a lookup dictionary of discordID to zwiftID
+        # Create a lookup dictionary of discordId to zwiftId
         zwift_lookup = {}
         for user in firebase_users:
-            if "discordID" in user and "zwiftID" in user:
-                zwift_lookup[user["discordID"]] = user["zwiftID"]
+            if "discordId" in user and "zwiftId" in user:
+                zwift_lookup[user["discordId"]] = user["zwiftId"]
         
         # NEW: Build a rider stats lookup from the latest club_stats
         rider_stats_lookup: Dict[str, Dict[str, Any]] = {}
@@ -337,10 +337,10 @@ class DiscordAPI:
                 member_data["roles"] = roles_info
             
             # Check if there's a ZwiftID in Firebase
-            firebase_users = firebase.get_documents_by_field("discord_users", "discordID", discord_id)
+            user_doc = firebase.get_document("users", discord_id)
             
-            if firebase_users and "zwiftID" in firebase_users[0]:
-                member_data["zwiftID"] = firebase_users[0]["zwiftID"]
+            if user_doc and "zwiftId" in user_doc:
+                member_data["zwiftID"] = user_doc["zwiftId"]
                 member_data["has_zwift_id"] = True
             else:
                 member_data["has_zwift_id"] = False

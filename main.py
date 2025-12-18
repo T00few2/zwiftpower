@@ -317,15 +317,16 @@ def generate_and_post_upgrades():
         print("[ERROR] Exception occurred:", e)
         return jsonify({"error": str(e)}), 500
 
-@app.route('/discord_users', methods=['GET'])
-def get_discord_users():
-    """Retrieve all discord users from Firebase"""
+@app.route('/users', methods=['GET'])
+@app.route('/discord_users', methods=['GET'])  # Keep old route for backwards compatibility
+def get_users():
+    """Retrieve all users from Firebase"""
     try:
         # Get limit parameter from query string, default to 100
         limit = request.args.get('limit', default=100, type=int)
         
         # Call the get_collection function from firebase module
-        users = firebase.get_collection('discord_users', limit=limit)
+        users = firebase.get_collection('users', limit=limit)
         
         # Return the users as JSON
         return jsonify({"users": users, "count": len(users)})

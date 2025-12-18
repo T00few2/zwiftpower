@@ -126,16 +126,16 @@ Stil
             str: Modified message with Discord mentions
         """
 
-        # Get Discord users from Firebase
+        # Get users from Firebase
         # Use a high limit to ensure we get all users (default is only 100)
-        discord_users = fb.get_collection("discord_users", limit=10000)
+        users = fb.get_collection("users", limit=10000)
          
         # Create a lookup dictionary of ZwiftIDs to Discord IDs
         zwiftid_to_discord = {}
-        for user in discord_users:
-            if "zwiftID" in user and "discordID" in user:
+        for user in users:
+            if "zwiftId" in user and "discordId" in user:
                 # Store the mapping from ZwiftID to Discord ID
-                zwiftid_to_discord[user["zwiftID"]] = user["discordID"]
+                zwiftid_to_discord[user["zwiftId"]] = user["discordId"]
         
         # Replace names with Discord mentions in the message
         modified_message = message
