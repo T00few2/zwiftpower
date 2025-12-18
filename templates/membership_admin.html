@@ -24,6 +24,16 @@
     th { background:#f9fafb; font-weight:600; }
     .actions { display:flex; gap:8px; }
     .muted { color:#6b7280; }
+    .status-badge { padding:2px 8px; border-radius:12px; font-size:11px; font-weight:600; text-transform:uppercase; }
+    .status-succeeded { background:#d1fae5; color:#065f46; }
+    .status-created, .status-initiated { background:#fef3c7; color:#92400e; }
+    .status-failed, .status-terminated { background:#fee2e2; color:#991b1b; }
+    .status-authorized, .status-captured { background:#dbeafe; color:#1e40af; }
+    .status-unknown { background:#f3f4f6; color:#374151; }
+    .filter-bar { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
+    .filter-btn { padding:6px 12px; border-radius:6px; border:1px solid #e5e7eb; background:#fff; cursor:pointer; font-size:12px; }
+    .filter-btn:hover { background:#f9fafb; }
+    .filter-btn.active { background:#667eea; color:#fff; border-color:#667eea; }
     .layout { display:grid; grid-template-columns: 320px 1fr; gap:20px; align-items:start; }
     .sidebar { position: sticky; top: 16px; }
     .section-title { display:flex; align-items:center; gap:8px; font-weight:600; }
@@ -100,28 +110,35 @@
 
       <section class="main">
         <div class="card">
-          <h2>Recent Payments</h2>
-          <div class="actions" style="margin-bottom:8px;">
+          <h2>Payments Overview</h2>
+          <div class="filter-bar">
+            <button class="filter-btn active" data-status="">All</button>
+            <button class="filter-btn" data-status="succeeded">✓ Succeeded</button>
+            <button class="filter-btn" data-status="created">⏳ Created</button>
+            <button class="filter-btn" data-status="initiated">🔄 Initiated</button>
+            <button class="filter-btn" data-status="failed">✗ Failed</button>
+            <span style="flex:1;"></span>
             <button class="btn secondary" id="refreshPaymentsBtn">Refresh</button>
             <a class="btn" href="/api/membership/payments.csv">Download CSV</a>
-            <span id="paymentsStatus" class="muted"></span>
           </div>
+          <div id="paymentsSummary" class="muted" style="margin-bottom:8px;"></div>
           <div style="overflow:auto;">
             <table>
               <thead>
                 <tr>
-                  <th>Paid at</th>
-                  <th>User ID</th>
+                  <th>Created</th>
+                  <th>Status</th>
                   <th>Full name</th>
-                  <th>Email</th>
-                  <th>Amount (DKK)</th>
+                  <th>Amount</th>
                   <th>Years</th>
-                  <th>Through</th>
-                  <th>PI</th>
+                  <th>Provider</th>
+                  <th>Provider State</th>
+                  <th>Reference</th>
+                  <th>Paid at</th>
                 </tr>
               </thead>
               <tbody id="paymentsTbody">
-                <tr><td colspan="8" class="muted">No data</td></tr>
+                <tr><td colspan="9" class="muted">No data</td></tr>
               </tbody>
             </table>
           </div>
@@ -229,39 +246,87 @@
     }
 
     function fmt(v) { return v == null ? '' : String(v); }
-
-    async function loadPayments() {
+    
+    function formatDateTime(isoStr) {
+      if (!isoStr) return '';
       try {
-        $('#paymentsStatus').textContent = 'Loading...';
-        const res = await fetch('/api/membership/payments?limit=100', { headers: { 'Accept': 'application/json' } });
+        const d = new Date(isoStr);
+        return d.toLocaleString('da-DK', { dateStyle: 'short', timeStyle: 'short' });
+      } catch { return isoStr; }
+    }
+    
+    function getStatusClass(status) {
+      const s = (status || '').toLowerCase();
+      if (s === 'succeeded') return 'status-succeeded';
+      if (s === 'created') return 'status-created';
+      if (s === 'initiated') return 'status-initiated';
+      if (s === 'failed' || s === 'terminated') return 'status-failed';
+      if (s === 'authorized' || s === 'captured') return 'status-authorized';
+      return 'status-unknown';
+    }
+
+    let currentFilter = '';
+    
+    async function loadPayments(statusFilter = '') {
+      try {
+        currentFilter = statusFilter;
+        const url = statusFilter 
+          ? `/api/membership/payments?limit=200&status=${encodeURIComponent(statusFilter)}`
+          : '/api/membership/payments?limit=200';
+        const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
         if (!res.ok) throw new Error('Failed to load payments');
         const data = await res.json();
         const list = Array.isArray(data.payments) ? data.payments : [];
         const tbody = $('#paymentsTbody');
+        
+        // Summary stats
+        const succeeded = list.filter(p => (p.status||'').toLowerCase() === 'succeeded').length;
+        const pending = list.filter(p => ['created','initiated'].includes((p.status||'').toLowerCase())).length;
+        const failed = list.filter(p => ['failed','terminated'].includes((p.status||'').toLowerCase())).length;
+        $('#paymentsSummary').innerHTML = `
+          <strong>${list.length}</strong> payments shown &nbsp;|&nbsp; 
+          <span style="color:#065f46;">✓ ${succeeded} succeeded</span> &nbsp;|&nbsp;
+          <span style="color:#92400e;">⏳ ${pending} pending</span> &nbsp;|&nbsp;
+          <span style="color:#991b1b;">✗ ${failed} failed</span>
+        `;
+        
         if (!list.length) {
-          tbody.innerHTML = '<tr><td colspan="8" class="muted">No data</td></tr>';
-          $('#paymentsStatus').textContent = 'No payments';
+          tbody.innerHTML = '<tr><td colspan="9" class="muted">No payments found</td></tr>';
           return;
         }
         tbody.innerHTML = list.map(p => {
-          const years = Array.isArray(p.coversYears) ? p.coversYears.join(',') : '';
-          const amt = (p.amountDkk != null) ? Number(p.amountDkk).toFixed(2) : '';
+          const years = Array.isArray(p.coversYears) ? p.coversYears.join(', ') : '';
+          const amt = (p.amountDkk != null) ? Number(p.amountDkk).toFixed(0) + ' DKK' : '';
+          const provider = fmt(p.provider || p.paymentProvider || '');
+          const providerState = fmt(p.providerState || '');
+          const providerRef = fmt(p.providerRef || '');
+          const status = fmt(p.status || '');
+          const statusClass = getStatusClass(status);
           return `<tr>
-            <td>${fmt(p.paidAt)}</td>
-            <td>${fmt(p.userId)}</td>
-            <td>${fmt(p.fullName)}</td>
-            <td>${fmt(p.userEmail)}</td>
+            <td>${formatDateTime(p.createdAt)}</td>
+            <td><span class="status-badge ${statusClass}">${status || 'unknown'}</span></td>
+            <td title="${fmt(p.userEmail)}">${fmt(p.fullName)}</td>
             <td>${amt}</td>
             <td>${years}</td>
-            <td>${fmt(p.coveredThroughYear)}</td>
-            <td>${fmt(p.stripe && p.stripe.paymentIntentId)}</td>
+            <td>${provider}</td>
+            <td><span class="status-badge ${getStatusClass(providerState)}">${providerState || '-'}</span></td>
+            <td title="${providerRef}" style="max-width:120px;overflow:hidden;text-overflow:ellipsis;">${providerRef.slice(-20)}</td>
+            <td>${formatDateTime(p.paidAt)}</td>
           </tr>`;
         }).join('');
-        $('#paymentsStatus').textContent = `Loaded ${list.length}`;
-        setTimeout(() => $('#paymentsStatus').textContent = '', 1200);
       } catch (e) {
-        $('#paymentsStatus').textContent = e.message || 'Error';
+        $('#paymentsSummary').textContent = e.message || 'Error loading payments';
       }
+    }
+    
+    function setupFilterButtons() {
+      document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          loadPayments(btn.dataset.status || '');
+        });
+      });
     }
 
     async function reconcileNow() {
@@ -284,9 +349,10 @@
 
     document.addEventListener('DOMContentLoaded', () => {
       $('#saveSettingsBtn').addEventListener('click', saveSettings);
-      $('#refreshPaymentsBtn').addEventListener('click', loadPayments);
+      $('#refreshPaymentsBtn').addEventListener('click', () => loadPayments(currentFilter));
       $('#refreshRolesBtn').addEventListener('click', loadRoles);
       $('#reconcileBtn').addEventListener('click', reconcileNow);
+      setupFilterButtons();
       // Load roles first so the select can reflect saved roleId when settings load
       loadRoles().then(loadSettings);
       loadPayments();

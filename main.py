@@ -1716,17 +1716,48 @@ def membership_payments_list():
     List recent membership payments from 'payments' collection.
     Optional query params:
       - limit: number of records (default 100)
+      - status: filter by status (e.g., 'succeeded', 'created', 'failed')
     """
     try:
         limit = int(request.args.get('limit', 100))
+        status_filter = request.args.get('status', '').strip().lower()
         docs = firebase.get_collection('payments', limit=limit, include_id=True) or []
-        # Sort by paidAt desc if present
-        def parse_paid_at(x):
-            try:
-                return datetime.fromisoformat(x.get('paidAt', ''))
-            except Exception:
-                return datetime.min
-        docs.sort(key=parse_paid_at, reverse=True)
+        
+        # Filter by status if provided
+        if status_filter:
+            docs = [p for p in docs if str(p.get('status') or '').lower() == status_filter]
+        
+        # Normalize provider fields for UI
+        for p in docs:
+            provider = str(p.get('paymentProvider') or '').strip().lower() or 'unknown'
+            p['provider'] = provider
+
+            # Handle vipps-checkout vs vipps (ePayment)
+            vipps = p.get('vipps') or {}
+            checkout = p.get('checkout') or {}
+            
+            if provider == 'vipps-checkout':
+                p['providerState'] = str(checkout.get('state') or p.get('status') or '').upper()
+                p['providerRef'] = str(checkout.get('reference') or p.get('id') or '')
+            elif provider == 'vipps':
+                vipps_state = str(vipps.get('state') or '').strip().upper()
+                p['providerState'] = vipps_state or str(p.get('status') or '').upper()
+                p['providerRef'] = str(vipps.get('reference') or p.get('id') or '')
+            else:
+                p['providerState'] = str(p.get('status') or '').upper()
+                p['providerRef'] = str(p.get('id') or '')
+
+        # Sort by createdAt desc (so we see newest payments first, including initiated ones)
+        def parse_date(x):
+            for field in ['createdAt', 'paidAt', 'updatedAt']:
+                try:
+                    val = x.get(field, '')
+                    if val:
+                        return datetime.fromisoformat(val.replace('Z', '+00:00'))
+                except Exception:
+                    pass
+            return datetime.min
+        docs.sort(key=parse_date, reverse=True)
         return jsonify({"payments": docs})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -1741,23 +1772,41 @@ def membership_payments_csv():
         import io, csv
         # Large limit to include all
         payments = firebase.get_collection('payments', limit=100000, include_id=True) or []
-        # Sort by paidAt desc
-        def parse_paid_at(x):
-            try:
-                return datetime.fromisoformat(x.get('paidAt', ''))
-            except Exception:
-                return datetime.min
-        payments.sort(key=parse_paid_at, reverse=True)
+        # Sort by createdAt desc
+        def parse_date(x):
+            for field in ['createdAt', 'paidAt', 'updatedAt']:
+                try:
+                    val = x.get(field, '')
+                    if val:
+                        return datetime.fromisoformat(val.replace('Z', '+00:00'))
+                except Exception:
+                    pass
+            return datetime.min
+        payments.sort(key=parse_date, reverse=True)
 
         buffer = io.StringIO()
         writer = csv.writer(buffer)
         writer.writerow([
-            'paidAt','userId','fullName','userEmail','amountDkk','currency','status',
-            'coveredThroughYear','coversYears','paymentIntentId','receiptUrl'
+            'createdAt','paidAt','userId','fullName','userEmail','amountDkk','currency','status',
+            'coveredThroughYear','coversYears','provider','providerState','providerRef','reference'
         ])
         for p in payments:
-            stripe = p.get('stripe') or {}
+            vipps = p.get('vipps') or {}
+            checkout = p.get('checkout') or {}
+            provider = str(p.get('paymentProvider') or '').strip().lower() or 'unknown'
+            provider_state = ''
+            provider_ref = ''
+            if provider == 'vipps-checkout':
+                provider_state = str(checkout.get('state') or p.get('status') or '').upper()
+                provider_ref = str(checkout.get('reference') or p.get('id') or '')
+            elif provider == 'vipps':
+                provider_state = str(vipps.get('state') or '').strip().upper()
+                provider_ref = str(vipps.get('reference') or p.get('id') or '')
+            else:
+                provider_state = str(p.get('status') or '').upper()
+                provider_ref = str(p.get('id') or '')
             writer.writerow([
+                p.get('createdAt',''),
                 p.get('paidAt',''),
                 p.get('userId',''),
                 p.get('fullName',''),
@@ -1767,8 +1816,10 @@ def membership_payments_csv():
                 p.get('status',''),
                 p.get('coveredThroughYear',''),
                 ','.join(map(str, p.get('coversYears') or [])),
-                stripe.get('paymentIntentId',''),
-                stripe.get('receiptUrl',''),
+                provider,
+                provider_state,
+                provider_ref,
+                checkout.get('reference','') or vipps.get('reference',''),
             ])
         csv_data = buffer.getvalue()
         from flask import make_response
