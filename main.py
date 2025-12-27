@@ -294,7 +294,14 @@ def generate_and_post_upgrades():
         print(f"[DEBUG] Comparing rider categories between {today} and {yesterday}")
         upgrade_data = firebase.compare_rider_categories(today, yesterday)
 
-        if not upgrade_data.get("upgradedZPCategory") and not upgrade_data.get("upgradedZwiftRacingCategory") and not upgrade_data.get("upgradedZRSCategory"):
+        # Be defensive: comparison should return a dict, but don't fail cron runs if it doesn't.
+        if not isinstance(upgrade_data, dict):
+            print(f"[WARN] compare_rider_categories returned non-dict: {type(upgrade_data)}")
+            return jsonify({"message": "No upgrades today."}), 200
+
+        if (not upgrade_data.get("upgradedZPCategory")
+            and not upgrade_data.get("upgradedZwiftRacingCategory")
+            and not upgrade_data.get("upgradedZRSCategory")):
             return jsonify({"message": "No upgrades today."}), 200
 
         # Generate upgrade comment

@@ -282,26 +282,64 @@ def compare_rider_categories(today_raw: str, yesterday_raw: str) -> Dict[str, An
         today_doc = db.collection('club_stats').document(today_id).get()
         yesterday_doc = db.collection('club_stats').document(yesterday_id).get()
 
+        # If a daily snapshot isn't present yet (e.g. cron runs before ingestion),
+        # treat it as "no upgrades" instead of failing the whole endpoint.
         if not today_doc.exists or not yesterday_doc.exists:
-            raise ValueError("One or both documents not found in Firestore")
+            missing = []
+            if not today_doc.exists:
+                missing.append(today_id)
+            if not yesterday_doc.exists:
+                missing.append(yesterday_id)
+            print(f"[WARN] compare_rider_categories: missing Firestore documents: {missing}")
+
+            paris_tz = pytz.timezone('Europe/Paris')
+            timestamp = datetime.now(paris_tz).strftime('%d/%m/%Y, %H:%M:%S')
+            return {
+                'message': f'No comparison data available (missing snapshots: {", ".join(missing)}).',
+                'timeStamp': timestamp,
+                'upgradedZPCategory': [],
+                'upgradedZwiftRacingCategory': [],
+                'upgradedZRSCategory': []
+            }
 
         today_data = today_doc.to_dict()
         yesterday_data = yesterday_doc.to_dict()
         
-        today_riders = today_data.get('data', {}).get('riders', []) if today_data else []
-        yesterday_riders = yesterday_data.get('data', {}).get('riders', []) if yesterday_data else []
+        today_riders = (today_data.get('data') or {}).get('riders', []) if today_data else []
+        yesterday_riders = (yesterday_data.get('data') or {}).get('riders', []) if yesterday_data else []
 
-        today_map = {r.get('riderId'): r for r in today_riders}
-        yesterday_map = {r.get('riderId'): r for r in yesterday_riders}
+        def _norm_rider_id(v: Any) -> str | None:
+            if v is None:
+                return None
+            if isinstance(v, (int, float)):
+                return str(int(v))
+            if isinstance(v, str):
+                return v.strip() or None
+            return str(v)
+
+        # Normalize keys so today's/yesterday's lookup always matches (Firestore data can mix str/int IDs).
+        today_map: Dict[str, Dict[str, Any]] = {}
+        for r in today_riders:
+            if not isinstance(r, dict):
+                continue
+            rid = _norm_rider_id(r.get('riderId'))
+            if rid:
+                today_map[rid] = r
+
+        yesterday_map: Dict[str, Dict[str, Any]] = {}
+        for r in yesterday_riders:
+            if not isinstance(r, dict):
+                continue
+            rid = _norm_rider_id(r.get('riderId'))
+            if rid:
+                yesterday_map[rid] = r
 
         upgraded_zp_category = []
         upgraded_zwift_racing_category = []
         upgraded_zrs_category = []
 
-        for rider_id_str in today_map.keys():
-            rider_id = int(rider_id_str) if isinstance(rider_id_str, str) else rider_id_str
-            today = today_map.get(rider_id)
-            yesterday = yesterday_map.get(rider_id)
+        for rider_id_str, today in today_map.items():
+            yesterday = yesterday_map.get(rider_id_str)
             
             if not today or not yesterday:
                 continue
@@ -323,13 +361,19 @@ def compare_rider_categories(today_raw: str, yesterday_raw: str) -> Dict[str, An
                 })
 
             # Compare Zwift racing categories
-            today_mixed = today.get('race', {}).get('current', {}).get('mixed')
-            yesterday_mixed = yesterday.get('race', {}).get('current', {}).get('mixed')
+            # 'race' (or nested keys) can be None in some snapshots; use safe access.
+            today_race = today.get('race') or {}
+            yesterday_race = yesterday.get('race') or {}
+            today_current = (today_race.get('current') or {}) if isinstance(today_race, dict) else {}
+            yesterday_current = (yesterday_race.get('current') or {}) if isinstance(yesterday_race, dict) else {}
+            today_mixed = (today_current.get('mixed')) if isinstance(today_current, dict) else None
+            yesterday_mixed = (yesterday_current.get('mixed')) if isinstance(yesterday_current, dict) else None
 
-            if (today_mixed and yesterday_mixed and 
-                isinstance(today_mixed.get('number'), (int, float)) and 
-                isinstance(yesterday_mixed.get('number'), (int, float)) and 
+            if (isinstance(today_mixed, dict) and isinstance(yesterday_mixed, dict) and
+                isinstance(today_mixed.get('number'), (int, float)) and
+                isinstance(yesterday_mixed.get('number'), (int, float)) and
                 today_mixed.get('number') < yesterday_mixed.get('number')):
+                rider_id = int(rider_id_str) if rider_id_str.isdigit() else rider_id_str
                 upgraded_zwift_racing_category.append({
                     'riderId': rider_id,
                     'name': name,
@@ -346,8 +390,9 @@ def compare_rider_categories(today_raw: str, yesterday_raw: str) -> Dict[str, An
                 today_zrs_cat = get_zrs_category(today_score)
                 yesterday_zrs_cat = get_zrs_category(yesterday_score)
                 
-                if (today_zrs_cat != yesterday_zrs_cat and 
+                if (today_zrs_cat != yesterday_zrs_cat and
                     zrs_category_rank[today_zrs_cat] > zrs_category_rank[yesterday_zrs_cat]):
+                    rider_id = int(rider_id_str) if rider_id_str.isdigit() else rider_id_str
                     upgraded_zrs_category.append({
                         'riderId': rider_id,
                         'name': name,
