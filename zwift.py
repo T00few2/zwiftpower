@@ -3,6 +3,7 @@ import backoff
 import logging
 import time
 from requests.exceptions import RequestException
+from typing import Any, Dict, List, Optional
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -121,3 +122,106 @@ class ZwiftAPI:
             if getattr(e, 'response', None) is not None and e.response.status_code == 404:
                 return None
             raise
+
+    def get_club_roster(
+        self,
+        club_id: str,
+        limit: int = 100,
+        start: int = 0,
+        paginate: bool = True,
+        max_pages: int = 50,
+    ) -> List[Dict[str, Any]]:
+        """
+        Fetch club roster (members) for a given club.
+
+        Endpoint pattern:
+          /api/clubs/club/{club_id}/roster?limit=100
+
+        Some Zwift deployments paginate with `start`; some ignore it. We handle both.
+        """
+        if not self.is_authenticated():
+            raise Exception("Not authenticated. Please authenticate first.")
+
+        headers = {
+            "Authorization": f"Bearer {self.auth_token['access_token']}",
+            "Accept": "application/json",
+        }
+
+        url = f"https://us-or-rly101.zwift.com/api/clubs/club/{club_id}/roster"
+
+        all_rows: List[Dict[str, Any]] = []
+        cur_start = int(start)
+        pages = 0
+
+        while True:
+            params: Dict[str, Any] = {"limit": int(limit)}
+            if cur_start:
+                params["start"] = cur_start
+
+            data = self.fetch_json_with_retry(url, headers=headers, params=params)
+
+            # Response shape can be a list or a wrapper dict depending on backend version.
+            if isinstance(data, list):
+                rows = data
+            elif isinstance(data, dict):
+                rows = (
+                    data.get("roster")
+                    or data.get("members")
+                    or data.get("items")
+                    or data.get("results")
+                    or []
+                )
+            else:
+                rows = []
+
+            if rows:
+                all_rows.extend(rows)
+
+            pages += 1
+
+            if not paginate:
+                break
+
+            # Stop when we get fewer than `limit` back (or no rows).
+            if not rows or len(rows) < int(limit):
+                break
+
+            if pages >= int(max_pages):
+                break
+
+            cur_start += len(rows)
+
+            # Be nice to the API.
+            time.sleep(0.5)
+
+        return all_rows
+
+    @staticmethod
+    def simplify_club_roster(roster: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Convert raw club roster entries into a minimal structure.
+
+        Output fields:
+          - firstName
+          - lastName
+          - gender
+          - countryCode
+          - profileId              (from membership.profileId, falls back to id)
+          - createdOn              (top-level createdOn)
+          - membershipCreatedOn    (membership.createdOn)
+        """
+        out: List[Dict[str, Any]] = []
+        for m in roster or []:
+            membership = (m or {}).get("membership") or {}
+            out.append(
+                {
+                    "firstName": (m or {}).get("firstName"),
+                    "lastName": (m or {}).get("lastName"),
+                    "gender": (m or {}).get("gender"),
+                    "countryCode": (m or {}).get("countryCode"),
+                    "profileId": membership.get("profileId") or (m or {}).get("id"),
+                    "createdOn": (m or {}).get("createdOn"),
+                    "membershipCreatedOn": membership.get("createdOn"),
+                }
+            )
+        return out

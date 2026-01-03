@@ -67,6 +67,7 @@ VERIFIED_MEMBER_ROLE_ID = os.getenv(
 )
 
 CONTENT_API_KEY = os.getenv("CONTENT_API_KEY", "your_content_api_key")
+ZWIFT_CLUB_ID = os.getenv("ZWIFT_CLUB_ID", "")  # Optional default for roster refresh
 
 def login_required(f):
     """Decorator to require Discord OAuth login with admin rights"""
@@ -115,6 +116,104 @@ def verify_api_key():
     
     token = auth_header.replace('Bearer ', '')
     return token == CONTENT_API_KEY
+
+
+def _commit_in_batches(write_ops, batch_size: int = 450):
+    """
+    Commit Firestore batch writes in chunks (Firestore limit is 500 ops per batch).
+    write_ops: iterable of callables that accept a firestore batch.
+    """
+    ops = list(write_ops or [])
+    committed = 0
+    for i in range(0, len(ops), batch_size):
+        batch = firebase.db.batch()
+        chunk = ops[i:i + batch_size]
+        for op in chunk:
+            op(batch)
+        batch.commit()
+        committed += len(chunk)
+    return committed
+
+
+def overwrite_companion_club_members_in_firestore(members: list[dict]) -> dict:
+    """
+    Store the current club roster in Firestore as an "official membership list",
+    overwriting any previous data.
+
+    Layout:
+      - companion_club_members/{profileId} (per-member docs)
+
+    Each member doc gets:
+      - rosterSyncedAt: datetime
+    """
+    sync_ts = datetime.utcnow()
+
+    members_col_ref = firebase.db.collection("companion_club_members")
+
+    # 1) Delete all existing docs (full overwrite)
+    existing_stream = members_col_ref.stream()
+
+    def make_delete_op(doc_ref):
+        def _op(batch):
+            batch.delete(doc_ref)
+        return _op
+
+    delete_ops = [make_delete_op(doc.reference) for doc in existing_stream]
+    deleted_count = _commit_in_batches(delete_ops)
+
+    # Upsert members
+    def make_set_op(profile_id: str, data: dict):
+        doc_ref = members_col_ref.document(str(profile_id))
+
+        def _op(batch):
+            batch.set(
+                doc_ref,
+                {
+                    **(data or {}),
+                    "profileId": str(profile_id),
+                    "rosterSyncedAt": sync_ts,
+                    "updatedAt": sync_ts,
+                },
+                merge=False,
+            )
+
+        return _op
+
+    upsert_ops = []
+    for m in members or []:
+        pid = (m or {}).get("profileId")
+        if pid is None:
+            continue
+        upsert_ops.append(make_set_op(str(pid), m))
+
+    upserted_count = _commit_in_batches(upsert_ops)
+
+    return {
+        "memberCount": len(members or []),
+        "syncedAt": sync_ts.isoformat() + "Z",
+        "deleted": deleted_count,
+        "upserted": upserted_count,
+    }
+
+
+def _refresh_companion_club_roster(club_id: str, limit: int = 100, paginate: bool = True) -> dict:
+    """Fetch roster from Zwift and overwrite Firestore collection companion_club_members."""
+    zwift_api = get_authenticated_zwift_api()
+    zwift_api.ensure_valid_token()
+
+    roster = zwift_api.get_club_roster(str(club_id), limit=limit, paginate=paginate)
+    simplified = ZwiftAPI.simplify_club_roster(roster or [])
+
+    result = overwrite_companion_club_members_in_firestore(simplified)
+    return {
+        "status": "success",
+        "clubId": str(club_id),
+        "fetched": len(roster or []),
+        "stored": result["memberCount"],
+        "deleted": result["deleted"],
+        "upserted": result["upserted"],
+        "syncedAt": result["syncedAt"],
+    }
 
 def get_authenticated_session() -> requests.Session:
     """Return a cached, authenticated session if available and still valid; otherwise, log in."""
@@ -3752,6 +3851,32 @@ def save_global_settings():
     except Exception as e:
         print(f"Error saving global settings: {str(e)}")
         return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/zwift/club/roster/refresh', methods=['POST'])
+def refresh_default_zwift_club_roster():
+    """
+    Refresh Zwift club roster for the single configured club (ZWIFT_CLUB_ID) and store it in Firestore.
+
+    Auth: Bearer CONTENT_API_KEY
+    """
+    if not verify_api_key():
+        return jsonify({"error": "Unauthorized"}), 401
+
+    if not ZWIFT_CLUB_ID or not str(ZWIFT_CLUB_ID).strip():
+        return jsonify({"error": "ZWIFT_CLUB_ID is not configured"}), 400
+
+    try:
+        limit = int(request.args.get("limit", "100"))
+        paginate_raw = str(request.args.get("paginate", "true")).lower().strip()
+        paginate = paginate_raw not in ("0", "false", "no", "off")
+
+        payload = _refresh_companion_club_roster(str(ZWIFT_CLUB_ID), limit=limit, paginate=paginate)
+        return jsonify(payload)
+
+    except Exception as e:
+        print(f"Error refreshing default Zwift club roster: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 8080))
