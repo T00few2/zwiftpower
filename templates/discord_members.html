@@ -175,6 +175,8 @@
                     <span>Total: {{ members|length }}</span>
                     <span>Linked: {{ linked_count }}</span>
                     <span>Unlinked: {{ unlinked_count }}</span>
+                    {% if member_role_count is defined %}<span>With member role: {{ member_role_count }}</span>{% endif %}
+                    {% if companion_count is defined %}<span>Companion members: {{ companion_count }}</span>{% endif %}
                 </div>
                 <div style="display: flex; gap: 10px;">
                     <a href="/dashboard" style="background: rgba(255,255,255,0.2); color: white; padding: 8px 16px; border-radius: 5px; text-decoration: none; font-size: 0.9em;">← Dashboard</a>
@@ -198,7 +200,11 @@
             <div class="filters" style="align-items: center;">
                 <label style="display: flex; align-items: center; white-space: nowrap;">
                     <input type="checkbox" id="filter-member-role" checked>
-                    <span style="margin-left: 8px;">Only show members with "member" role</span>
+                    <span style="margin-left: 8px;">Only show members with member role</span>
+                </label>
+                <label style="display: flex; align-items: center; white-space: nowrap; margin-left: 16px;">
+                    <input type="checkbox" id="filter-companion-member">
+                    <span style="margin-left: 8px;">Only show companion club members</span>
                 </label>
             </div>
 
@@ -225,6 +231,7 @@
                             <th data-sort-key="discord" style="cursor: pointer; text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Username <span class="sort-indicator"></span></th>
                             <th data-sort-key="roles" style="cursor: pointer; text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Roles <span class="sort-indicator"></span></th>
                             <th data-sort-key="zwiftId" style="cursor: pointer; text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Zwift ID <span class="sort-indicator"></span></th>
+                            <th data-sort-key="companion" style="cursor: pointer; text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Companion <span class="sort-indicator"></span></th>
                             <th data-sort-key="zrsCat" style="cursor: pointer; text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">ZRS Cat <span class="sort-indicator"></span></th>
                             <th data-sort-key="zrsScore" style="cursor: pointer; text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">ZRS Score <span class="sort-indicator"></span></th>
                             <th data-sort-key="zpCat" style="cursor: pointer; text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Pace group <span class="sort-indicator"></span></th>
@@ -237,6 +244,8 @@
                         {% for member in members %}
                         <tr class="member-row {% if member.has_zwift_id %}has-zwift{% else %}no-zwift{% endif %}"
                             data-has-zwift="{{ member.has_zwift_id|lower }}"
+                            data-has-member-role="{{ member.has_member_role|default(false)|lower }}"
+                            data-is-companion="{{ member.is_companion_member|default(false)|lower }}"
                             data-discord-id="{{ member.discordID }}"
                             data-username="{{ member.username }}"
                             data-display-name="{{ member.display_name }}"
@@ -259,6 +268,13 @@
                                 {% endif %}
                             </td>
                             <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">{% if member.has_zwift_id %}{{ member.zwiftID }}{% else %}-{% endif %}</td>
+                            <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">
+                                {% if member.is_companion_member %}
+                                    <span class="role-tag" style="background:#57F287; color:#fff;">Yes</span>
+                                {% else %}
+                                    <span class="role-tag" style="background:#ddd; color:#333;">No</span>
+                                {% endif %}
+                            </td>
                             <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">{% if member.zrsCategory is defined %}{{ member.zrsCategory }}{% else %}-{% endif %}</td>
                             <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">{% if member.racingScore is defined %}{{ member.racingScore|round(0)|int }}{% else %}-{% endif %}</td>
                             <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">{% if member.zpCategory is defined %}{{ member.zpCategory }}{% else %}-{% endif %}</td>
@@ -333,6 +349,11 @@
                 applyFilters();
             });
 
+            // Setup companion membership filter checkbox
+            document.getElementById('filter-companion-member').addEventListener('change', function() {
+                applyFilters();
+            });
+
             // Build category filter options dynamically
             buildCategoryFilters();
             // Category filter listeners
@@ -379,6 +400,7 @@
             const searchTerm = document.getElementById('member-search').value.toLowerCase();
             const filterType = document.getElementById('filter-type').value;
             const filterMemberRole = document.getElementById('filter-member-role').checked;
+            const filterCompanion = document.getElementById('filter-companion-member').checked;
             const zrsCat = document.getElementById('filter-zrs-cat').value;
             const zpCat = document.getElementById('filter-zp-cat').value;
             const veloCat = document.getElementById('filter-velo-cat').value;
@@ -406,11 +428,13 @@
                 // Match member role filter
                 let matchesMemberRole = true;
                 if (filterMemberRole) {
-                    const roleTags = row.querySelectorAll('.role-tag');
-                    const hasMemberRole = Array.from(roleTags).some(tag => tag.textContent.trim().toLowerCase() === 'member');
-                    if (!hasMemberRole) {
-                        matchesMemberRole = false;
-                    }
+                    if (row.dataset.hasMemberRole !== 'true') matchesMemberRole = false;
+                }
+
+                // Match companion membership filter
+                let matchesCompanion = true;
+                if (filterCompanion) {
+                    if (row.dataset.isCompanion !== 'true') matchesCompanion = false;
                 }
                 // Match selected role from dropdown
                 let matchesSelectedRole = true;
@@ -435,7 +459,7 @@
                 if (veloCat !== 'all' && rowVeloCat !== veloCat) matchesCats = false;
                 
                 // Show or hide based on all conditions
-                row.style.display = (matchesSearch && matchesFilter && matchesMemberRole && matchesSelectedRole && matchesCats) ? 'table-row' : 'none';
+                row.style.display = (matchesSearch && matchesFilter && matchesMemberRole && matchesCompanion && matchesSelectedRole && matchesCats) ? 'table-row' : 'none';
             });
         }
         
@@ -653,6 +677,9 @@
                     const v = row.dataset.zwiftId || '';
                     const n = parseFloat(v);
                     return isNaN(n) ? -Infinity : n;
+                }
+                case 'companion': {
+                    return row.dataset.isCompanion === 'true' ? 1 : 0;
                 }
                 case 'zrsCat':
                     return (row.dataset.zrsCat || '').toUpperCase();

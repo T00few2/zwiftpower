@@ -465,6 +465,29 @@ def get_discord_members():
         else:
             # Get all members with ZwiftIDs merged
             members = discord_api.merge_with_zwift_ids(include_role_names=include_roles)
+
+        # Compute "member role" flag using role ID (robust vs role name changes)
+        # Requirement: only check the Community Member role id (1195878123795910736 by default).
+        community_role_id = str(COMMUNITY_MEMBER_ROLE_ID or "").strip()
+        for m in members:
+            role_ids = [str(r) for r in (m.get("role_ids") or [])]
+            m["has_member_role"] = bool(community_role_id and community_role_id in role_ids)
+
+        # Compute companion membership flag by checking companion_club_members/{profileId}
+        companion_ids = set()
+        try:
+            companion_ids = set(
+                [doc.id for doc in firebase.db.collection("companion_club_members").stream()]
+            )
+        except Exception as comp_err:
+            print(f"Warning: could not load companion_club_members: {comp_err}")
+            companion_ids = set()
+
+        for m in members:
+            zwift_id = m.get("zwiftID")
+            m["is_companion_member"] = bool(
+                zwift_id is not None and str(zwift_id) in companion_ids
+            )
             
         # For HTML requests, render the template with data
         if is_html_request:
@@ -499,13 +522,17 @@ def get_discord_members():
             
             linked_count = len([m for m in members if m.get('has_zwift_id')])
             unlinked_count = len(members) - linked_count
+            member_role_count = len([m for m in members if m.get("has_member_role")])
+            companion_count = len([m for m in members if m.get("is_companion_member")])
             
             return render_template(
                 'discord_members.html',
                 members=members,
                 zwift_riders=zwift_riders,
                 linked_count=linked_count,
-                unlinked_count=unlinked_count
+                unlinked_count=unlinked_count,
+                member_role_count=member_role_count,
+                companion_count=companion_count,
             )
         
         # For API requests, return JSON
