@@ -297,9 +297,6 @@
             <button onclick="runEstimatedBackfill()" style="padding: 8px 16px; background: #2d3748; color: white; border: none; border-radius: 5px; cursor: pointer;">
                 🧩 Backfill (estimate)
             </button>
-            <button onclick="runEstimatedBackfillSinceCreation()" style="padding: 8px 16px; background: #1a202c; color: white; border: none; border-radius: 5px; cursor: pointer;">
-                🧩 Backfill since creation
-            </button>
         </div>
 
         <div id="loading" class="loading">
@@ -461,8 +458,12 @@
         async function runEstimatedBackfill() {
             const membersPeriodRaw = document.getElementById('members-period-select')?.value || '30';
             const membersDays = (membersPeriodRaw === 'all') ? 5000 : Number(membersPeriodRaw);
+            const sinceCreation = (membersPeriodRaw === 'all');
             const ok = confirm(
-                "Backfill will ESTIMATE past TOTAL member counts using current members' join dates.\n\n" +
+                (sinceCreation
+                    ? "Backfill will ESTIMATE TOTAL member counts from the server's creation date to today.\n\n"
+                    : `Backfill will ESTIMATE TOTAL member counts for the last ${membersDays} days.\n\n`
+                ) +
                 "It cannot account for leavers.\n\n" +
                 "Continue?"
             );
@@ -474,12 +475,14 @@
                 const res = await fetch('/api/discord/stats/members/backfill', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ days: Number(membersDays), force: false })
+                    body: sinceCreation
+                        ? JSON.stringify({ since_creation: true, force: false })
+                        : JSON.stringify({ days: Number(membersDays), force: false })
                 });
                 const data = await res.json();
                 if (!res.ok || data.error) {
                     console.error('Backfill error:', data);
-                    alert('Backfill failed. Check server logs.');
+                    alert(`Backfill failed: ${data.error || 'Unknown error'}`);
                     showError();
                     return;
                 }
@@ -488,41 +491,7 @@
                 await loadData();
             } catch (e) {
                 console.error('Backfill request failed:', e);
-                alert('Backfill failed. Check console/server.');
-                showError();
-            }
-        }
-
-        async function runEstimatedBackfillSinceCreation() {
-            const ok = confirm(
-                "Backfill since creation will ESTIMATE TOTAL member counts from the server's creation date to today.\n\n" +
-                "This may write many days of data and can take a while.\n\n" +
-                "It still cannot account for leavers.\n\n" +
-                "Continue?"
-            );
-            if (!ok) return;
-
-            showLoading();
-
-            try {
-                const res = await fetch('/api/discord/stats/members/backfill', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ since_creation: true, force: false })
-                });
-                const data = await res.json();
-                if (!res.ok || data.error) {
-                    console.error('Backfill error:', data);
-                    alert('Backfill failed. Check server logs.');
-                    showError();
-                    return;
-                }
-
-                alert(`Backfill complete: wrote ${data.written}, skipped ${data.skipped}.`);
-                await loadData();
-            } catch (e) {
-                console.error('Backfill request failed:', e);
-                alert('Backfill failed. Check console/server.');
+                alert(`Backfill failed: ${e?.message || 'Unknown error'}`);
                 showError();
             }
         }

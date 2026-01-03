@@ -2471,6 +2471,26 @@ def backfill_member_counts():
         written = 0
         skipped = 0
 
+        # Preload existing docs once (avoids N reads for long ranges)
+        existing_keys = set()
+        if not force:
+            try:
+                start_key = start_date.strftime('%Y-%m-%d')
+                end_key = end_date.strftime('%Y-%m-%d')
+                existing_docs = (
+                    col.where('dateKey', '>=', start_key)
+                       .where('dateKey', '<=', end_key)
+                       .stream()
+                )
+                for doc in existing_docs:
+                    dct = doc.to_dict() or {}
+                    dk = dct.get('dateKey')
+                    if isinstance(dk, str) and dk:
+                        existing_keys.add(dk)
+            except Exception:
+                # If this fails (e.g., permissions/index), we'll fall back to writes without skipping.
+                existing_keys = set()
+
         # Batch writes for speed (Firestore batch limit: 500 operations)
         batch = firebase.db.batch()
         batch_ops = 0
@@ -2482,8 +2502,7 @@ def backfill_member_counts():
             doc_ref = col.document(date_key)
 
             if not force:
-                existing = doc_ref.get()
-                if existing.exists:
+                if date_key in existing_keys:
                     skipped += 1
                     d += timedelta(days=1)
                     continue
