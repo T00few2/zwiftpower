@@ -287,6 +287,9 @@
             <button onclick="runEstimatedBackfill()" style="padding: 8px 16px; background: #2d3748; color: white; border: none; border-radius: 5px; cursor: pointer;">
                 🧩 Backfill (estimate)
             </button>
+            <button onclick="runEstimatedBackfillSinceCreation()" style="padding: 8px 16px; background: #1a202c; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                🧩 Backfill since creation
+            </button>
         </div>
 
         <div id="loading" class="loading">
@@ -453,6 +456,40 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ days: Number(period), force: false })
+                });
+                const data = await res.json();
+                if (!res.ok || data.error) {
+                    console.error('Backfill error:', data);
+                    alert('Backfill failed. Check server logs.');
+                    showError();
+                    return;
+                }
+
+                alert(`Backfill complete: wrote ${data.written}, skipped ${data.skipped}.`);
+                await loadData();
+            } catch (e) {
+                console.error('Backfill request failed:', e);
+                alert('Backfill failed. Check console/server.');
+                showError();
+            }
+        }
+
+        async function runEstimatedBackfillSinceCreation() {
+            const ok = confirm(
+                "Backfill since creation will ESTIMATE TOTAL member counts from the server's creation date to today.\n\n" +
+                "This may write many days of data and can take a while.\n\n" +
+                "It still cannot account for leavers.\n\n" +
+                "Continue?"
+            );
+            if (!ok) return;
+
+            showLoading();
+
+            try {
+                const res = await fetch('/api/discord/stats/members/backfill', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ since_creation: true, force: false })
                 });
                 const data = await res.json();
                 if (!res.ok || data.error) {

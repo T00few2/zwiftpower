@@ -2398,6 +2398,22 @@ def _parse_discord_iso_datetime(value: str) -> Optional[datetime]:
     except Exception:
         return None
 
+def _discord_snowflake_created_at_utc(snowflake_id: str) -> Optional[datetime]:
+    """
+    Derive creation timestamp from a Discord snowflake ID.
+    Discord epoch: 2015-01-01T00:00:00.000Z
+    """
+    try:
+        if not isinstance(snowflake_id, str) or not snowflake_id.strip():
+            return None
+        sf = int(snowflake_id)
+        # 42-bit timestamp in ms since Discord epoch, stored in the top bits
+        discord_epoch_ms = 1420070400000
+        ts_ms = (sf >> 22) + discord_epoch_ms
+        return datetime.fromtimestamp(ts_ms / 1000.0, tz=pytz.utc)
+    except Exception:
+        return None
+
 @app.route('/api/discord/stats/members/backfill', methods=['POST'])
 @login_required
 def backfill_member_counts():
@@ -2411,16 +2427,29 @@ def backfill_member_counts():
         body = request.get_json(silent=True) or {}
         days = body.get('days', 90)
         force = bool(body.get('force', False))
-
-        try:
-            days = int(days)
-        except Exception:
-            days = 90
-        days = max(1, min(days, 365))
+        since_creation = bool(body.get('since_creation', False))
 
         cet = pytz.timezone('Europe/Berlin')
         end_date = datetime.now(cet).date()
-        start_date = end_date - timedelta(days=days - 1)
+
+        if since_creation:
+            created_at_utc = _discord_snowflake_created_at_utc(DISCORD_GUILD_ID)
+            if not created_at_utc:
+                return jsonify({"error": "Unable to determine server creation time from DISCORD_GUILD_ID"}), 400
+            start_date = created_at_utc.astimezone(cet).date()
+            days = (end_date - start_date).days + 1
+        else:
+            try:
+                days = int(days)
+            except Exception:
+                days = 90
+            # allow larger ranges, but keep a hard cap for safety
+            days = max(1, min(days, 5000))
+            start_date = end_date - timedelta(days=days - 1)
+
+        # Hard cap safety: avoid accidentally writing extreme ranges
+        if days > 5000:
+            return jsonify({"error": "Requested range too large (max 5000 days)"}), 400
 
         # Pull current members once
         discord_api = DiscordAPI(DISCORD_BOT_TOKEN, DISCORD_GUILD_ID)
@@ -2442,30 +2471,47 @@ def backfill_member_counts():
         written = 0
         skipped = 0
 
+        # Batch writes for speed (Firestore batch limit: 500 operations)
+        batch = firebase.db.batch()
+        batch_ops = 0
+
         d = start_date
+        now_utc_iso = datetime.utcnow().isoformat() + "Z"
         while d <= end_date:
             date_key = d.strftime('%Y-%m-%d')
             doc_ref = col.document(date_key)
-            existing = doc_ref.get()
-            if existing.exists and not force:
-                skipped += 1
-                d += timedelta(days=1)
-                continue
+
+            if not force:
+                existing = doc_ref.get()
+                if existing.exists:
+                    skipped += 1
+                    d += timedelta(days=1)
+                    continue
 
             member_count = bisect_right(total_join_dates, d)
 
             snapshot = {
                 "dateKey": date_key,
-                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "timestamp": now_utc_iso,
                 "memberCount": int(member_count),
                 "estimated": True,
                 "estimatedMode": "cohort_joined_at",
-                "estimatedAt": datetime.utcnow().isoformat() + "Z",
+                "estimatedAt": now_utc_iso,
             }
 
-            doc_ref.set(snapshot, merge=True)
+            batch.set(doc_ref, snapshot, merge=True)
+            batch_ops += 1
             written += 1
+
+            if batch_ops >= 450:
+                batch.commit()
+                batch = firebase.db.batch()
+                batch_ops = 0
+
             d += timedelta(days=1)
+
+        if batch_ops > 0:
+            batch.commit()
 
         return jsonify({
             "status": "ok",
