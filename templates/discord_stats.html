@@ -276,6 +276,16 @@
             </div>
 
             <div class="control-group">
+                <label for="members-period-select">Members Range:</label>
+                <select id="members-period-select">
+                    <option value="30" selected>Last 30 days</option>
+                    <option value="90">Last 90 days</option>
+                    <option value="365">Last 365 days</option>
+                    <option value="all">All time (backfill)</option>
+                </select>
+            </div>
+
+            <div class="control-group">
                 <label for="role-select">Roles:</label>
                 <select id="role-select" multiple>
                     <!-- populated on load -->
@@ -406,6 +416,14 @@
                 loadData();
             });
 
+            // Members range change
+            const membersPeriodSelect = document.getElementById('members-period-select');
+            if (membersPeriodSelect) {
+                membersPeriodSelect.addEventListener('change', function() {
+                    loadData();
+                });
+            }
+
             // Role selection change
             const roleSelect = document.getElementById('role-select');
             if (roleSelect) {
@@ -441,7 +459,8 @@
         }
 
         async function runEstimatedBackfill() {
-            const period = document.getElementById('period-select').value;
+            const membersPeriodRaw = document.getElementById('members-period-select')?.value || '30';
+            const membersDays = (membersPeriodRaw === 'all') ? 5000 : Number(membersPeriodRaw);
             const ok = confirm(
                 "Backfill will ESTIMATE past TOTAL member counts using current members' join dates.\n\n" +
                 "It cannot account for leavers.\n\n" +
@@ -455,7 +474,7 @@
                 const res = await fetch('/api/discord/stats/members/backfill', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ days: Number(period), force: false })
+                    body: JSON.stringify({ days: Number(membersDays), force: false })
                 });
                 const data = await res.json();
                 if (!res.ok || data.error) {
@@ -511,6 +530,8 @@
         async function loadData() {
             const period = document.getElementById('period-select').value;
             const roleIds = getSelectedRoleIds();
+            const membersPeriodRaw = document.getElementById('members-period-select')?.value || '30';
+            const membersDays = (membersPeriodRaw === 'all') ? 5000 : Number(membersPeriodRaw);
             
             showLoading();
             
@@ -525,8 +546,8 @@
 
                 // Load member count history
                 const membersUrl = roleIds.length
-                    ? `/api/discord/stats/members?days=${period}&role_ids=${encodeURIComponent(roleIds.join(','))}`
-                    : `/api/discord/stats/members?days=${period}`;
+                    ? `/api/discord/stats/members?days=${membersDays}&role_ids=${encodeURIComponent(roleIds.join(','))}`
+                    : `/api/discord/stats/members?days=${membersDays}`;
                 const membersResponse = await fetch(membersUrl);
                 const membersData = await membersResponse.json();
                 

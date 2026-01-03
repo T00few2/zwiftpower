@@ -2530,7 +2530,8 @@ def get_daily_member_counts():
     """Get daily Discord member counts for charts (y=members, x=date). Supports role filtering."""
     try:
         days = request.args.get('days', default=30, type=int)
-        days = max(1, min(days, 365))
+        # Allow long ranges for backfilled totals (server creation can be multiple years)
+        days = max(1, min(days, 5000))
         role_ids_param = request.args.get('role_ids', default='', type=str) or ''
         role_ids = [r.strip() for r in role_ids_param.split(',') if r.strip()]
 
