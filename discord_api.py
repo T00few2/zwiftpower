@@ -74,6 +74,32 @@ class DiscordAPI:
         except requests.RequestException as e:
             print(f"Error fetching guild roles: {e}")
             return {}
+
+    def get_guild_member_counts(self) -> Dict[str, Any]:
+        """
+        Fetch guild-level counts (member count, presence count when available).
+        
+        Uses Discord's guild endpoint with `with_counts=true` which returns
+        approximate counts without enumerating all members.
+        
+        Returns:
+            Dict[str, Any]: Dict containing keys like `approximate_member_count`
+                            and `approximate_presence_count` when available.
+        """
+        try:
+            response = requests.get(
+                f"{self.api_base_url}/guilds/{self.guild_id}?with_counts=true",
+                headers=self.headers,
+            )
+            response.raise_for_status()
+            data = response.json() or {}
+            return {
+                "approximate_member_count": data.get("approximate_member_count"),
+                "approximate_presence_count": data.get("approximate_presence_count"),
+            }
+        except requests.RequestException as e:
+            print(f"Error fetching guild counts: {e}")
+            return {}
     
     def get_all_members(self, limit: int = 1000, include_role_names: bool = True) -> List[Dict[str, Any]]:
         """

@@ -2323,6 +2323,137 @@ def get_daily_discord_stats():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+def _record_daily_member_count_snapshot() -> None:
+    """
+    Record a daily snapshot of Discord member count in Firestore.
+    
+    Stores/updates one document per day in collection `server_member_counts`,
+    using `dateKey` (YYYY-MM-DD) as the document ID.
+    """
+    try:
+        # Use Central European Time for dateKey consistency with other dashboards
+        cet = pytz.timezone('Europe/Berlin')
+        now_cet = datetime.now(cet)
+        date_key = now_cet.strftime('%Y-%m-%d')
+
+        # Prefer lightweight guild counts for total; but we still enumerate members to compute role counts
+        discord_api = DiscordAPI(DISCORD_BOT_TOKEN, DISCORD_GUILD_ID)
+        counts = discord_api.get_guild_member_counts()
+        member_count = counts.get("approximate_member_count")
+        presence_count = counts.get("approximate_presence_count")
+
+        role_counts = {}
+        try:
+            # Enumerate members to compute role membership counts (roleId -> count)
+            all_members = discord_api.get_all_members(limit=200000, include_role_names=False)
+            for m in all_members:
+                for role_id in (m.get("role_ids") or []):
+                    if isinstance(role_id, str) and role_id:
+                        role_counts[role_id] = role_counts.get(role_id, 0) + 1
+            # If lightweight count wasn't available, use enumerated count
+            if not isinstance(member_count, int):
+                member_count = len(all_members)
+        except Exception:
+            # If enumeration fails, we can still store total member count if available
+            all_members = None
+
+        if not isinstance(member_count, int):
+            return
+
+        snapshot = {
+            "dateKey": date_key,
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "memberCount": int(member_count),
+        }
+        if isinstance(presence_count, int):
+            snapshot["presenceCount"] = int(presence_count)
+        if isinstance(role_counts, dict) and role_counts:
+            snapshot["roleCounts"] = role_counts
+
+        firebase.db.collection('server_member_counts').document(date_key).set(snapshot, merge=True)
+    except Exception as e:
+        try:
+            logging.warning(f"Failed to record daily member count snapshot: {e}")
+        except Exception:
+            pass
+
+@app.route('/api/discord/stats/members', methods=['GET'])
+@login_required
+def get_daily_member_counts():
+    """Get daily Discord member counts for charts (y=members, x=date). Supports role filtering."""
+    try:
+        days = request.args.get('days', default=30, type=int)
+        days = max(1, min(days, 365))
+        role_ids_param = request.args.get('role_ids', default='', type=str) or ''
+        role_ids = [r.strip() for r in role_ids_param.split(',') if r.strip()]
+
+        cet = pytz.timezone('Europe/Berlin')
+        end_date = datetime.now(cet).date()
+        start_date = end_date - timedelta(days=days - 1)
+
+        start_key = start_date.strftime('%Y-%m-%d')
+        end_key = end_date.strftime('%Y-%m-%d')
+
+        docs = (
+            firebase.db.collection('server_member_counts')
+            .where('dateKey', '>=', start_key)
+            .where('dateKey', '<=', end_key)
+            .order_by('dateKey')
+            .stream()
+        )
+
+        result = []
+        for doc in docs:
+            d = doc.to_dict() or {}
+            date_key = d.get('dateKey')
+            member_count = d.get('memberCount')
+            if not date_key or not isinstance(member_count, int):
+                continue
+            row = {
+                "date": date_key,
+                "members": member_count,
+            }
+            if role_ids:
+                role_counts = d.get('roleCounts') or {}
+                selected = {}
+                if isinstance(role_counts, dict):
+                    for rid in role_ids:
+                        v = role_counts.get(rid)
+                        if isinstance(v, int):
+                            selected[rid] = v
+                row["roles"] = selected
+            result.append(row)
+
+        return jsonify({
+            "period": {"days": days, "start": start_key, "end": end_key},
+            "daily_members": result
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/discord/stats/roles', methods=['GET'])
+@login_required
+def get_discord_roles_for_stats():
+    """Return guild roles for role selection in the stats UI."""
+    try:
+        discord_api = DiscordAPI(DISCORD_BOT_TOKEN, DISCORD_GUILD_ID)
+        roles_lookup = discord_api.get_guild_roles() or {}
+        roles = []
+        for role_id, role in roles_lookup.items():
+            name = role.get("name")
+            if not isinstance(role_id, str) or not role_id:
+                continue
+            if not isinstance(name, str) or not name:
+                continue
+            # Hide @everyone from UI; it matches guild id and isn't useful as a filter
+            if name == "@everyone":
+                continue
+            roles.append({"id": role_id, "name": name})
+        roles.sort(key=lambda r: r["name"].lower())
+        return jsonify({"roles": roles})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/discord/stats/top-users', methods=['GET'])
 @login_required
 def get_top_users():
@@ -2464,6 +2595,7 @@ def get_top_channels():
 @login_required
 def discord_stats():
     """Discord server statistics dashboard"""
+    _record_daily_member_count_snapshot()
     return render_template('discord_stats.html')
 
 # Optional debug endpoint to verify data exists
