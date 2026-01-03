@@ -284,6 +284,9 @@
             <button onclick="refreshData()" style="padding: 8px 16px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer;">
                 🔄 Refresh Data
             </button>
+            <button onclick="runEstimatedBackfill()" style="padding: 8px 16px; background: #2d3748; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                🧩 Backfill (estimate)
+            </button>
         </div>
 
         <div id="loading" class="loading">
@@ -432,6 +435,40 @@
         
         function refreshData() {
             loadData();
+        }
+
+        async function runEstimatedBackfill() {
+            const period = document.getElementById('period-select').value;
+            const ok = confirm(
+                "Backfill will ESTIMATE past TOTAL member counts using current members' join dates.\n\n" +
+                "It cannot account for leavers.\n\n" +
+                "Continue?"
+            );
+            if (!ok) return;
+
+            showLoading();
+
+            try {
+                const res = await fetch('/api/discord/stats/members/backfill', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ days: Number(period), force: false })
+                });
+                const data = await res.json();
+                if (!res.ok || data.error) {
+                    console.error('Backfill error:', data);
+                    alert('Backfill failed. Check server logs.');
+                    showError();
+                    return;
+                }
+
+                alert(`Backfill complete: wrote ${data.written}, skipped ${data.skipped}.`);
+                await loadData();
+            } catch (e) {
+                console.error('Backfill request failed:', e);
+                alert('Backfill failed. Check console/server.');
+                showError();
+            }
         }
         
         async function loadData() {

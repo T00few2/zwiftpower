@@ -11,6 +11,8 @@ import firebase
 from discord_api import DiscordAPI
 from zwift import ZwiftAPI
 import pytz
+from bisect import bisect_right
+from typing import Optional
 from zwiftpower import ZwiftPower
 from zwiftcommentator import ZwiftCommentator
 
@@ -2376,6 +2378,105 @@ def _record_daily_member_count_snapshot() -> None:
             logging.warning(f"Failed to record daily member count snapshot: {e}")
         except Exception:
             pass
+
+def _parse_discord_iso_datetime(value: str) -> Optional[datetime]:
+    """
+    Parse Discord ISO timestamps (often ending with 'Z') into a timezone-aware datetime.
+    Returns None on parse failure.
+    """
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        # Discord typically returns e.g. "2024-01-02T03:04:05.678Z"
+        if value.endswith("Z"):
+            value = value[:-1] + "+00:00"
+        dt = datetime.fromisoformat(value)
+        if dt.tzinfo is None:
+            # Assume UTC if tz missing
+            dt = pytz.utc.localize(dt)
+        return dt
+    except Exception:
+        return None
+
+@app.route('/api/discord/stats/members/backfill', methods=['POST'])
+@login_required
+def backfill_member_counts():
+    """
+    Estimate historical member counts for missing days using current members' joined_at timestamps.
+
+    This is NOT a true historical reconstruction (leavers are unknown).
+    It counts the cohort of members currently in the guild who had joined by each day.
+    """
+    try:
+        body = request.get_json(silent=True) or {}
+        days = body.get('days', 90)
+        force = bool(body.get('force', False))
+
+        try:
+            days = int(days)
+        except Exception:
+            days = 90
+        days = max(1, min(days, 365))
+
+        cet = pytz.timezone('Europe/Berlin')
+        end_date = datetime.now(cet).date()
+        start_date = end_date - timedelta(days=days - 1)
+
+        # Pull current members once
+        discord_api = DiscordAPI(DISCORD_BOT_TOKEN, DISCORD_GUILD_ID)
+        members = discord_api.get_all_members(limit=200000, include_role_names=False)
+
+        # Build array of join dates (CET date) for totals
+        total_join_dates = []
+
+        for m in members:
+            joined_at = _parse_discord_iso_datetime(m.get('joined_at'))
+            if not joined_at:
+                continue
+            joined_date_cet = joined_at.astimezone(cet).date()
+            total_join_dates.append(joined_date_cet)
+
+        total_join_dates.sort()
+
+        col = firebase.db.collection('server_member_counts')
+        written = 0
+        skipped = 0
+
+        d = start_date
+        while d <= end_date:
+            date_key = d.strftime('%Y-%m-%d')
+            doc_ref = col.document(date_key)
+            existing = doc_ref.get()
+            if existing.exists and not force:
+                skipped += 1
+                d += timedelta(days=1)
+                continue
+
+            member_count = bisect_right(total_join_dates, d)
+
+            snapshot = {
+                "dateKey": date_key,
+                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "memberCount": int(member_count),
+                "estimated": True,
+                "estimatedMode": "cohort_joined_at",
+                "estimatedAt": datetime.utcnow().isoformat() + "Z",
+            }
+
+            doc_ref.set(snapshot, merge=True)
+            written += 1
+            d += timedelta(days=1)
+
+        return jsonify({
+            "status": "ok",
+            "period": {"days": days, "start": start_date.strftime('%Y-%m-%d'), "end": end_date.strftime('%Y-%m-%d')},
+            "written": written,
+            "skipped": skipped,
+            "note": "Estimated backfill uses current members + joined_at; leavers are not represented."
+        })
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/discord/stats/members', methods=['GET'])
 @login_required
