@@ -87,15 +87,33 @@ class ZwiftPower:
         resp.raise_for_status()  # Raise an exception for non-200
         return resp.json()
 
-    def get_team_results(self, club_id: int) -> dict:
+    def get_team_results(self, club_id: int, allowed_zwids: set[str] | None = None) -> dict:
         """
         Fetch JSON data about the team's results for a given team/club ID.
         Returns the parsed JSON as a dictionary.
+
+        If allowed_zwids is provided, filter the returned `data` rows at the source
+        so downstream analysis only considers those Zwift IDs.
         """
         url = f"https://zwiftpower.com/api3.php?do=team_results&id={club_id}"
         resp = self.session.get(url)
         resp.raise_for_status()
-        return resp.json()
+        payload = resp.json()
+
+        if allowed_zwids:
+            allowed = {str(z).strip() for z in allowed_zwids if str(z).strip()}
+            try:
+                rows = payload.get("data", [])
+                if isinstance(rows, list):
+                    payload["data"] = [
+                        r for r in rows
+                        if isinstance(r, dict) and str(r.get("zwid", "")).strip() in allowed
+                    ]
+            except Exception:
+                # Be defensive: if payload shape changes, don't break callers.
+                pass
+
+        return payload
 
     def _format_timestamp(self, timestamp):
         """

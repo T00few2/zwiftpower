@@ -257,13 +257,20 @@ def format_date(input_str: str) -> str:
     day = input_str[4:6]
     return f"{year}-{month}-{day}"
 
-def compare_rider_categories(today_raw: str, yesterday_raw: str) -> Dict[str, Any]:
+def compare_rider_categories(
+    today_raw: str,
+    yesterday_raw: str,
+    allowed_rider_ids: Optional[set[str]] = None,
+) -> Dict[str, Any]:
     """
     Compare rider categories between two dates to find riders who upgraded.
     
     Args:
         today_raw: Today's date in YYMMDD format
         yesterday_raw: Yesterday's date in YYMMDD format
+        allowed_rider_ids: Optional allowlist of rider IDs (Zwift IDs) to include.
+                          When provided, riders not in this set are excluded at the
+                          data source before any upgrade comparisons are computed.
         
     Returns:
         Dict containing comparison results with upgraded riders
@@ -317,13 +324,17 @@ def compare_rider_categories(today_raw: str, yesterday_raw: str) -> Dict[str, An
                 return v.strip() or None
             return str(v)
 
+        allowed: Optional[set[str]] = None
+        if allowed_rider_ids:
+            allowed = {str(r).strip() for r in allowed_rider_ids if str(r).strip()}
+
         # Normalize keys so today's/yesterday's lookup always matches (Firestore data can mix str/int IDs).
         today_map: Dict[str, Dict[str, Any]] = {}
         for r in today_riders:
             if not isinstance(r, dict):
                 continue
             rid = _norm_rider_id(r.get('riderId'))
-            if rid:
+            if rid and (allowed is None or rid in allowed):
                 today_map[rid] = r
 
         yesterday_map: Dict[str, Dict[str, Any]] = {}
@@ -331,7 +342,7 @@ def compare_rider_categories(today_raw: str, yesterday_raw: str) -> Dict[str, An
             if not isinstance(r, dict):
                 continue
             rid = _norm_rider_id(r.get('riderId'))
-            if rid:
+            if rid and (allowed is None or rid in allowed):
                 yesterday_map[rid] = r
 
         upgraded_zp_category = []
@@ -353,6 +364,7 @@ def compare_rider_categories(today_raw: str, yesterday_raw: str) -> Dict[str, An
             if (is_zp_category(today_cat) and is_zp_category(yesterday_cat) and 
                 today_cat != yesterday_cat and 
                 zp_category_rank[today_cat] > zp_category_rank[yesterday_cat]):
+                rider_id = int(rider_id_str) if rider_id_str.isdigit() else rider_id_str
                 upgraded_zp_category.append({
                     'riderId': rider_id,
                     'name': name,

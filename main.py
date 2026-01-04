@@ -66,6 +66,83 @@ VERIFIED_MEMBER_ROLE_ID = os.getenv(
     "DISCORD_VERIFIED_MEMBER_ROLE_ID", "1385216556166025347"
 )
 
+# Cache for verified Zwift IDs (to avoid enumerating all Discord members on every cron hit)
+_verified_zwift_ids_cache: Optional[set[str]] = None
+_verified_zwift_ids_cache_ts: Optional[float] = None
+VERIFIED_ZWIFT_IDS_CACHE_TTL_SECONDS = int(os.getenv("VERIFIED_ZWIFT_IDS_CACHE_TTL_SECONDS", "900"))  # 15 min
+
+
+def _get_verified_member_zwift_ids(force_refresh: bool = False) -> set[str]:
+    """
+    Return a set of Zwift IDs for Discord members who currently have the Verified Member role.
+
+    Source of truth:
+      - Discord guild member roles (role_ids)
+      - Firestore users collection for discordId -> zwiftId link
+    """
+    global _verified_zwift_ids_cache, _verified_zwift_ids_cache_ts
+
+    now = time.time()
+    if (not force_refresh
+        and _verified_zwift_ids_cache is not None
+        and _verified_zwift_ids_cache_ts is not None
+        and (now - _verified_zwift_ids_cache_ts) < VERIFIED_ZWIFT_IDS_CACHE_TTL_SECONDS):
+        return _verified_zwift_ids_cache
+
+    role_id = str(VERIFIED_MEMBER_ROLE_ID or "").strip()
+    if not role_id:
+        _verified_zwift_ids_cache = set()
+        _verified_zwift_ids_cache_ts = now
+        return _verified_zwift_ids_cache
+
+    guild_id = os.environ.get("DISCORD_GUILD_ID")
+    bot_token = os.environ.get("DISCORD_BOT_TOKEN")
+    if not guild_id or not bot_token:
+        # Don't hard-fail cron endpoints if env is misconfigured; just return empty allowlist.
+        _verified_zwift_ids_cache = set()
+        _verified_zwift_ids_cache_ts = now
+        return _verified_zwift_ids_cache
+
+    # Build discordId -> zwiftId lookup from Firestore users
+    discord_to_zwift: dict[str, str] = {}
+    try:
+        users = firebase.get_collection("users", limit=100000) or []
+        for u in users:
+            if not isinstance(u, dict):
+                continue
+            did = u.get("discordId")
+            zid = u.get("zwiftId")
+            did_s = str(did).strip() if did is not None else ""
+            zid_s = str(zid).strip() if zid is not None else ""
+            if did_s and zid_s:
+                discord_to_zwift[did_s] = zid_s
+    except Exception as e:
+        print(f"[WARN] Failed to load users for verified allowlist: {e}")
+        discord_to_zwift = {}
+
+    verified_zwift_ids: set[str] = set()
+    try:
+        discord_api = DiscordAPI(bot_token, guild_id)
+        members = discord_api.get_all_members(limit=100000, include_role_names=False) or []
+        for m in members:
+            if not isinstance(m, dict):
+                continue
+            discord_id = str(m.get("discordID") or "").strip()
+            if not discord_id:
+                continue
+            role_ids = [str(r) for r in (m.get("role_ids") or [])]
+            if role_id in role_ids:
+                zwift_id = discord_to_zwift.get(discord_id)
+                if zwift_id:
+                    verified_zwift_ids.add(str(zwift_id).strip())
+    except Exception as e:
+        print(f"[WARN] Failed to build verified allowlist from Discord: {e}")
+        verified_zwift_ids = set()
+
+    _verified_zwift_ids_cache = verified_zwift_ids
+    _verified_zwift_ids_cache_ts = now
+    return verified_zwift_ids
+
 CONTENT_API_KEY = os.getenv("CONTENT_API_KEY", "your_content_api_key")
 ZWIFT_CLUB_ID = os.getenv("ZWIFT_CLUB_ID", "")  # Optional default for roster refresh
 ZWIFTPOWER_CLUB_ID = os.getenv("ZWIFTPOWER_CLUB_ID", "")  # ZwiftPower team/club id for roster refresh (required)
@@ -415,7 +492,8 @@ def generate_and_post_commentary(club_id):
 
         zp = ZwiftPower(ZWIFT_USERNAME, ZWIFT_PASSWORD)
         zp.session = session
-        results = zp.get_team_results(club_id)
+        allowed_zwids = _get_verified_member_zwift_ids()
+        results = zp.get_team_results(club_id, allowed_zwids=allowed_zwids)
         results_summary = zp.analyze_team_results(results)
 
         print("[DEBUG] Team results fetched:", results)
@@ -456,7 +534,8 @@ def generate_and_post_upgrades():
 
         # Use firebase.compare_rider_categories instead of external API
         print(f"[DEBUG] Comparing rider categories between {today} and {yesterday}")
-        upgrade_data = firebase.compare_rider_categories(today, yesterday)
+        allowed_zwids = _get_verified_member_zwift_ids()
+        upgrade_data = firebase.compare_rider_categories(today, yesterday, allowed_rider_ids=allowed_zwids)
 
         # Be defensive: comparison should return a dict, but don't fail cron runs if it doesn't.
         if not isinstance(upgrade_data, dict):
