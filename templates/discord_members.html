@@ -177,6 +177,7 @@
                     <span>Unlinked: {{ unlinked_count }}</span>
                     {% if member_role_count is defined %}<span>With member role: {{ member_role_count }}</span>{% endif %}
                     {% if companion_count is defined %}<span>Companion members: {{ companion_count }}</span>{% endif %}
+                    {% if zwiftpower_count is defined %}<span>ZwiftPower members: {{ zwiftpower_count }}</span>{% endif %}
                 </div>
                 <div style="display: flex; gap: 10px;">
                     <a href="/dashboard" style="background: rgba(255,255,255,0.2); color: white; padding: 8px 16px; border-radius: 5px; text-decoration: none; font-size: 0.9em;">← Dashboard</a>
@@ -206,6 +207,10 @@
                     <input type="checkbox" id="filter-companion-member">
                     <span style="margin-left: 8px;">Only show companion club members</span>
                 </label>
+                <label style="display: flex; align-items: center; white-space: nowrap; margin-left: 16px;">
+                    <input type="checkbox" id="filter-zwiftpower-member">
+                    <span style="margin-left: 8px;">Only show ZwiftPower roster members</span>
+                </label>
             </div>
 
             <div class="filters" style="align-items: center;">
@@ -232,6 +237,7 @@
                             <th data-sort-key="roles" style="cursor: pointer; text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Roles <span class="sort-indicator"></span></th>
                             <th data-sort-key="zwiftId" style="cursor: pointer; text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Zwift ID <span class="sort-indicator"></span></th>
                             <th data-sort-key="companion" style="cursor: pointer; text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Companion <span class="sort-indicator"></span></th>
+                            <th data-sort-key="zwiftpower" style="cursor: pointer; text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">ZwiftPower <span class="sort-indicator"></span></th>
                             <th data-sort-key="zrsCat" style="cursor: pointer; text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">ZRS Cat <span class="sort-indicator"></span></th>
                             <th data-sort-key="zrsScore" style="cursor: pointer; text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">ZRS Score <span class="sort-indicator"></span></th>
                             <th data-sort-key="zpCat" style="cursor: pointer; text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Pace group <span class="sort-indicator"></span></th>
@@ -246,6 +252,7 @@
                             data-has-zwift="{{ member.has_zwift_id|lower }}"
                             data-has-member-role="{{ member.has_member_role|default(false)|lower }}"
                             data-is-companion="{{ member.is_companion_member|default(false)|lower }}"
+                            data-is-zwiftpower="{{ member.is_zwiftpower_member|default(false)|lower }}"
                             data-discord-id="{{ member.discordID }}"
                             data-username="{{ member.username }}"
                             data-display-name="{{ member.display_name }}"
@@ -271,6 +278,13 @@
                             <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">
                                 {% if member.is_companion_member %}
                                     <span class="role-tag" style="background:#57F287; color:#fff;">Yes</span>
+                                {% else %}
+                                    <span class="role-tag" style="background:#ddd; color:#333;">No</span>
+                                {% endif %}
+                            </td>
+                            <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">
+                                {% if member.is_zwiftpower_member %}
+                                    <span class="role-tag" style="background:#5865F2; color:#fff;">Yes</span>
                                 {% else %}
                                     <span class="role-tag" style="background:#ddd; color:#333;">No</span>
                                 {% endif %}
@@ -354,6 +368,11 @@
                 applyFilters();
             });
 
+            // Setup ZwiftPower roster membership filter checkbox
+            document.getElementById('filter-zwiftpower-member').addEventListener('change', function() {
+                applyFilters();
+            });
+
             // Build category filter options dynamically
             buildCategoryFilters();
             // Category filter listeners
@@ -401,6 +420,7 @@
             const filterType = document.getElementById('filter-type').value;
             const filterMemberRole = document.getElementById('filter-member-role').checked;
             const filterCompanion = document.getElementById('filter-companion-member').checked;
+            const filterZwiftPower = document.getElementById('filter-zwiftpower-member').checked;
             const zrsCat = document.getElementById('filter-zrs-cat').value;
             const zpCat = document.getElementById('filter-zp-cat').value;
             const veloCat = document.getElementById('filter-velo-cat').value;
@@ -436,6 +456,12 @@
                 if (filterCompanion) {
                     if (row.dataset.isCompanion !== 'true') matchesCompanion = false;
                 }
+
+                // Match ZwiftPower membership filter
+                let matchesZwiftPower = true;
+                if (filterZwiftPower) {
+                    if (row.dataset.isZwiftpower !== 'true') matchesZwiftPower = false;
+                }
                 // Match selected role from dropdown
                 let matchesSelectedRole = true;
                 if (roleFilter !== 'all') {
@@ -459,7 +485,7 @@
                 if (veloCat !== 'all' && rowVeloCat !== veloCat) matchesCats = false;
                 
                 // Show or hide based on all conditions
-                row.style.display = (matchesSearch && matchesFilter && matchesMemberRole && matchesCompanion && matchesSelectedRole && matchesCats) ? 'table-row' : 'none';
+                row.style.display = (matchesSearch && matchesFilter && matchesMemberRole && matchesCompanion && matchesZwiftPower && matchesSelectedRole && matchesCats) ? 'table-row' : 'none';
             });
         }
         
@@ -680,6 +706,9 @@
                 }
                 case 'companion': {
                     return row.dataset.isCompanion === 'true' ? 1 : 0;
+                }
+                case 'zwiftpower': {
+                    return row.dataset.isZwiftpower === 'true' ? 1 : 0;
                 }
                 case 'zrsCat':
                     return (row.dataset.zrsCat || '').toUpperCase();

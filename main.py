@@ -546,10 +546,23 @@ def get_discord_members():
             print(f"Warning: could not load companion_club_members: {comp_err}")
             companion_ids = set()
 
+        # Compute ZwiftPower roster membership flag by checking zwiftpower_club_members/{zwid}
+        zwiftpower_ids = set()
+        try:
+            zwiftpower_ids = set(
+                [doc.id for doc in firebase.db.collection("zwiftpower_club_members").stream()]
+            )
+        except Exception as zp_err:
+            print(f"Warning: could not load zwiftpower_club_members: {zp_err}")
+            zwiftpower_ids = set()
+
         for m in members:
             zwift_id = m.get("zwiftID")
             m["is_companion_member"] = bool(
                 zwift_id is not None and str(zwift_id) in companion_ids
+            )
+            m["is_zwiftpower_member"] = bool(
+                zwift_id is not None and str(zwift_id) in zwiftpower_ids
             )
             
         # For HTML requests, render the template with data
@@ -587,6 +600,7 @@ def get_discord_members():
             unlinked_count = len(members) - linked_count
             member_role_count = len([m for m in members if m.get("has_member_role")])
             companion_count = len([m for m in members if m.get("is_companion_member")])
+            zwiftpower_count = len([m for m in members if m.get("is_zwiftpower_member")])
             
             return render_template(
                 'discord_members.html',
@@ -596,6 +610,7 @@ def get_discord_members():
                 unlinked_count=unlinked_count,
                 member_role_count=member_role_count,
                 companion_count=companion_count,
+                zwiftpower_count=zwiftpower_count,
             )
         
         # For API requests, return JSON
