@@ -740,6 +740,162 @@ def assign_zwift_id():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
+@app.route('/api/discord/reconcile-verified-role', methods=['POST'])
+@login_required
+def reconcile_verified_member_role():
+    """
+    Reconcile the Verified Member role on Discord against current eligibility rules.
+
+    Current baseline eligibility: user has linked Zwift ID (users.discordId -> users.zwiftId).
+    Optional additional requirements (future-proofing):
+      - requireCompanion: Zwift ID exists in companion_club_members/{zwiftId}
+      - requireZwiftPower: Zwift ID exists in zwiftpower_club_members/{zwiftId}
+
+    Body (optional JSON):
+      {
+        "requireZwiftId": true,
+        "requireCompanion": false,
+        "requireZwiftPower": false,
+        "dryRun": false
+      }
+    """
+    try:
+        data = request.get_json(silent=True) or {}
+        require_zwift = bool(data.get("requireZwiftId", True))
+        require_companion = bool(data.get("requireCompanion", False))
+        require_zwiftpower = bool(data.get("requireZwiftPower", False))
+        dry_run = bool(data.get("dryRun", False))
+
+        role_id = str(VERIFIED_MEMBER_ROLE_ID or "").strip()
+        if not role_id:
+            return jsonify({"error": "VERIFIED_MEMBER_ROLE_ID not configured"}), 400
+
+        guild_id = os.environ.get("DISCORD_GUILD_ID")
+        bot_token = os.environ.get("DISCORD_BOT_TOKEN")
+        if not guild_id or not bot_token:
+            return jsonify({"error": "Discord env not configured (DISCORD_GUILD_ID/DISCORD_BOT_TOKEN)"}), 500
+
+        # Build discordId -> zwiftId lookup from Firebase users
+        discord_to_zwift = {}
+        try:
+            users = firebase.get_collection("users", limit=100000) or []
+            for u in users:
+                try:
+                    did = u.get("discordId")
+                    zid = u.get("zwiftId")
+                    if did is None:
+                        continue
+                    did_s = str(did).strip()
+                    if not did_s:
+                        continue
+                    # Store zid even if None; we'll validate per requirements later
+                    discord_to_zwift[did_s] = zid
+                except Exception:
+                    continue
+        except Exception as e:
+            return jsonify({"error": f"Failed to load users from Firebase: {str(e)}"}), 500
+
+        # Optional roster sets (loaded only if requested)
+        companion_ids = set()
+        zwiftpower_ids = set()
+        if require_companion:
+            try:
+                companion_ids = set([doc.id for doc in firebase.db.collection("companion_club_members").stream()])
+            except Exception as comp_err:
+                return jsonify({"error": f"Failed to load companion roster: {str(comp_err)}"}), 500
+        if require_zwiftpower:
+            try:
+                zwiftpower_ids = set([doc.id for doc in firebase.db.collection("zwiftpower_club_members").stream()])
+            except Exception as zp_err:
+                return jsonify({"error": f"Failed to load ZwiftPower roster: {str(zp_err)}"}), 500
+
+        # Fetch all Discord members (use high limit to avoid truncation)
+        discord_api = DiscordAPI(DISCORD_BOT_TOKEN, DISCORD_GUILD_ID)
+        members = discord_api.get_all_members(limit=100000, include_role_names=False) or []
+
+        headers = {"Authorization": f"Bot {bot_token}"}
+
+        result = {
+            "dry_run": dry_run,
+            "role_id": role_id,
+            "require_zwift_id": require_zwift,
+            "require_companion": require_companion,
+            "require_zwiftpower": require_zwiftpower,
+            "total_members": len(members),
+            "eligible": 0,
+            "ineligible": 0,
+            "added": 0,
+            "removed": 0,
+            "unchanged": 0,
+            "errors": 0,
+        }
+
+        for m in members:
+            discord_id = str(m.get("discordID") or "").strip()
+            if not discord_id:
+                continue
+            role_ids = [str(r) for r in (m.get("role_ids") or [])]
+            has_verified = role_id in role_ids
+
+            zwift_id = discord_to_zwift.get(discord_id)
+            has_zwift = zwift_id is not None and str(zwift_id).strip() != ""
+            zwift_id_str = str(zwift_id).strip() if has_zwift else ""
+
+            eligible = True
+            if require_zwift and not has_zwift:
+                eligible = False
+            if eligible and require_companion and zwift_id_str not in companion_ids:
+                eligible = False
+            if eligible and require_zwiftpower and zwift_id_str not in zwiftpower_ids:
+                eligible = False
+
+            if eligible:
+                result["eligible"] += 1
+            else:
+                result["ineligible"] += 1
+
+            # Only call Discord when a change is needed
+            if eligible and not has_verified:
+                if dry_run:
+                    result["added"] += 1
+                else:
+                    try:
+                        r = requests.put(
+                            f"https://discord.com/api/v10/guilds/{guild_id}/members/{discord_id}/roles/{role_id}",
+                            headers=headers,
+                        )
+                        if 200 <= r.status_code < 300:
+                            result["added"] += 1
+                        else:
+                            # 403/404 treated as non-fatal (missing perms / user not found)
+                            if r.status_code not in (403, 404):
+                                result["errors"] += 1
+                    except Exception:
+                        result["errors"] += 1
+            elif (not eligible) and has_verified:
+                if dry_run:
+                    result["removed"] += 1
+                else:
+                    try:
+                        r = requests.delete(
+                            f"https://discord.com/api/v10/guilds/{guild_id}/members/{discord_id}/roles/{role_id}",
+                            headers=headers,
+                        )
+                        # 204 expected; 404 ok (already absent)
+                        if r.status_code in (200, 202, 204, 404):
+                            result["removed"] += 1
+                        else:
+                            result["errors"] += 1
+                    except Exception:
+                        result["errors"] += 1
+            else:
+                result["unchanged"] += 1
+
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/member_outreach/send', methods=['POST'])
 @login_required
 def send_member_outreach():

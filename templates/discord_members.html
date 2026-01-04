@@ -309,6 +309,39 @@
         </div>
 
         <div class="assignment-panel">
+            <h2>Verified Role Tools</h2>
+            <p style="margin-top: 0; color: #666;">
+                Reconcile the <strong>Verified member</strong> role across the Discord server based on your current rules.
+                Default is <strong>linked Zwift ID</strong> only.
+            </p>
+
+            <div style="border: 1px solid #eee; border-radius: 8px; padding: 12px; background: #fafafa; margin-bottom: 16px;">
+                <label style="display:flex; align-items:center; gap:10px; margin: 6px 0;">
+                    <input type="checkbox" id="req-zwiftid" checked />
+                    <span>Require linked Zwift ID</span>
+                </label>
+                <label style="display:flex; align-items:center; gap:10px; margin: 6px 0;">
+                    <input type="checkbox" id="req-companion" />
+                    <span>Require Companion club roster membership</span>
+                </label>
+                <label style="display:flex; align-items:center; gap:10px; margin: 6px 0;">
+                    <input type="checkbox" id="req-zwiftpower" />
+                    <span>Require ZwiftPower club roster membership</span>
+                </label>
+                <label style="display:flex; align-items:center; gap:10px; margin: 6px 0;">
+                    <input type="checkbox" id="dry-run" />
+                    <span>Dry run (show counts, don’t change Discord)</span>
+                </label>
+
+                <button id="reconcile-verified-btn" type="button" style="margin-top: 10px;" onclick="reconcileVerifiedRole()">
+                    Reconcile Verified member role
+                </button>
+
+                <div id="reconcile-success" class="success-message" style="display:none;"></div>
+                <div id="reconcile-error" class="error-message" style="display:none;"></div>
+                <div id="reconcile-loading" class="loading" style="display:none;">Reconciling...</div>
+            </div>
+
             <h2>Assign Zwift ID</h2>
             <div id="selected-member-info" class="hidden">
                 <p>Selected: <span id="selected-member-name"></span></p>
@@ -631,6 +664,54 @@
             });
         }
         
+        async function reconcileVerifiedRole() {
+            const btn = document.getElementById('reconcile-verified-btn');
+            const loading = document.getElementById('reconcile-loading');
+            const okEl = document.getElementById('reconcile-success');
+            const errEl = document.getElementById('reconcile-error');
+
+            okEl.style.display = 'none';
+            errEl.style.display = 'none';
+            loading.style.display = 'block';
+            btn.disabled = true;
+
+            const payload = {
+                requireZwiftId: document.getElementById('req-zwiftid').checked,
+                requireCompanion: document.getElementById('req-companion').checked,
+                requireZwiftPower: document.getElementById('req-zwiftpower').checked,
+                dryRun: document.getElementById('dry-run').checked
+            };
+
+            try {
+                const res = await fetch('/api/discord/reconcile-verified-role', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    throw new Error(data.error || 'Reconcile failed');
+                }
+
+                const msg = `
+                    <strong>Done.</strong><br/>
+                    Total members: ${data.total_members ?? '-'}<br/>
+                    Eligible: ${data.eligible ?? '-'} | Ineligible: ${data.ineligible ?? '-'}<br/>
+                    Added: ${data.added ?? '-'} | Removed: ${data.removed ?? '-'} | Unchanged: ${data.unchanged ?? '-'}<br/>
+                    Errors: ${data.errors ?? '-'}<br/>
+                    <span style="color:#666;">${data.dry_run ? 'Dry run only (no Discord changes).' : 'Changes applied to Discord.'}</span>
+                `;
+                okEl.innerHTML = msg;
+                okEl.style.display = 'block';
+            } catch (e) {
+                errEl.textContent = e.message || String(e);
+                errEl.style.display = 'block';
+            } finally {
+                loading.style.display = 'none';
+                btn.disabled = false;
+            }
+        }
+
         function showSuccess(message) {
             const successEl = document.getElementById('success-message');
             successEl.textContent = message;
