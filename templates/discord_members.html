@@ -9,8 +9,8 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             line-height: 1.6;
             color: #333;
-            max-width: 1200px;
-            margin: 0 auto;
+            max-width: 100%;
+            margin: 0;
             padding: 20px;
             background-color: #f5f5f5;
         }
@@ -25,29 +25,27 @@
             align-items: center;
         }
         .main {
-            display: flex;
-            gap: 20px;
-            align-items: flex-start;
+            display: block;
         }
         .members-list {
-            flex: 1;
             background: white;
             border-radius: 8px;
             padding: 20px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            min-width: 0; /* allow the table to shrink; prevent sidebar from being pushed below */
+            width: 100%;
+            min-width: 0;
         }
-        .assignment-panel {
-            flex: 0 0 420px; /* keep tools visible */
-            min-width: 360px;
+        .tools-panel {
             background: white;
             border-radius: 8px;
             padding: 20px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            position: sticky;
-            top: 20px;
-            max-height: calc(100vh - 40px); /* sticky panel stays visible; content scrolls inside */
-            overflow: auto;
+            margin-bottom: 20px;
+        }
+        .tools-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
         }
         .member-card {
             border: 1px solid #ddd;
@@ -209,10 +207,9 @@
             padding: 12px;
             background: #fff;
         }
-        /* Small screens: stack panel on top so tools don't disappear off-screen */
+        /* Small screens: stack tools above table in a single column */
         @media (max-width: 1100px) {
-            .main { flex-direction: column; }
-            .assignment-panel { position: relative; top: auto; max-height: none; min-width: 0; flex: 1; }
+            .tools-grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -238,6 +235,79 @@
     </div>
 
     <div class="main">
+        <div class="tools-panel">
+            <div class="tools-grid">
+                <details class="tool-section">
+                    <summary>Verified Role Tools</summary>
+                    <div class="tool-section-body">
+                        <p style="margin-top: 0; color: #666;">
+                            Reconcile the <strong>Verified member</strong> role across the Discord server based on your current rules.
+                            Default is <strong>linked Zwift ID</strong> only.
+                        </p>
+
+                        <div style="border: 1px solid #eee; border-radius: 8px; padding: 12px; background: #fafafa;">
+                            <label style="display:flex; align-items:center; gap:10px; margin: 6px 0;">
+                                <input type="checkbox" id="req-zwiftid" checked />
+                                <span>Require linked Zwift ID</span>
+                            </label>
+                            <label style="display:flex; align-items:center; gap:10px; margin: 6px 0;">
+                                <input type="checkbox" id="req-companion" />
+                                <span>Require Companion club roster membership</span>
+                            </label>
+                            <label style="display:flex; align-items:center; gap:10px; margin: 6px 0;">
+                                <input type="checkbox" id="req-zwiftpower" />
+                                <span>Require ZwiftPower club roster membership</span>
+                            </label>
+                            <label style="display:flex; align-items:center; gap:10px; margin: 6px 0;">
+                                <input type="checkbox" id="dry-run" />
+                                <span>Dry run (show counts, don’t change Discord)</span>
+                            </label>
+
+                            <button id="reconcile-verified-btn" type="button" style="margin-top: 10px;" onclick="reconcileVerifiedRole()">
+                                Reconcile Verified member role
+                            </button>
+
+                            <div id="reconcile-success" class="success-message" style="display:none;"></div>
+                            <div id="reconcile-error" class="error-message" style="display:none;"></div>
+                            <div id="reconcile-loading" class="loading" style="display:none;">Reconciling...</div>
+                        </div>
+                    </div>
+                </details>
+
+                <details class="tool-section" open>
+                    <summary>Assign Zwift ID</summary>
+                    <div class="tool-section-body">
+                        <div id="selected-member-info" class="hidden">
+                            <p>Selected: <span id="selected-member-name"></span></p>
+                            <p>Username: <span id="selected-member-username"></span></p>
+                            <p>Discord ID: <span id="selected-discord-id"></span></p>
+                        </div>
+                        
+                        <div id="no-selection-message">
+                            <p>Select a member from the list to assign a Zwift ID.</p>
+                        </div>
+                        
+                        <div id="assignment-form" class="assignment-form hidden">
+                            <label for="zwift-rider-select">Select Zwift Rider:</label>
+                            <input type="text" id="zwift-search" placeholder="Search Zwift riders...">
+                            <select id="zwift-rider-select" size="10" style="height: 200px;">
+                                {% for rider in zwift_riders %}
+                                <option value="{{ rider.riderId|string }}">{{ rider.name }} (ID: {{ rider.riderId }})</option>
+                                {% endfor %}
+                            </select>
+                            
+                            <button id="assign-btn" onclick="assignZwiftID()">Assign Zwift ID</button>
+                            <button id="cancel-btn" onclick="cancelAssignment()" style="background-color: #ED4245;">Cancel</button>
+                            
+                            <div id="success-message" class="success-message"></div>
+                            <div id="error-message" class="error-message"></div>
+                            <div id="loading" class="loading">Processing...</div>
+                        </div>
+                    </div>
+                </details>
+            </div>
+        </div>
+
         <div class="members-list">
             <div class="filters">
                 <select id="filter-type">
@@ -356,77 +426,6 @@
                     </tbody>
                 </table>
             </div>
-        </div>
-
-        <div class="assignment-panel">
-            <details class="tool-section">
-                <summary>Verified Role Tools</summary>
-                <div class="tool-section-body">
-                    <p style="margin-top: 0; color: #666;">
-                        Reconcile the <strong>Verified member</strong> role across the Discord server based on your current rules.
-                        Default is <strong>linked Zwift ID</strong> only.
-                    </p>
-
-                    <div style="border: 1px solid #eee; border-radius: 8px; padding: 12px; background: #fafafa;">
-                        <label style="display:flex; align-items:center; gap:10px; margin: 6px 0;">
-                            <input type="checkbox" id="req-zwiftid" checked />
-                            <span>Require linked Zwift ID</span>
-                        </label>
-                        <label style="display:flex; align-items:center; gap:10px; margin: 6px 0;">
-                            <input type="checkbox" id="req-companion" />
-                            <span>Require Companion club roster membership</span>
-                        </label>
-                        <label style="display:flex; align-items:center; gap:10px; margin: 6px 0;">
-                            <input type="checkbox" id="req-zwiftpower" />
-                            <span>Require ZwiftPower club roster membership</span>
-                        </label>
-                        <label style="display:flex; align-items:center; gap:10px; margin: 6px 0;">
-                            <input type="checkbox" id="dry-run" />
-                            <span>Dry run (show counts, don’t change Discord)</span>
-                        </label>
-
-                        <button id="reconcile-verified-btn" type="button" style="margin-top: 10px;" onclick="reconcileVerifiedRole()">
-                            Reconcile Verified member role
-                        </button>
-
-                        <div id="reconcile-success" class="success-message" style="display:none;"></div>
-                        <div id="reconcile-error" class="error-message" style="display:none;"></div>
-                        <div id="reconcile-loading" class="loading" style="display:none;">Reconciling...</div>
-                    </div>
-                </div>
-            </details>
-
-            <details class="tool-section" open>
-                <summary>Assign Zwift ID</summary>
-                <div class="tool-section-body">
-                    <div id="selected-member-info" class="hidden">
-                        <p>Selected: <span id="selected-member-name"></span></p>
-                        <p>Username: <span id="selected-member-username"></span></p>
-                        <p>Discord ID: <span id="selected-discord-id"></span></p>
-                    </div>
-                    
-                    <div id="no-selection-message">
-                        <p>Select a member from the list to assign a Zwift ID.</p>
-                    </div>
-                    
-                    <div id="assignment-form" class="assignment-form hidden">
-                        <label for="zwift-rider-select">Select Zwift Rider:</label>
-                        <input type="text" id="zwift-search" placeholder="Search Zwift riders...">
-                        <select id="zwift-rider-select" size="10" style="height: 200px;">
-                            {% for rider in zwift_riders %}
-                            <option value="{{ rider.riderId|string }}">{{ rider.name }} (ID: {{ rider.riderId }})</option>
-                            {% endfor %}
-                        </select>
-                        
-                        <button id="assign-btn" onclick="assignZwiftID()">Assign Zwift ID</button>
-                        <button id="cancel-btn" onclick="cancelAssignment()" style="background-color: #ED4245;">Cancel</button>
-                        
-                        <div id="success-message" class="success-message"></div>
-                        <div id="error-message" class="error-message"></div>
-                        <div id="loading" class="loading">Processing...</div>
-                    </div>
-                </div>
-            </details>
         </div>
     </div>
 
