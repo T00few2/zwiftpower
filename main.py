@@ -68,6 +68,7 @@ VERIFIED_MEMBER_ROLE_ID = os.getenv(
 
 CONTENT_API_KEY = os.getenv("CONTENT_API_KEY", "your_content_api_key")
 ZWIFT_CLUB_ID = os.getenv("ZWIFT_CLUB_ID", "")  # Optional default for roster refresh
+ZWIFTPOWER_CLUB_ID = os.getenv("ZWIFTPOWER_CLUB_ID", "")  # ZwiftPower team/club id for roster refresh (required)
 
 def login_required(f):
     """Decorator to require Discord OAuth login with admin rights"""
@@ -185,6 +186,68 @@ def overwrite_companion_club_members_in_firestore(members: list[dict]) -> dict:
         if pid is None:
             continue
         upsert_ops.append(make_set_op(str(pid), m))
+
+    upserted_count = _commit_in_batches(upsert_ops)
+
+    return {
+        "memberCount": len(members or []),
+        "syncedAt": sync_ts.isoformat() + "Z",
+        "deleted": deleted_count,
+        "upserted": upserted_count,
+    }
+
+
+def overwrite_zwiftpower_club_members_in_firestore(members: list[dict]) -> dict:
+    """
+    Store ZwiftPower team_riders roster in Firestore, overwriting any previous data.
+
+    Collection:
+      - zwiftpower_club_members/{zwid}
+
+    Fields stored per doc:
+      - zwid (Zwift ID)
+      - name
+      - rank (numeric when possible)
+      - rankRaw (original rank value)
+      - rosterSyncedAt, updatedAt
+    """
+    sync_ts = datetime.utcnow()
+    col_ref = firebase.db.collection("zwiftpower_club_members")
+
+    # 1) Delete all existing docs (full overwrite)
+    existing_stream = col_ref.stream()
+
+    def make_delete_op(doc_ref):
+        def _op(batch):
+            batch.delete(doc_ref)
+        return _op
+
+    delete_ops = [make_delete_op(doc.reference) for doc in existing_stream]
+    deleted_count = _commit_in_batches(delete_ops)
+
+    # 2) Write fresh docs keyed by zwid
+    def make_set_op(doc_id: str, data: dict):
+        doc_ref = col_ref.document(str(doc_id))
+
+        def _op(batch):
+            batch.set(
+                doc_ref,
+                {
+                    **(data or {}),
+                    "rosterSyncedAt": sync_ts,
+                    "updatedAt": sync_ts,
+                },
+                merge=False,
+            )
+
+        return _op
+
+    upsert_ops = []
+    for m in members or []:
+        zwid = (m or {}).get("zwid")
+        if zwid is None:
+            continue
+        upsert_ops.append(make_set_op(str(zwid), m))
 
     upserted_count = _commit_in_batches(upsert_ops)
 
@@ -3903,6 +3966,92 @@ def refresh_default_zwift_club_roster():
 
     except Exception as e:
         print(f"Error refreshing default Zwift club roster: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/zwiftpower/club/roster/refresh', methods=['POST'])
+def refresh_zwiftpower_club_roster():
+    """
+    Refresh ZwiftPower team_riders roster for the configured club (ZWIFTPOWER_CLUB_ID)
+    and store it in Firestore.
+
+    Auth: Bearer CONTENT_API_KEY
+
+    Overwrites Firestore collection: zwiftpower_club_members
+    """
+    if not verify_api_key():
+        return jsonify({"error": "Unauthorized"}), 401
+
+    if not ZWIFTPOWER_CLUB_ID or not str(ZWIFTPOWER_CLUB_ID).strip():
+        return jsonify({"error": "ZWIFTPOWER_CLUB_ID is not configured"}), 400
+
+    club_id_str = str(ZWIFTPOWER_CLUB_ID or "").strip()
+
+    try:
+        club_id = int(club_id_str)
+    except Exception:
+        return jsonify({"error": "ZWIFTPOWER_CLUB_ID must be an integer"}), 400
+
+    try:
+        session = get_authenticated_session()
+        zp = ZwiftPower(ZWIFT_USERNAME, ZWIFT_PASSWORD)
+        zp.session = session
+
+        raw = zp.get_team_riders(club_id) or {}
+        rows = raw.get("data") or []
+
+        simplified = []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+
+            zwid = row.get("zwid")
+            if zwid is None:
+                continue
+
+            name = row.get("name")
+            if isinstance(name, str):
+                name = name.strip()
+            else:
+                name = None
+
+            rank_raw = row.get("rank")
+            rank_num = None
+
+            if isinstance(rank_raw, (int, float)):
+                rank_num = float(rank_raw)
+            elif isinstance(rank_raw, str):
+                s = rank_raw.strip().replace(",", ".")
+                if s:
+                    try:
+                        rank_num = float(s)
+                    except Exception:
+                        rank_num = None
+
+            simplified.append(
+                {
+                    "zwid": zwid,
+                    "name": name,
+                    "rank": rank_num,
+                    "rankRaw": rank_raw,
+                }
+            )
+
+        result = overwrite_zwiftpower_club_members_in_firestore(simplified)
+        return jsonify(
+            {
+                "status": "success",
+                "clubId": club_id,
+                "fetched": len(rows),
+                "stored": result["memberCount"],
+                "deleted": result["deleted"],
+                "upserted": result["upserted"],
+                "syncedAt": result["syncedAt"],
+            }
+        )
+
+    except Exception as e:
+        print(f"Error refreshing ZwiftPower club roster: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == '__main__':
