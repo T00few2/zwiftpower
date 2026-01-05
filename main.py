@@ -2278,6 +2278,60 @@ def membership_payments_csv():
         return resp
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/membership/payments/totals-per-year', methods=['GET'])
+@login_required
+def membership_payments_totals_per_year():
+    """
+    Aggregate succeeded payments by calendar year (based on paidAt, fallback to createdAt)
+    and return total amount (DKK) + count per year.
+    """
+    try:
+        payments = firebase.get_collection('payments', limit=100000, include_id=True) or []
+
+        totals = {}  # year -> {"totalAmountDkk": int, "count": int}
+
+        def parse_dt(val: str):
+            if not val:
+                return None
+            try:
+                # Accept ISO strings with Z suffix
+                return datetime.fromisoformat(str(val).replace('Z', '+00:00'))
+            except Exception:
+                return None
+
+        for p in payments:
+            try:
+                if str(p.get('status', '')).lower() != 'succeeded':
+                    continue
+
+                dt = parse_dt(p.get('paidAt') or '') or parse_dt(p.get('createdAt') or '')
+                if not dt:
+                    continue
+
+                year = int(dt.year)
+
+                amt_raw = p.get('amountDkk', None)
+                if amt_raw is None or amt_raw == '':
+                    continue
+                try:
+                    amt = int(float(amt_raw))
+                except Exception:
+                    continue
+
+                if year not in totals:
+                    totals[year] = {"totalAmountDkk": 0, "count": 0}
+                totals[year]["totalAmountDkk"] += amt
+                totals[year]["count"] += 1
+            except Exception:
+                continue
+
+        years = sorted(totals.keys(), reverse=True)
+        out = [{"year": y, **totals[y]} for y in years]
+        return jsonify({"totals": out})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 @app.route('/api/membership/reconcile-roles', methods=['POST'])
 @login_required
 def membership_reconcile_roles():
