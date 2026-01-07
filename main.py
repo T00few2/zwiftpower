@@ -2171,6 +2171,20 @@ def membership_payments_list():
         limit = int(request.args.get('limit', 100))
         status_filter = request.args.get('status', '').strip().lower()
         docs = firebase.get_collection('payments', limit=limit, include_id=True) or []
+
+        # Build discordId -> zwiftId lookup (to show Zwift ID in payments table)
+        discord_to_zwift: dict[str, str] = {}
+        try:
+            users = firebase.get_collection('users', limit=100000) or []
+            for u in users:
+                if not isinstance(u, dict):
+                    continue
+                did = str(u.get('discordId') or '').strip()
+                zid = str(u.get('zwiftId') or '').strip()
+                if did and zid:
+                    discord_to_zwift[did] = zid
+        except Exception:
+            discord_to_zwift = {}
         
         # Filter by status if provided
         if status_filter:
@@ -2178,6 +2192,10 @@ def membership_payments_list():
         
         # Normalize provider fields for UI
         for p in docs:
+            # Enrich with Zwift ID (from linked Discord user)
+            uid = str(p.get('userId') or '').strip()
+            p['zwiftId'] = discord_to_zwift.get(uid, '')
+
             provider = str(p.get('paymentProvider') or '').strip().lower() or 'unknown'
             p['provider'] = provider
 
@@ -2221,6 +2239,21 @@ def membership_payments_csv():
         import io, csv
         # Large limit to include all
         payments = firebase.get_collection('payments', limit=100000, include_id=True) or []
+
+        # Build discordId -> zwiftId lookup for CSV export
+        discord_to_zwift: dict[str, str] = {}
+        try:
+            users = firebase.get_collection('users', limit=100000) or []
+            for u in users:
+                if not isinstance(u, dict):
+                    continue
+                did = str(u.get('discordId') or '').strip()
+                zid = str(u.get('zwiftId') or '').strip()
+                if did and zid:
+                    discord_to_zwift[did] = zid
+        except Exception:
+            discord_to_zwift = {}
+
         # Sort by createdAt desc
         def parse_date(x):
             for field in ['createdAt', 'paidAt', 'updatedAt']:
@@ -2236,10 +2269,11 @@ def membership_payments_csv():
         buffer = io.StringIO()
         writer = csv.writer(buffer)
         writer.writerow([
-            'createdAt','paidAt','userId','fullName','userEmail','amountDkk','currency','status',
+            'createdAt','paidAt','userId','zwiftId','fullName','userEmail','amountDkk','currency','status',
             'coveredThroughYear','coversYears','provider','providerState','providerRef','reference'
         ])
         for p in payments:
+            zwift_id = discord_to_zwift.get(str(p.get('userId') or '').strip(), '')
             vipps = p.get('vipps') or {}
             checkout = p.get('checkout') or {}
             provider = str(p.get('paymentProvider') or '').strip().lower() or 'unknown'
@@ -2258,6 +2292,7 @@ def membership_payments_csv():
                 p.get('createdAt',''),
                 p.get('paidAt',''),
                 p.get('userId',''),
+                zwift_id,
                 p.get('fullName',''),
                 p.get('userEmail',''),
                 p.get('amountDkk',''),

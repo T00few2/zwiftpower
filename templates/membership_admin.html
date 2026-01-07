@@ -130,6 +130,7 @@
                   <th>Created</th>
                   <th>Status</th>
                   <th>Full name</th>
+                  <th>Zwift ID</th>
                   <th>Amount</th>
                   <th>Years</th>
                   <th>Provider</th>
@@ -139,7 +140,7 @@
                 </tr>
               </thead>
               <tbody id="paymentsTbody">
-                <tr><td colspan="9" class="muted">No data</td></tr>
+                <tr><td colspan="10" class="muted">No data</td></tr>
               </tbody>
             </table>
           </div>
@@ -327,7 +328,7 @@
         `;
         
         if (!list.length) {
-          tbody.innerHTML = '<tr><td colspan="9" class="muted">No payments found</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="10" class="muted">No payments found</td></tr>';
           return;
         }
         tbody.innerHTML = list.map(p => {
@@ -342,6 +343,7 @@
             <td>${formatDateTime(p.createdAt)}</td>
             <td><span class="status-badge ${statusClass}">${status || 'unknown'}</span></td>
             <td title="${fmt(p.userEmail)}">${fmt(p.fullName)}</td>
+            <td>${fmt(p.zwiftId)}</td>
             <td>${amt}</td>
             <td>${years}</td>
             <td>${provider}</td>
