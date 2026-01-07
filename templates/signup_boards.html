@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📋 Signup Boards - DZR Admin Dashboard</title>
+    
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📋</text></svg>">
+    <meta name="theme-color" content="#667eea">
+    
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+            min-height: 100vh;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .logo {
+            font-size: 2em;
+        }
+        
+        .header-title {
+            margin: 0;
+            font-size: 1.5em;
+            font-weight: 300;
+        }
+        
+        .breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-left: 20px;
+            opacity: 0.8;
+        }
+        
+        .breadcrumb a {
+            color: white;
+            text-decoration: none;
+            opacity: 0.8;
+        }
+        
+        .breadcrumb a:hover {
+            opacity: 1;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 30px 20px;
+        }
+        
+        .action-bar {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 30px;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9em;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: white;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: white;
+            color: #666;
+            border: 1px solid #ddd;
+        }
+        
+        .btn-secondary:hover {
+            background: #f8f9fa;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+        }
+        
+        .btn-danger:hover {
+            background: #c82333;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+            transition: transform 0.2s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-2px);
+        }
+        
+        .card-header {
+            padding: 15px 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .card-title {
+            margin: 0;
+            font-size: 1.1em;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .card-body {
+            padding: 20px;
+        }
+        
+        .card-desc {
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 15px;
+            min-height: 40px;
+        }
+        
+        .option-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            margin-right: 5px;
+            margin-bottom: 5px;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .action-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.1em;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+        }
+        
+        .action-btn:hover {
+            opacity: 1;
+        }
+        
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            backdrop-filter: blur(5px);
+            overflow-y: auto;
+        }
+        
+        .modal-content {
+            background: white;
+            margin: 50px auto;
+            border-radius: 12px;
+            max-width: 800px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            position: relative;
+        }
+        
+        .modal-header {
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 12px 12px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .close-modal {
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            background: none;
+            border: none;
+        }
+        
+        .modal-body {
+            padding: 20px;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+        
+        .form-control {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 1em;
+        }
+        
+        .options-container {
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 10px;
+            margin-top: 10px;
+        }
+        
+        .option-row {
+            display: grid;
+            grid-template-columns: 60px 1fr 1fr 150px 40px;
+            gap: 10px;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+        
+        .option-header {
+            font-weight: 600;
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        
+        .remove-option {
+            color: #dc3545;
+            cursor: pointer;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .alert {
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .alert-success { background: #d4edda; color: #155724; }
+        .alert-danger { background: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <div class="header-left">
+                <div class="logo">📋</div>
+                <h1 class="header-title">Signup Boards</h1>
+                <div class="breadcrumb">
+                    <a href="/">Dashboard</a>
+                    <span>›</span>
+                    <span>Signup Boards</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="alert alert-success" id="successAlert"></div>
+        <div class="alert alert-danger" id="errorAlert"></div>
+
+        <div class="action-bar">
+            <button class="btn btn-primary" onclick="openCreateModal()">
+                ➕ Create New Board
+            </button>
+        </div>
+
+        <div id="loading" style="text-align: center; padding: 40px;">
+            Loading...
+        </div>
+
+        <div class="grid" id="boardsGrid"></div>
+    </div>
+
+    <!-- Create/Edit Modal -->
+    <div id="boardModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title" id="modalTitle">Create Signup Board</h2>
+                <button class="close-modal" onclick="closeModal('boardModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="boardForm">
+                    <input type="hidden" id="boardId">
+                    
+                    <div class="form-group">
+                        <label class="form-label">Title</label>
+                        <input type="text" class="form-control" id="title" required placeholder="e.g. Sunday Social Ride">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" id="description" rows="3" placeholder="Description of the event..."></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Required Role (Global)</label>
+                        <select class="form-control" id="requiredRole">
+                            <option value="">No global requirement</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">
+                            <input type="checkbox" id="allowMultiple"> Allow selecting multiple options
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Options</label>
+                        <div class="options-container">
+                            <div class="option-row option-header">
+                                <div>Emoji</div>
+                                <div>Label</div>
+                                <div>Value (ID)</div>
+                                <div>Role Req.</div>
+                                <div></div>
+                            </div>
+                            <div id="optionsList"></div>
+                            <button type="button" class="btn btn-secondary" onclick="addOptionRow()" style="margin-top: 10px; width: 100%;">
+                                ➕ Add Option
+                            </button>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                        <button type="button" class="btn btn-secondary" onclick="closeModal('boardModal')">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save Board</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let guildRoles = [];
+        let boards = [];
+
+        async function loadData() {
+            try {
+                const [rolesResp, boardsResp] = await Promise.all([
+                    fetch('/api/roles/guild-roles'),
+                    fetch('/api/signup-boards')
+                ]);
+                
+                const rolesData = await rolesResp.json();
+                guildRoles = rolesData.roles || [];
+                
+                const boardsData = await boardsResp.json();
+                boards = boardsData.boards || [];
+                
+                renderBoards();
+                populateRoleSelects();
+                document.getElementById('loading').style.display = 'none';
+            } catch (e) {
+                showError("Failed to load data: " + e.message);
+            }
+        }
+
+        function renderBoards() {
+            const grid = document.getElementById('boardsGrid');
+            if (boards.length === 0) {
+                grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #666;">No signup boards found. Create one!</div>';
+                return;
+            }
+            
+            grid.innerHTML = boards.map(board => `
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">${escapeHtml(board.title)}</h3>
+                        <div class="actions">
+                            <button class="action-btn" onclick="editBoard('${board.id}')" title="Edit">✏️</button>
+                            <button class="action-btn" onclick="deleteBoard('${board.id}')" title="Delete" style="color:#dc3545">🗑️</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="card-desc">${escapeHtml(board.description || '')}</div>
+                        <div>
+                            ${(board.options || []).map(opt => `
+                                <span class="option-badge">${opt.emoji} ${escapeHtml(opt.label)}</span>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function populateRoleSelects() {
+            const globalSelect = document.getElementById('requiredRole');
+            const opts = '<option value="">No requirement</option>' + 
+                guildRoles.map(r => `<option value="${r.id}">${escapeHtml(r.name)}</option>`).join('');
+            globalSelect.innerHTML = opts;
+        }
+
+        function getRoleOptionsHtml(selectedId) {
+             return '<option value="">None</option>' + 
+                guildRoles.map(r => `<option value="${r.id}" ${r.id === selectedId ? 'selected' : ''}>${escapeHtml(r.name)}</option>`).join('');
+        }
+
+        function addOptionRow(data = {}) {
+            const list = document.getElementById('optionsList');
+            const div = document.createElement('div');
+            div.className = 'option-row';
+            div.innerHTML = `
+                <input type="text" class="form-control" placeholder="Emoji" value="${escapeHtml(data.emoji || '')}" name="opt_emoji" required>
+                <input type="text" class="form-control" placeholder="Label" value="${escapeHtml(data.label || '')}" name="opt_label" required>
+                <input type="text" class="form-control" placeholder="Value" value="${escapeHtml(data.value || '')}" name="opt_value" required>
+                <select class="form-control" name="opt_role">
+                    ${getRoleOptionsHtml(data.roleId)}
+                </select>
+                <div class="remove-option" onclick="this.parentElement.remove()">✕</div>
+            `;
+            list.appendChild(div);
+        }
+
+        function openCreateModal() {
+            document.getElementById('modalTitle').textContent = 'Create Signup Board';
+            document.getElementById('boardId').value = '';
+            document.getElementById('boardForm').reset();
+            document.getElementById('optionsList').innerHTML = '';
+            addOptionRow(); // Add one default row
+            document.getElementById('boardModal').style.display = 'block';
+        }
+
+        function editBoard(id) {
+            const board = boards.find(b => b.id === id);
+            if (!board) return;
+
+            document.getElementById('modalTitle').textContent = 'Edit Signup Board';
+            document.getElementById('boardId').value = board.id;
+            document.getElementById('title').value = board.title;
+            document.getElementById('description').value = board.description || '';
+            document.getElementById('requiredRole').value = board.requiredRole || '';
+            document.getElementById('allowMultiple').checked = !!board.allowMultiple;
+            
+            const list = document.getElementById('optionsList');
+            list.innerHTML = '';
+            (board.options || []).forEach(opt => addOptionRow(opt));
+            
+            document.getElementById('boardModal').style.display = 'block';
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).style.display = 'none';
+        }
+
+        document.getElementById('boardForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('boardId').value;
+            
+            // Collect options
+            const options = [];
+            const rows = document.querySelectorAll('#optionsList .option-row');
+            rows.forEach(row => {
+                options.push({
+                    emoji: row.querySelector('[name="opt_emoji"]').value,
+                    label: row.querySelector('[name="opt_label"]').value,
+                    value: row.querySelector('[name="opt_value"]').value,
+                    roleId: row.querySelector('[name="opt_role"]').value || null
+                });
+            });
+
+            const data = {
+                title: document.getElementById('title').value,
+                description: document.getElementById('description').value,
+                requiredRole: document.getElementById('requiredRole').value || null,
+                allowMultiple: document.getElementById('allowMultiple').checked,
+                options: options
+            };
+
+            const method = id ? 'PUT' : 'POST';
+            const url = id ? `/api/signup-boards/${id}` : '/api/signup-boards';
+
+            try {
+                const resp = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                if (!resp.ok) throw new Error(await resp.text());
+                
+                showSuccess(`Board ${id ? 'updated' : 'created'} successfully`);
+                closeModal('boardModal');
+                loadData();
+            } catch (err) {
+                showError(err.message);
+            }
+        });
+
+        async function deleteBoard(id) {
+            if (!confirm("Are you sure?")) return;
+            try {
+                const resp = await fetch(`/api/signup-boards/${id}`, { method: 'DELETE' });
+                if (!resp.ok) throw new Error(await resp.text());
+                showSuccess("Board deleted");
+                loadData();
+            } catch (err) {
+                showError(err.message);
+            }
+        }
+
+        function showSuccess(msg) {
+            const el = document.getElementById('successAlert');
+            el.textContent = msg;
+            el.style.display = 'block';
+            setTimeout(() => el.style.display = 'none', 3000);
+        }
+
+        function showError(msg) {
+            const el = document.getElementById('errorAlert');
+            el.textContent = msg;
+            el.style.display = 'block';
+            setTimeout(() => el.style.display = 'none', 5000);
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        loadData();
+    </script>
+</body>
+</html>
+

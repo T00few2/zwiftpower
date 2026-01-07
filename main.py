@@ -4358,6 +4358,87 @@ def refresh_zwiftpower_club_roster():
         print(f"Error refreshing ZwiftPower club roster: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
+@app.route('/signup-boards', methods=['GET'])
+@login_required
+def signup_boards_page():
+    """Signup boards management page"""
+    return render_template('signup_boards.html')
+
+@app.route('/api/signup-boards', methods=['GET'])
+@login_required
+def get_signup_boards():
+    """Get all signup board configurations"""
+    try:
+        boards = firebase.get_collection("signup_board_configs", include_id=True)
+        return jsonify({"boards": boards})
+    except Exception as e:
+        print(f"Error fetching signup boards: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/signup-boards', methods=['POST'])
+@login_required
+def create_signup_board():
+    """Create a new signup board configuration"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+            
+        if not data.get('title'):
+            return jsonify({"error": "Title is required"}), 400
+
+        import uuid
+        board_id = str(uuid.uuid4())
+        
+        data['createdAt'] = datetime.now()
+        data['updatedAt'] = datetime.now()
+        
+        success = firebase.set_document("signup_board_configs", board_id, data)
+        
+        if success:
+            return jsonify({"message": "Board created", "id": board_id}), 201
+        else:
+            return jsonify({"error": "Failed to create board"}), 500
+            
+    except Exception as e:
+        print(f"Error creating signup board: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/signup-boards/<board_id>', methods=['PUT'])
+@login_required
+def update_signup_board(board_id):
+    """Update a signup board configuration"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+            
+        data['updatedAt'] = datetime.now()
+        
+        success = firebase.set_document("signup_board_configs", board_id, data, merge=True)
+        
+        if success:
+            return jsonify({"message": "Board updated"}), 200
+        else:
+            return jsonify({"error": "Failed to update board"}), 500
+            
+    except Exception as e:
+        print(f"Error updating signup board: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/signup-boards/<board_id>', methods=['DELETE'])
+@login_required
+def delete_signup_board(board_id):
+    """Delete a signup board configuration"""
+    try:
+        success = firebase.delete_document("signup_board_configs", board_id)
+        if success:
+            return jsonify({"message": "Board deleted"}), 200
+        else:
+            return jsonify({"error": "Failed to delete board"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 8080))
     app.run(host='0.0.0.0', port=port)
