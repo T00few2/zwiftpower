@@ -435,6 +435,11 @@
                     </div>
                     <div class="card-body">
                         <div class="card-desc">${escapeHtml(board.description || '')}</div>
+                        <div style="margin-bottom: 15px; display: flex; align-items: center; gap: 8px; font-size: 0.85em; color: #666; background: #f8f9fa; padding: 6px 10px; border-radius: 6px;">
+                            <span>ID:</span>
+                            <code style="background: #eee; padding: 2px 5px; border-radius: 4px; user-select: all;">${board.id}</code>
+                            <button class="action-btn" onclick="navigator.clipboard.writeText('${board.id}'); showSuccess('Copied ID!')" title="Copy ID" style="padding: 0; font-size: 1.1em;">📋</button>
+                        </div>
                         <div>
                             ${(board.options || []).map(opt => `
                                 <span class="option-badge">${opt.emoji} ${escapeHtml(opt.label)}</span>
