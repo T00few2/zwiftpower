@@ -2179,6 +2179,8 @@
                             <span class="panel-badge">${count} roles</div>
                         </div>
                         <div class="panel-actions-inline">
+                            <button class="btn btn-secondary" onclick="editPanel('${panel.panelId}')" title="Edit Panel">✏️ Edit</button>
+                            <button class="btn btn-secondary" onclick="deletePanel('${panel.panelId}')" title="Delete Panel">🗑️ Delete</button>
                             <button class="btn btn-secondary" onclick="addRoleToPanel('${panel.panelId}')">➕ Add Role</button>
                         </div>
                     </summary>
