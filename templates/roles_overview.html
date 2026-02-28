@@ -1,18 +1,21 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🎭 Role Management - DZR Admin Dashboard</title>
-    
+
     <!-- Favicon and App Icons -->
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎭</text></svg>">
-    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎭</text></svg>">
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎭</text></svg>">
+    <link rel="apple-touch-icon"
+        href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎭</text></svg>">
     <meta name="theme-color" content="#667eea">
-    
+
     <!-- SortableJS for drag and drop -->
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
-    
+
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -21,14 +24,14 @@
             background-color: #f5f5f5;
             min-height: 100vh;
         }
-        
+
         .header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             padding: 20px 0;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
         }
-        
+
         .header-content {
             max-width: 1400px;
             margin: 0 auto;
@@ -37,23 +40,23 @@
             justify-content: space-between;
             align-items: center;
         }
-        
+
         .header-left {
             display: flex;
             align-items: center;
             gap: 15px;
         }
-        
+
         .logo {
             font-size: 2em;
         }
-        
+
         .header-title {
             margin: 0;
             font-size: 1.5em;
             font-weight: 300;
         }
-        
+
         .breadcrumb {
             display: flex;
             align-items: center;
@@ -61,23 +64,23 @@
             margin-left: 20px;
             opacity: 0.8;
         }
-        
+
         .breadcrumb a {
             color: white;
             text-decoration: none;
             opacity: 0.8;
         }
-        
+
         .breadcrumb a:hover {
             opacity: 1;
         }
-        
+
         .container {
             max-width: 1400px;
             margin: 0 auto;
             padding: 30px 20px;
         }
-        
+
         .action-bar {
             display: flex;
             justify-content: space-between;
@@ -86,12 +89,12 @@
             flex-wrap: wrap;
             gap: 15px;
         }
-        
+
         .action-buttons {
             display: flex;
             gap: 10px;
         }
-        
+
         .btn {
             padding: 10px 20px;
             border: none;
@@ -105,85 +108,85 @@
             align-items: center;
             gap: 8px;
         }
-        
+
         .btn-primary {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
         }
-        
+
         .btn-primary:hover {
             transform: translateY(-1px);
             box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
         }
-        
+
         .btn-secondary {
             background: white;
             color: #666;
             border: 1px solid #ddd;
         }
-        
+
         .btn-secondary:hover {
             background: #f8f9fa;
             border-color: #ccc;
         }
-        
+
         .btn-danger {
             background: #dc3545;
             color: white;
         }
-        
+
         .btn-danger:hover {
             background: #c82333;
             transform: translateY(-1px);
         }
-        
+
         .stats-overview {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 20px;
             margin-bottom: 30px;
         }
-        
+
         .stat-card {
             background: white;
             padding: 20px;
             border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             text-align: center;
         }
-        
+
         .stat-number {
             font-size: 2em;
             font-weight: bold;
             color: #667eea;
             margin-bottom: 5px;
         }
-        
+
         .stat-label {
             color: #666;
             font-size: 0.9em;
             text-transform: uppercase;
             letter-spacing: 1px;
         }
-        
+
         .panels-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
             gap: 20px;
         }
-        
+
         .panel-card {
             background: white;
             border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             transition: transform 0.2s ease;
             overflow: hidden;
         }
-        
+
         .panel-card:hover {
             transform: translateY(-2px);
         }
-        
+
         .panel-header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -192,20 +195,20 @@
             justify-content: space-between;
             align-items: center;
         }
-        
+
         .panel-title {
             font-size: 1.2em;
             font-weight: 600;
             margin: 0;
         }
-        
+
         .panel-actions {
             display: flex;
             gap: 10px;
         }
-        
+
         .panel-actions button {
-            background: rgba(255,255,255,0.2);
+            background: rgba(255, 255, 255, 0.2);
             border: none;
             color: white;
             width: 32px;
@@ -217,46 +220,46 @@
             justify-content: center;
             transition: background 0.2s ease;
         }
-        
+
         .panel-actions button:hover {
-            background: rgba(255,255,255,0.3);
+            background: rgba(255, 255, 255, 0.3);
         }
-        
+
         .panel-body {
             padding: 20px;
         }
-        
+
         .panel-description {
             color: #666;
             margin-bottom: 15px;
             font-size: 0.9em;
         }
-        
+
         .panel-info {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 15px;
             margin-bottom: 20px;
         }
-        
+
         .info-item {
             display: flex;
             flex-direction: column;
             gap: 5px;
         }
-        
+
         .info-label {
             font-size: 0.8em;
             color: #999;
             text-transform: uppercase;
             letter-spacing: 1px;
         }
-        
+
         .info-value {
             font-weight: 500;
             color: #333;
         }
-        
+
         .channel-badge {
             background: #e3f2fd;
             color: #1976d2;
@@ -265,19 +268,19 @@
             font-size: 0.8em;
             font-weight: 500;
         }
-        
+
         .roles-list {
             display: flex;
             flex-wrap: wrap;
             gap: 8px;
         }
-        
+
         .roles-list-enhanced {
             display: flex;
             flex-direction: column;
             gap: 12px;
         }
-        
+
         .role-item {
             display: flex;
             align-items: center;
@@ -290,34 +293,34 @@
             cursor: default;
             position: relative;
         }
-        
+
         .role-item:hover {
             border-color: #667eea;
             box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1);
         }
-        
+
         .role-item.missing {
             opacity: 0.6;
             border-color: #dc3545;
             background: #f8d7da;
         }
-        
+
         /* Drag and Drop Styles */
         .role-item.sortable-ghost {
             opacity: 0.4;
             background: #e3f2fd;
         }
-        
+
         .role-item.sortable-chosen {
             transform: scale(1.02);
             box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
         }
-        
+
         .role-item.sortable-drag {
             transform: rotate(5deg);
             box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
         }
-        
+
         .drag-handle {
             cursor: grab;
             color: #999;
@@ -327,27 +330,27 @@
             transition: all 0.2s ease;
             flex-shrink: 0;
         }
-        
+
         .drag-handle:hover {
             color: #667eea;
             background: rgba(102, 126, 234, 0.1);
         }
-        
+
         .drag-handle:active {
             cursor: grabbing;
         }
-        
+
         .roles-list-enhanced.sortable {
             min-height: 60px;
         }
-        
+
         .roles-list-enhanced.sortable-placeholder {
             background: #e3f2fd;
             border: 2px dashed #667eea;
             border-radius: 8px;
             margin: 6px 0;
         }
-        
+
         .role-badge {
             padding: 6px 12px;
             border-radius: 20px;
@@ -360,25 +363,25 @@
             min-width: fit-content;
             flex-shrink: 0;
         }
-        
+
         .role-details {
             flex: 1;
             min-width: 0;
         }
-        
+
         .role-description {
             font-size: 0.85em;
             color: #666;
             margin-bottom: 6px;
             font-style: italic;
         }
-        
+
         .role-meta {
             display: flex;
             flex-wrap: wrap;
             gap: 6px;
         }
-        
+
         .meta-tag {
             background: #e9ecef;
             color: #495057;
@@ -389,38 +392,38 @@
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
-        
+
         .meta-tag.approval {
             background: #fff3cd;
             color: #856404;
         }
-        
+
         .meta-tag.captain {
             background: #d1ecf1;
             color: #0c5460;
         }
-        
+
         .meta-tag.channel {
             background: #f8d7da;
             color: #721c24;
         }
-        
+
         .meta-tag.button-color {
             background: #e7f3ff;
             color: #004085;
         }
-        
+
         .meta-tag.prerequisites {
             background: #fff0e6;
             color: #cc6600;
         }
-        
+
         .role-actions {
             display: flex;
             gap: 6px;
             flex-shrink: 0;
         }
-        
+
         .role-action-btn {
             background: rgba(102, 126, 234, 0.1);
             border: none;
@@ -435,25 +438,25 @@
             transition: all 0.2s ease;
             font-size: 0.9em;
         }
-        
+
         .role-action-btn:hover {
             background: rgba(102, 126, 234, 0.2);
         }
-        
+
         .role-action-btn.remove-btn {
             background: rgba(220, 53, 69, 0.1);
             color: #dc3545;
         }
-        
+
         .role-action-btn.remove-btn:hover {
             background: rgba(220, 53, 69, 0.2);
         }
-        
+
         .role-badge.missing {
             background: #6c757d;
             opacity: 0.6;
         }
-        
+
         .add-role-btn {
             background: rgba(102, 126, 234, 0.1);
             color: #667eea;
@@ -464,11 +467,11 @@
             cursor: pointer;
             transition: all 0.2s ease;
         }
-        
+
         .add-role-btn:hover {
             background: rgba(102, 126, 234, 0.2);
         }
-        
+
         .role-remove-btn {
             background: rgba(220, 53, 69, 0.8);
             color: white;
@@ -484,17 +487,17 @@
             justify-content: center;
             transition: background 0.2s ease;
         }
-        
+
         .role-remove-btn:hover {
             background: rgba(220, 53, 69, 1);
         }
-        
+
         .no-panels {
             text-align: center;
             padding: 60px 20px;
             color: #666;
         }
-        
+
         .no-panels .icon {
             font-size: 4em;
             margin-bottom: 20px;
@@ -507,45 +510,189 @@
             grid-template-columns: 280px 1fr;
             gap: 20px;
         }
+
         .sidebar {
             background: white;
             border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             padding: 16px;
             height: 100%;
             align-self: start;
         }
-        .sidebar h3 { margin: 0 0 10px; font-size: 1.1em; }
-        .sidebar .filter-group { margin-bottom: 14px; }
-        .sidebar .filter-group label { display:block; font-size: .85em; color:#666; margin-bottom:6px; }
-        .sidebar .filter-group input[type="text"] { width:100%; padding:8px; border:1px solid #ddd; border-radius:6px; }
-        .sidebar .checkbox-row { display:flex; align-items:center; gap:8px; margin:6px 0; font-size:.9em; }
-        .panel-list { list-style:none; padding:0; margin:0; max-height: 520px; overflow:auto; }
-        .panel-item { display:flex; align-items:center; gap:10px; padding:8px; border-radius:6px; cursor:pointer; }
-        .panel-item:hover { background:#f6f7fb; }
-        .panel-item input { margin:0; }
-        .panel-item .name { flex:1; font-weight:500; }
-        .panel-item .meta { font-size:.8em; color:#777; }
 
-        .main { min-height: 300px; }
-        .panel-section { background: white; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        .panel-section summary { cursor: pointer; padding: 12px 16px; background:#f8f9fb; border-bottom:1px solid #eee; display:flex; align-items:center; justify-content:space-between; }
-        .panel-title-row { display:flex; gap:10px; align-items:center; }
-        .panel-title-row .panel-name { font-weight:600; }
-        .panel-title-row .panel-badge { background:#e3f2fd; color:#1976d2; padding:2px 8px; border-radius:12px; font-size:.8em; }
-        .panel-actions-inline button { margin-left: 8px; }
+        .sidebar h3 {
+            margin: 0 0 10px;
+            font-size: 1.1em;
+        }
 
-        .roles-table { width:100%; border-collapse: separate; border-spacing:0; }
-        .roles-table th, .roles-table td { padding: 8px 10px; border-bottom:1px solid #eee; vertical-align: middle; }
-        .roles-table thead th { position: sticky; top: 0; background:#f8f9fb; z-index: 1; text-align:left; font-weight:600; font-size:.9em; }
-        .roles-table .drag-handle { cursor: grab; color:#999; font-size:1.1em; user-select:none; }
-        .roles-table .drag-handle:active { cursor: grabbing; }
-        .roles-table .w-1 { width: 36px; }
-        .roles-table .w-10 { width: 72px; }
-        .inline-input { width: 100%; padding:6px 8px; border:1px solid #e1e5e9; border-radius:6px; font-size:.9em; }
-        .inline-input:focus, .roles-table select:focus { outline:none; border-color:#667eea; box-shadow: 0 0 0 2px rgba(102,126,234,.15); }
-        .inline-select { padding:6px 8px; border:1px solid #e1e5e9; border-radius:6px; background:white; }
-        
+        .sidebar .filter-group {
+            margin-bottom: 14px;
+        }
+
+        .sidebar .filter-group label {
+            display: block;
+            font-size: .85em;
+            color: #666;
+            margin-bottom: 6px;
+        }
+
+        .sidebar .filter-group input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+        }
+
+        .sidebar .checkbox-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 6px 0;
+            font-size: .9em;
+        }
+
+        .panel-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            max-height: 520px;
+            overflow: auto;
+        }
+
+        .panel-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        .panel-item:hover {
+            background: #f6f7fb;
+        }
+
+        .panel-item input {
+            margin: 0;
+        }
+
+        .panel-item .name {
+            flex: 1;
+            font-weight: 500;
+        }
+
+        .panel-item .meta {
+            font-size: .8em;
+            color: #777;
+        }
+
+        .main {
+            min-height: 300px;
+        }
+
+        .panel-section {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        .panel-section summary {
+            cursor: pointer;
+            padding: 12px 16px;
+            background: #f8f9fb;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .panel-title-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .panel-title-row .panel-name {
+            font-weight: 600;
+        }
+
+        .panel-title-row .panel-badge {
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: .8em;
+        }
+
+        .panel-actions-inline button {
+            margin-left: 8px;
+        }
+
+        .roles-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+
+        .roles-table th,
+        .roles-table td {
+            padding: 8px 10px;
+            border-bottom: 1px solid #eee;
+            vertical-align: middle;
+        }
+
+        .roles-table thead th {
+            position: sticky;
+            top: 0;
+            background: #f8f9fb;
+            z-index: 1;
+            text-align: left;
+            font-weight: 600;
+            font-size: .9em;
+        }
+
+        .roles-table .drag-handle {
+            cursor: grab;
+            color: #999;
+            font-size: 1.1em;
+            user-select: none;
+        }
+
+        .roles-table .drag-handle:active {
+            cursor: grabbing;
+        }
+
+        .roles-table .w-1 {
+            width: 36px;
+        }
+
+        .roles-table .w-10 {
+            width: 72px;
+        }
+
+        .inline-input {
+            width: 100%;
+            padding: 6px 8px;
+            border: 1px solid #e1e5e9;
+            border-radius: 6px;
+            font-size: .9em;
+        }
+
+        .inline-input:focus,
+        .roles-table select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 2px rgba(102, 126, 234, .15);
+        }
+
+        .inline-select {
+            padding: 6px 8px;
+            border: 1px solid #e1e5e9;
+            border-radius: 6px;
+            background: white;
+        }
+
         /* Modal Styles */
         .modal {
             display: none;
@@ -555,10 +702,10 @@
             top: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0,0,0,0.5);
+            background-color: rgba(0, 0, 0, 0.5);
             backdrop-filter: blur(5px);
         }
-        
+
         .modal-content {
             background: white;
             margin: 50px auto;
@@ -568,9 +715,9 @@
             width: 90%;
             max-height: 80vh;
             overflow-y: auto;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
         }
-        
+
         .modal-header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -580,40 +727,40 @@
             justify-content: space-between;
             align-items: center;
         }
-        
+
         .modal-title {
             margin: 0;
             font-size: 1.3em;
             font-weight: 600;
         }
-        
+
         .close {
-            color: rgba(255,255,255,0.8);
+            color: rgba(255, 255, 255, 0.8);
             font-size: 28px;
             font-weight: bold;
             cursor: pointer;
             line-height: 1;
         }
-        
+
         .close:hover {
             color: white;
         }
-        
+
         .modal-body {
             padding: 30px;
         }
-        
+
         .form-group {
             margin-bottom: 20px;
         }
-        
+
         .form-label {
             display: block;
             margin-bottom: 8px;
             font-weight: 500;
             color: #333;
         }
-        
+
         .form-control {
             width: 100%;
             padding: 12px;
@@ -622,25 +769,25 @@
             font-size: 0.9em;
             transition: border-color 0.2s ease;
         }
-        
+
         .form-control:focus {
             outline: none;
             border-color: #667eea;
         }
-        
+
         .form-text {
             font-size: 0.8em;
             color: #666;
             margin-top: 5px;
         }
-        
+
         .loading {
             display: none;
             text-align: center;
             padding: 40px;
             color: #666;
         }
-        
+
         .spinner {
             display: inline-block;
             width: 40px;
@@ -651,46 +798,52 @@
             animation: spin 1s linear infinite;
             margin-bottom: 15px;
         }
-        
+
         @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
         }
-        
+
         .alert {
             padding: 12px 16px;
             border-radius: 8px;
             margin-bottom: 20px;
             display: none;
         }
-        
+
         .alert-success {
             background: #d4edda;
             color: #155724;
             border: 1px solid #c3e6cb;
         }
-        
+
         .alert-danger {
             background: #f8d7da;
             color: #721c24;
             border: 1px solid #f5c6cb;
         }
-        
+
         @media (max-width: 768px) {
             .container {
                 padding: 20px 15px;
             }
-            
+
             .panels-grid {
                 grid-template-columns: 1fr;
             }
-            
+
             .panel-info {
                 grid-template-columns: 1fr;
             }
         }
     </style>
 </head>
+
 <body>
     <div class="header">
         <div class="header-content">
@@ -709,7 +862,7 @@
     <div class="container">
         <div class="alert alert-success" id="successAlert"></div>
         <div class="alert alert-danger" id="errorAlert"></div>
-        
+
         <div class="action-bar">
             <div class="stats-overview" id="statsOverview">
                 <div class="stat-card">
@@ -725,7 +878,7 @@
                     <div class="stat-label">Active Channels</div>
                 </div>
             </div>
-            
+
             <div class="action-buttons">
                 <button class="btn btn-secondary" onclick="refreshData()">
                     🔄 Refresh
@@ -789,18 +942,25 @@
                         <input type="text" class="form-control" id="panelId" required>
                         <div class="form-text">Unique identifier for this panel (lowercase, no spaces)</div>
                     </div>
-                    
+
                     <div class="form-group">
                         <label class="form-label" for="panelName">Panel Name *</label>
                         <input type="text" class="form-control" id="panelName" required>
                         <div class="form-text">Display name for this role panel</div>
                     </div>
-                    
+
                     <div class="form-group">
                         <label class="form-label" for="panelDescription">Description</label>
-                        <textarea class="form-control" id="panelDescription" rows="3" placeholder="Click the buttons below to add or remove roles!"></textarea>
+                        <textarea class="form-control" id="panelDescription" rows="3"
+                            placeholder="Click the buttons below to add or remove roles!"></textarea>
                     </div>
-                    
+
+                    <div class="form-group">
+                        <label class="form-label" for="panelFooterText">Footer Text</label>
+                        <textarea class="form-control" id="panelFooterText" rows="3"
+                            placeholder="Optional text displayed after the role list. E.g. rules, extra links, etc."></textarea>
+                    </div>
+
                     <div class="form-group">
                         <label class="form-label" for="channelSelect">Channel *</label>
                         <select class="form-control" id="channelSelect" required>
@@ -808,7 +968,7 @@
                         </select>
                         <div class="form-text">Channel where this role panel will be displayed</div>
                     </div>
-                    
+
                     <div class="form-group">
                         <label class="form-label" for="requiredRoles">Required Roles</label>
                         <select class="form-control" id="requiredRoles" multiple>
@@ -816,7 +976,7 @@
                         </select>
                         <div class="form-text">Users must have one of these roles to access this panel</div>
                     </div>
-                    
+
                     <div class="form-group">
                         <label class="form-label" for="approvalChannel">Approval Channel</label>
                         <select class="form-control" id="approvalChannel">
@@ -824,10 +984,73 @@
                         </select>
                         <div class="form-text">Channel for role approval requests</div>
                     </div>
-                    
+
                     <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 30px;">
-                        <button type="button" class="btn btn-secondary" onclick="closeModal('createPanelModal')">Cancel</button>
+                        <button type="button" class="btn btn-secondary"
+                            onclick="closeModal('createPanelModal')">Cancel</button>
                         <button type="submit" class="btn btn-primary">Create Panel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Panel Modal -->
+    <div id="editPanelModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Edit Role Panel</h2>
+                <span class="close" onclick="closeModal('editPanelModal')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="editPanelForm">
+                    <!-- Panel ID is hidden as it can't be changed -->
+                    <input type="hidden" id="editPanelId">
+
+                    <div class="form-group">
+                        <label class="form-label" for="editPanelName">Panel Name *</label>
+                        <input type="text" class="form-control" id="editPanelName" required>
+                        <div class="form-text">Display name for this role panel</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="editPanelDescription">Description</label>
+                        <textarea class="form-control" id="editPanelDescription" rows="3"
+                            placeholder="Click the buttons below to add or remove roles!"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="editPanelFooterText">Footer Text</label>
+                        <textarea class="form-control" id="editPanelFooterText" rows="3"
+                            placeholder="Optional text displayed after the role list. E.g. rules, extra links, etc."></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="editPanelChannelSelect">Channel *</label>
+                        <select class="form-control" id="editPanelChannelSelect" required>
+                        </select>
+                        <div class="form-text">Channel where this role panel will be displayed</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="editPanelRequiredRoles">Required Roles</label>
+                        <select class="form-control" id="editPanelRequiredRoles" multiple>
+                        </select>
+                        <div class="form-text">Users must have one of these roles to access this panel</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="editPanelApprovalChannel">Approval Channel</label>
+                        <select class="form-control" id="editPanelApprovalChannel">
+                            <option value="">No approval required</option>
+                        </select>
+                        <div class="form-text">Channel for role approval requests</div>
+                    </div>
+
+                    <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 30px;">
+                        <button type="button" class="btn btn-secondary"
+                            onclick="closeModal('editPanelModal')">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save Changes</button>
                     </div>
                 </form>
             </div>
@@ -850,19 +1073,20 @@
                         </select>
                         <div class="form-text">Choose the Discord role to add to this panel</div>
                     </div>
-                    
+
                     <div class="form-group">
                         <label class="form-label" for="roleDescription">Description</label>
-                        <textarea class="form-control" id="roleDescription" rows="2" placeholder="Optional description for this role"></textarea>
+                        <textarea class="form-control" id="roleDescription" rows="2"
+                            placeholder="Optional description for this role"></textarea>
                         <div class="form-text">Explain what this role provides or represents</div>
                     </div>
-                    
+
                     <div class="form-group">
                         <label class="form-label" for="roleEmoji">Emoji</label>
                         <input type="text" class="form-control" id="roleEmoji" placeholder="🔹" maxlength="10">
                         <div class="form-text">Optional emoji to display with the role (e.g., 🎮, 🎯, 👑)</div>
                     </div>
-                    
+
                     <div class="form-group">
                         <label class="form-label" for="buttonColor">Button Color</label>
                         <select class="form-control" id="buttonColor">
@@ -873,14 +1097,15 @@
                         </select>
                         <div class="form-text">Choose the color of the button users will click in Discord</div>
                     </div>
-                    
+
                     <div class="form-group">
                         <label class="form-label" for="requiredRoles">Required Roles (Prerequisites)</label>
                         <select class="form-control" id="requiredRoles" multiple style="height: 120px;">
                         </select>
-                        <div class="form-text">Users must have these roles before they can get this role. Hold Ctrl/Cmd to select multiple roles.</div>
+                        <div class="form-text">Users must have these roles before they can get this role. Hold Ctrl/Cmd
+                            to select multiple roles.</div>
                     </div>
-                    
+
                     <div class="form-group">
                         <label class="form-label">
                             <input type="checkbox" id="requiresApproval" style="margin-right: 8px;">
@@ -888,13 +1113,13 @@
                         </label>
                         <div class="form-text">Check this if role assignment should require approval</div>
                     </div>
-                    
+
                     <div class="form-group" id="teamCaptainGroup" style="display: none;">
                         <label class="form-label" for="teamCaptain">Team Captain</label>
                         <input type="text" class="form-control" id="teamCaptain" placeholder="User ID of team captain">
                         <div class="form-text">Discord User ID of the team captain who can approve this role</div>
                     </div>
-                    
+
                     <div class="form-group" id="roleApprovalChannelGroup" style="display: none;">
                         <label class="form-label" for="roleApprovalChannel">Role-Specific Approval Channel</label>
                         <select class="form-control" id="roleApprovalChannel">
@@ -902,7 +1127,7 @@
                         </select>
                         <div class="form-text">Override the panel's approval channel for this specific role</div>
                     </div>
-                    
+
                     <!-- Team Role Toggle & Fields -->
                     <div class="form-group">
                         <label class="form-label">
@@ -929,7 +1154,8 @@
                         </div>
                         <div class="form-group">
                             <label class="form-label" for="division">Division</label>
-                            <input type="text" class="form-control" id="division" placeholder="e.g., A1 / Doppio / Diamond">
+                            <input type="text" class="form-control" id="division"
+                                placeholder="e.g., A1 / Doppio / Diamond">
                         </div>
                         <div class="form-group">
                             <label class="form-label" for="rideTime">Ride Time (HH:MM)</label>
@@ -954,12 +1180,14 @@
                         </div>
                         <div class="form-group">
                             <label class="form-label" for="captainDisplayName">Captain Display Name (optional)</label>
-                            <input type="text" class="form-control" id="captainDisplayName" placeholder="Shown on website">
+                            <input type="text" class="form-control" id="captainDisplayName"
+                                placeholder="Shown on website">
                         </div>
                     </div>
-                    
+
                     <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 30px;">
-                        <button type="button" class="btn btn-secondary" onclick="closeModal('addRoleModal')">Cancel</button>
+                        <button type="button" class="btn btn-secondary"
+                            onclick="closeModal('addRoleModal')">Cancel</button>
                         <button type="submit" class="btn btn-primary">Add Role</button>
                     </div>
                 </form>
@@ -981,19 +1209,20 @@
                         <input type="text" class="form-control" id="editRoleName" readonly>
                         <div class="form-text">Role name cannot be changed (managed by Discord)</div>
                     </div>
-                    
+
                     <div class="form-group">
                         <label class="form-label" for="editRoleDescription">Description</label>
-                        <textarea class="form-control" id="editRoleDescription" rows="2" placeholder="Optional description for this role"></textarea>
+                        <textarea class="form-control" id="editRoleDescription" rows="2"
+                            placeholder="Optional description for this role"></textarea>
                         <div class="form-text">Explain what this role provides or represents</div>
                     </div>
-                    
+
                     <div class="form-group">
                         <label class="form-label" for="editRoleEmoji">Emoji</label>
                         <input type="text" class="form-control" id="editRoleEmoji" placeholder="🔹" maxlength="10">
                         <div class="form-text">Optional emoji to display with the role (e.g., 🎮, 🎯, 👑)</div>
                     </div>
-                    
+
                     <div class="form-group">
                         <label class="form-label" for="editButtonColor">Button Color</label>
                         <select class="form-control" id="editButtonColor">
@@ -1004,14 +1233,15 @@
                         </select>
                         <div class="form-text">Choose the color of the button users will click in Discord</div>
                     </div>
-                    
+
                     <div class="form-group">
                         <label class="form-label" for="editRequiredRoles">Required Roles (Prerequisites)</label>
                         <select class="form-control" id="editRequiredRoles" multiple style="height: 120px;">
                         </select>
-                        <div class="form-text">Users must have these roles before they can get this role. Hold Ctrl/Cmd to select multiple roles.</div>
+                        <div class="form-text">Users must have these roles before they can get this role. Hold Ctrl/Cmd
+                            to select multiple roles.</div>
                     </div>
-                    
+
                     <div class="form-group">
                         <label class="form-label">
                             <input type="checkbox" id="editRequiresApproval" style="margin-right: 8px;">
@@ -1019,13 +1249,14 @@
                         </label>
                         <div class="form-text">Check this if role assignment should require approval</div>
                     </div>
-                    
+
                     <div class="form-group" id="editTeamCaptainGroup" style="display: none;">
                         <label class="form-label" for="editTeamCaptain">Team Captain</label>
-                        <input type="text" class="form-control" id="editTeamCaptain" placeholder="User ID of team captain">
+                        <input type="text" class="form-control" id="editTeamCaptain"
+                            placeholder="User ID of team captain">
                         <div class="form-text">Discord User ID of the team captain who can approve this role</div>
                     </div>
-                    
+
                     <div class="form-group" id="editRoleApprovalChannelGroup" style="display: none;">
                         <label class="form-label" for="editRoleApprovalChannel">Role-Specific Approval Channel</label>
                         <select class="form-control" id="editRoleApprovalChannel">
@@ -1082,13 +1313,15 @@
                             </select>
                         </div>
                         <div class="form-group">
-                            <label class="form-label" for="editCaptainDisplayName">Captain Display Name (optional)</label>
+                            <label class="form-label" for="editCaptainDisplayName">Captain Display Name
+                                (optional)</label>
                             <input type="text" class="form-control" id="editCaptainDisplayName">
                         </div>
                     </div>
-                    
+
                     <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 30px;">
-                        <button type="button" class="btn btn-secondary" onclick="closeModal('editRoleModal')">Cancel</button>
+                        <button type="button" class="btn btn-secondary"
+                            onclick="closeModal('editRoleModal')">Cancel</button>
                         <button type="submit" class="btn btn-primary">Update Role</button>
                     </div>
                 </form>
@@ -1102,7 +1335,7 @@
         let channels = [];
 
         // Initialize the page
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             loadData();
         });
 
@@ -1130,7 +1363,7 @@
             console.log('Loaded panels data:', data);
             panels = data.panels || [];
             console.log('Parsed panels:', panels);
-            
+
             // Debug: Log each panel's roles in detail
             panels.forEach((panel, index) => {
                 console.log(`Panel ${index} (${panel.panelId}):`, panel);
@@ -1165,7 +1398,7 @@
             const totalPanels = panels.length;
             const totalRoles = panels.reduce((sum, panel) => sum + panel.roles.length, 0);
             const activeChannels = new Set(panels.map(p => p.channelId)).size;
-            
+
             document.getElementById('totalPanels').textContent = totalPanels;
             document.getElementById('totalRoles').textContent = totalRoles;
             document.getElementById('activeChannels').textContent = activeChannels;
@@ -1200,11 +1433,11 @@
         function createPanelCard(panel) {
             const channel = channels.find(c => c.id === panel.channelId);
             const channelName = channel ? channel.name : 'Unknown Channel';
-            
+
             const rolesHtml = panel.roles.map(role => {
                 const color = role.roleColor ? `#${role.roleColor.toString(16).padStart(6, '0')}` : '#6c757d';
                 const missingClass = !role.roleExists ? ' missing' : '';
-                
+
                 // Create role info tooltip/details
                 const roleDetails = [];
                 if (role.description) roleDetails.push(`Description: ${role.description}`);
@@ -1218,9 +1451,9 @@
                     }).join(', ');
                     roleDetails.push(`Prerequisites: ${prereqNames}`);
                 }
-                
+
                 const tooltipText = roleDetails.length > 0 ? roleDetails.join(' • ') : 'No additional settings';
-                
+
                 return `
                     <div class="role-item${missingClass}" data-role-id="${role.roleId}" title="${escapeHtml(tooltipText)}">
                         <div class="drag-handle" title="Drag to reorder">⋮⋮</div>
@@ -1254,7 +1487,7 @@
                     </div>
                 `;
             }).join('');
-            
+
             return `
                 <div class="panel-card">
                     <div class="panel-header">
@@ -1297,18 +1530,18 @@
             const channelSelect = document.getElementById('channelSelect');
             channelSelect.innerHTML = '<option value="">Select a channel...</option>' +
                 channels.map(channel => `<option value="${channel.id}">#${channel.name}</option>`).join('');
-            
+
             // Populate required roles dropdown
             const requiredRoles = document.getElementById('requiredRoles');
-            requiredRoles.innerHTML = guildRoles.map(role => 
+            requiredRoles.innerHTML = guildRoles.map(role =>
                 `<option value="${role.id}">${role.name}</option>`
             ).join('');
-            
+
             // Populate approval channel dropdown
             const approvalChannel = document.getElementById('approvalChannel');
             approvalChannel.innerHTML = '<option value="">No approval required</option>' +
                 channels.map(channel => `<option value="${channel.id}">#${channel.name}</option>`).join('');
-            
+
             document.getElementById('createPanelModal').style.display = 'block';
         }
 
@@ -1317,18 +1550,19 @@
         }
 
         // Handle create panel form submission
-        document.getElementById('createPanelForm').addEventListener('submit', async function(e) {
+        document.getElementById('createPanelForm').addEventListener('submit', async function (e) {
             e.preventDefault();
-            
+
             const formData = {
                 panelId: document.getElementById('panelId').value.toLowerCase().replace(/[^a-z0-9_-]/g, ''),
                 name: document.getElementById('panelName').value,
                 description: document.getElementById('panelDescription').value || 'Click the buttons below to add or remove roles!',
+                footerText: document.getElementById('panelFooterText').value || '',
                 channelId: document.getElementById('channelSelect').value,
                 requiredRoles: Array.from(document.getElementById('requiredRoles').selectedOptions).map(o => o.value),
                 approvalChannelId: document.getElementById('approvalChannel').value || null
             };
-            
+
             try {
                 const response = await fetch('/api/roles/panels', {
                     method: 'POST',
@@ -1337,18 +1571,18 @@
                     },
                     body: JSON.stringify(formData)
                 });
-                
+
                 if (!response.ok) {
                     const error = await response.json();
                     throw new Error(error.error || 'Failed to create panel');
                 }
-                
+
                 const result = await response.json();
                 showSuccess(result.message);
                 closeModal('createPanelModal');
                 document.getElementById('createPanelForm').reset();
                 loadData();
-                
+
             } catch (error) {
                 showError(error.message);
             }
@@ -1358,21 +1592,21 @@
             if (!confirm('Are you sure you want to delete this panel? This action cannot be undone.')) {
                 return;
             }
-            
+
             try {
                 const response = await fetch(`/api/roles/panels/${panelId}`, {
                     method: 'DELETE'
                 });
-                
+
                 if (!response.ok) {
                     const error = await response.json();
                     throw new Error(error.error || 'Failed to delete panel');
                 }
-                
+
                 const result = await response.json();
                 showSuccess(result.message);
                 loadData();
-                
+
             } catch (error) {
                 showError(error.message);
             }
@@ -1411,7 +1645,7 @@
         }
 
         // Close modals when clicking outside
-        window.onclick = function(event) {
+        window.onclick = function (event) {
             const modals = document.querySelectorAll('.modal');
             modals.forEach(modal => {
                 if (event.target === modal) {
@@ -1427,36 +1661,36 @@
         // Add role functionality
         function addRoleToPanel(panelId) {
             currentPanelForRole = panelId;
-            
+
             // Populate role dropdown - exclude roles already in this panel
             const currentPanel = panels.find(p => p.panelId === panelId);
             const existingRoleIds = currentPanel ? currentPanel.roles.map(r => r.roleId) : [];
-            
+
             const roleSelect = document.getElementById('roleSelect');
             roleSelect.innerHTML = '<option value="">Select a role...</option>' +
                 guildRoles
                     .filter(role => !existingRoleIds.includes(role.id)) // Filter out existing roles
                     .map(role => `<option value="${role.id}" data-name="${role.name}">${role.name}</option>`)
                     .join('');
-            
+
             // Populate approval channel dropdown for role-specific overrides
             const roleApprovalChannel = document.getElementById('roleApprovalChannel');
             roleApprovalChannel.innerHTML = '<option value="">Use panel default</option>' +
                 channels.map(channel => `<option value="${channel.id}">#${channel.name}</option>`).join('');
-            
+
             // Populate required roles dropdown for the selected role
             const requiredRoles = document.getElementById('requiredRoles');
             requiredRoles.innerHTML = guildRoles
                 .filter(role => !existingRoleIds.includes(role.id)) // Exclude existing roles in panel
                 .map(role => `<option value="${role.id}">${role.name}</option>`)
                 .join('');
-            
+
             // Reset form
             document.getElementById('addRoleForm').reset();
             document.getElementById('teamCaptainGroup').style.display = 'none';
             document.getElementById('roleApprovalChannelGroup').style.display = 'none';
             document.getElementById('teamRoleFields').style.display = 'none';
-            
+
             document.getElementById('addRoleModal').style.display = 'block';
         }
 
@@ -1467,16 +1701,16 @@
                 showError('Panel not found');
                 return;
             }
-            
+
             const role = panel.roles.find(r => r.roleId === roleId);
             if (!role) {
                 showError('Role not found');
                 return;
             }
-            
+
             // Store current editing context
             currentEditingRole = { panelId, roleId, role };
-            
+
             // Populate form with current role data
             document.getElementById('editRoleName').value = role.roleName;
             document.getElementById('editRoleDescription').value = role.description || '';
@@ -1496,44 +1730,44 @@
             document.getElementById('editSortIndex').value = (role.sortIndex != null ? role.sortIndex : 0);
             document.getElementById('editVisibility').value = role.visibility || 'public';
             document.getElementById('editCaptainDisplayName').value = role.captainDisplayName || '';
-            
+
             // Populate required roles dropdown (exclude current role and already selected roles)
             const editRequiredRoles = document.getElementById('editRequiredRoles');
             editRequiredRoles.innerHTML = guildRoles
                 .filter(r => r.id !== roleId) // Exclude current role
                 .map(r => `<option value="${r.id}">${r.name}</option>`)
                 .join('');
-            
+
             // Set currently selected required roles
             if (role.requiredRoles && role.requiredRoles.length > 0) {
                 Array.from(editRequiredRoles.options).forEach(option => {
                     option.selected = role.requiredRoles.includes(option.value);
                 });
             }
-            
+
             // Show/hide conditional fields
             const showApprovalFields = role.requiresApproval || false;
             document.getElementById('editTeamCaptainGroup').style.display = showApprovalFields ? 'block' : 'none';
             document.getElementById('editRoleApprovalChannelGroup').style.display = showApprovalFields ? 'block' : 'none';
-            
+
             // Populate approval channel dropdown
             const editRoleApprovalChannel = document.getElementById('editRoleApprovalChannel');
             editRoleApprovalChannel.innerHTML = '<option value="">Use panel default</option>' +
                 channels.map(channel => `<option value="${channel.id}">#${channel.name}</option>`).join('');
-            
+
             // Set current approval channel
             if (role.roleApprovalChannelId) {
                 editRoleApprovalChannel.value = role.roleApprovalChannelId;
             }
-            
+
             document.getElementById('editRoleModal').style.display = 'block';
         }
 
         // Handle approval checkbox change
-        document.getElementById('requiresApproval').addEventListener('change', function(e) {
+        document.getElementById('requiresApproval').addEventListener('change', function (e) {
             const teamCaptainGroup = document.getElementById('teamCaptainGroup');
             const roleApprovalChannelGroup = document.getElementById('roleApprovalChannelGroup');
-            
+
             if (e.target.checked) {
                 teamCaptainGroup.style.display = 'block';
                 roleApprovalChannelGroup.style.display = 'block';
@@ -1544,10 +1778,10 @@
         });
 
         // Handle edit role approval checkbox change
-        document.getElementById('editRequiresApproval').addEventListener('change', function(e) {
+        document.getElementById('editRequiresApproval').addEventListener('change', function (e) {
             const editTeamCaptainGroup = document.getElementById('editTeamCaptainGroup');
             const editRoleApprovalChannelGroup = document.getElementById('editRoleApprovalChannelGroup');
-            
+
             if (e.target.checked) {
                 editTeamCaptainGroup.style.display = 'block';
                 editRoleApprovalChannelGroup.style.display = 'block';
@@ -1558,33 +1792,33 @@
         });
 
         // Toggle team role fields (add)
-        document.getElementById('isTeamRole').addEventListener('change', function(e) {
+        document.getElementById('isTeamRole').addEventListener('change', function (e) {
             document.getElementById('teamRoleFields').style.display = e.target.checked ? 'block' : 'none';
         });
         // Toggle team role fields (edit)
-        document.addEventListener('change', function(e) {
+        document.addEventListener('change', function (e) {
             if (e.target && e.target.id === 'editIsTeamRole') {
                 document.getElementById('editTeamRoleFields').style.display = e.target.checked ? 'block' : 'none';
             }
         });
 
         // Handle add role form submission
-        document.getElementById('addRoleForm').addEventListener('submit', async function(e) {
+        document.getElementById('addRoleForm').addEventListener('submit', async function (e) {
             e.preventDefault();
-            
+
             if (!currentPanelForRole) {
                 showError('No panel selected');
                 return;
             }
-            
+
             const roleSelect = document.getElementById('roleSelect');
             const selectedOption = roleSelect.options[roleSelect.selectedIndex];
-            
+
             if (!selectedOption || !selectedOption.value) {
                 showError('Please select a role');
                 return;
             }
-            
+
             const formData = {
                 roleId: selectedOption.value,
                 roleName: selectedOption.dataset.name,
@@ -1605,10 +1839,10 @@
                 visibility: document.getElementById('visibility').value || 'public',
                 captainDisplayName: document.getElementById('captainDisplayName').value || null
             };
-            
+
             console.log('Submitting role data:', formData);
             console.log('Adding to panel:', currentPanelForRole);
-            
+
             try {
                 const response = await fetch(`/api/roles/panels/${currentPanelForRole}/roles`, {
                     method: 'POST',
@@ -1617,24 +1851,24 @@
                     },
                     body: JSON.stringify(formData)
                 });
-                
+
                 console.log('Response status:', response.status);
                 const result = await response.json();
                 console.log('Response data:', result);
-                
+
                 if (!response.ok) {
                     throw new Error(result.error || 'Failed to add role to panel');
                 }
-                
+
                 showSuccess(result.message);
                 closeModal('addRoleModal');
                 document.getElementById('addRoleForm').reset();
                 currentPanelForRole = null;
-                
+
                 console.log('About to refresh data...');
                 await loadData(); // Refresh the data to show the new role
                 console.log('Data refresh completed');
-                
+
             } catch (error) {
                 console.error('Error adding role:', error);
                 showError(error.message);
@@ -1642,14 +1876,14 @@
         });
 
         // Handle edit role form submission
-        document.getElementById('editRoleForm').addEventListener('submit', async function(e) {
+        document.getElementById('editRoleForm').addEventListener('submit', async function (e) {
             e.preventDefault();
-            
+
             if (!currentEditingRole) {
                 showError('No role selected for editing');
                 return;
             }
-            
+
             const formData = {
                 description: document.getElementById('editRoleDescription').value || null,
                 emoji: document.getElementById('editRoleEmoji').value || null,
@@ -1668,7 +1902,7 @@
                 visibility: document.getElementById('editVisibility').value || 'public',
                 captainDisplayName: document.getElementById('editCaptainDisplayName').value || null
             };
-            
+
             try {
                 const response = await fetch(`/api/roles/panels/${currentEditingRole.panelId}/roles/${currentEditingRole.roleId}`, {
                     method: 'PUT',
@@ -1677,20 +1911,20 @@
                     },
                     body: JSON.stringify(formData)
                 });
-                
+
                 const result = await response.json();
-                
+
                 if (!response.ok) {
                     throw new Error(result.error || 'Failed to update role');
                 }
-                
+
                 showSuccess(result.message);
                 closeModal('editRoleModal');
                 document.getElementById('editRoleForm').reset();
                 currentEditingRole = null;
-                
+
                 await loadData(); // Refresh the data to show the updated role
-                
+
             } catch (error) {
                 console.error('Error updating role:', error);
                 showError(error.message);
@@ -1702,30 +1936,99 @@
             if (!confirm('Are you sure you want to remove this role from the panel?')) {
                 return;
             }
-            
+
             try {
                 const response = await fetch(`/api/roles/panels/${panelId}/roles/${roleId}`, {
                     method: 'DELETE'
                 });
-                
+
                 if (!response.ok) {
                     const error = await response.json();
                     throw new Error(error.error || 'Failed to remove role from panel');
                 }
-                
+
                 const result = await response.json();
                 showSuccess(result.message);
                 loadData(); // Refresh the data to show the updated panel
-                
+
             } catch (error) {
                 showError(error.message);
             }
         }
 
-        // Edit panel functionality (placeholder for now)
+        // Edit panel functionality
         function editPanel(panelId) {
-            showError('Edit panel functionality coming soon!');
+            const panel = panels.find(p => p.panelId === panelId);
+            if (!panel) {
+                showError('Panel not found');
+                return;
+            }
+
+            // Populate form fields
+            document.getElementById('editPanelId').value = panel.panelId;
+            document.getElementById('editPanelName').value = panel.name || '';
+            document.getElementById('editPanelDescription').value = panel.description || '';
+            document.getElementById('editPanelFooterText').value = panel.footerText || '';
+
+            // Populate channel dropdown
+            const channelSelect = document.getElementById('editPanelChannelSelect');
+            channelSelect.innerHTML = channels.map(channel =>
+                `<option value="${channel.id}" ${channel.id === panel.channelId ? 'selected' : ''}>#${channel.name}</option>`
+            ).join('');
+
+            // Populate required roles dropdown
+            const requiredRoles = document.getElementById('editPanelRequiredRoles');
+            requiredRoles.innerHTML = guildRoles.map(role =>
+                `<option value="${role.id}" ${(panel.requiredRoles || []).includes(role.id) ? 'selected' : ''}>${role.name}</option>`
+            ).join('');
+
+            // Populate approval channel dropdown
+            const approvalChannel = document.getElementById('editPanelApprovalChannel');
+            approvalChannel.innerHTML = '<option value="">No approval required</option>' +
+                channels.map(channel =>
+                    `<option value="${channel.id}" ${(panel.approvalChannelId === channel.id) ? 'selected' : ''}>#${channel.name}</option>`
+                ).join('');
+
+            document.getElementById('editPanelModal').style.display = 'block';
         }
+
+        // Handle edit panel form submission
+        document.getElementById('editPanelForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
+
+            const panelId = document.getElementById('editPanelId').value;
+            const formData = {
+                name: document.getElementById('editPanelName').value,
+                description: document.getElementById('editPanelDescription').value || 'Click the buttons below to add or remove roles!',
+                footerText: document.getElementById('editPanelFooterText').value || '',
+                channelId: document.getElementById('editPanelChannelSelect').value,
+                requiredRoles: Array.from(document.getElementById('editPanelRequiredRoles').selectedOptions).map(o => o.value),
+                approvalChannelId: document.getElementById('editPanelApprovalChannel').value || null
+            };
+
+            try {
+                const response = await fetch(`/api/roles/panels/${panelId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to update panel');
+                }
+
+                const result = await response.json();
+                showSuccess(result.message);
+                closeModal('editPanelModal');
+                loadData(); // Refresh the list
+
+            } catch (error) {
+                showError(error.message);
+            }
+        });
 
         // Initialize drag and drop functionality
         function initializeDragAndDrop() {
@@ -1739,7 +2042,7 @@
                     ghostClass: 'sortable-ghost',
                     chosenClass: 'sortable-chosen',
                     dragClass: 'sortable-drag',
-                    onEnd: function(evt) {
+                    onEnd: function (evt) {
                         handleRoleReorder(panelId, evt);
                     }
                 });
@@ -1752,7 +2055,7 @@
                 const roleList = evt.to;
                 const rowItems = roleList.querySelectorAll('tr[data-role-id]');
                 const newOrder = Array.from(rowItems).map(item => item.dataset.roleId);
-                
+
                 const response = await fetch(`/api/roles/panels/${panelId}/reorder`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
@@ -1787,23 +2090,23 @@
             const searchVal = ((searchInput && searchInput.value) || '').toLowerCase();
             const filtered = panels.filter(p => {
                 if (!searchVal) return true;
-                return (String(p.name||'').toLowerCase().includes(searchVal) || String(p.panelId||'').toLowerCase().includes(searchVal));
+                return (String(p.name || '').toLowerCase().includes(searchVal) || String(p.panelId || '').toLowerCase().includes(searchVal));
             });
 
             listEl.innerHTML = filtered.map(p => {
                 const checked = selectedPanelIds.includes(p.panelId) ? 'checked' : '';
-                const roleCount = (p.roles||[]).length;
+                const roleCount = (p.roles || []).length;
                 const channel = (channels.find(c => c.id === p.channelId)?.name) || 'unknown';
                 return `
                     <li class="panel-item" data-panel-id="${p.panelId}">
                         <input type="checkbox" class="panel-select" ${checked}>
-                        <div class="name">${escapeHtml(p.name||p.panelId)}</div>
+                        <div class="name">${escapeHtml(p.name || p.panelId)}</div>
                         <div class="meta">#${escapeHtml(channel)} · ${roleCount}</div>
                     </li>`;
             }).join('');
 
             // Event wiring (delegated)
-            listEl.addEventListener('change', function(ev) {
+            listEl.addEventListener('change', function (ev) {
                 const tgt = ev.target;
                 if (tgt && tgt.classList.contains('panel-select')) {
                     const li = tgt.closest('.panel-item');
@@ -1821,13 +2124,13 @@
             });
 
             if (searchInput && !searchInput._bound) {
-                searchInput.addEventListener('input', function(){
+                searchInput.addEventListener('input', function () {
                     renderSidebar();
                 });
                 searchInput._bound = true;
             }
             if (onlyTeams && !onlyTeams._bound) {
-                onlyTeams.addEventListener('change', function(){
+                onlyTeams.addEventListener('change', function () {
                     uiFilters.onlyTeams = !!this.checked;
                     renderMain();
                 });
@@ -1835,7 +2138,7 @@
             }
             const selAll = document.getElementById('selectAllPanels');
             if (selAll && !selAll._bound) {
-                selAll.addEventListener('change', function(){
+                selAll.addEventListener('change', function () {
                     if (this.checked) {
                         selectedPanelIds = panels.map(p => p.panelId);
                     } else {
@@ -1926,11 +2229,11 @@
                     <td>#${escapeHtml(channelName)}</td>
                     <td>
                         <select class="inline-select inline-field" data-field="visibility">
-                            <option value="public" ${role.visibility==='public'?'selected':''}>public</option>
-                            <option value="hidden" ${role.visibility==='hidden'?'selected':''}>hidden</option>
+                            <option value="public" ${role.visibility === 'public' ? 'selected' : ''}>public</option>
+                            <option value="hidden" ${role.visibility === 'hidden' ? 'selected' : ''}>hidden</option>
                         </select>
                     </td>
-                    <td><input class="inline-input inline-field" data-field="sortIndex" type="number" value="${Number.isFinite(role.sortIndex)? role.sortIndex : 0}"></td>
+                    <td><input class="inline-input inline-field" data-field="sortIndex" type="number" value="${Number.isFinite(role.sortIndex) ? role.sortIndex : 0}"></td>
                     <td>
                         <button class="role-action-btn" onclick="editRole('${panelId}','${role.roleId}')" title="Edit Role">✏️</button>
                         <button class="role-action-btn remove-btn" onclick="removeRoleFromPanel('${panelId}','${role.roleId}')" title="Remove Role">🗑️</button>
@@ -1971,12 +2274,12 @@
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(patch)
                         });
-                        const data = await resp.json().catch(()=>({}));
+                        const data = await resp.json().catch(() => ({}));
                         if (!resp.ok) throw new Error(data.error || 'Update failed');
                         showSuccess('Updated');
                         const p = panels.find(x => x.panelId === panelId);
                         if (p) {
-                            const rr = (p.roles||[]).find(r => r.roleId === roleId);
+                            const rr = (p.roles || []).find(r => r.roleId === roleId);
                             if (rr) { rr[field] = value; }
                         }
                     } catch (e) {
@@ -1987,14 +2290,14 @@
             }
 
             // Change (commit on blur/toggle)
-            container.addEventListener('change', function(ev) {
+            container.addEventListener('change', function (ev) {
                 const t = ev.target;
                 if (!t.classList || !t.classList.contains('inline-field')) return;
                 queueUpdate(t);
             });
 
             // Live input debounce for text/number
-            container.addEventListener('input', function(ev) {
+            container.addEventListener('input', function (ev) {
                 const t = ev.target;
                 if (!t.classList || !t.classList.contains('inline-field')) return;
                 if (t.type === 'text' || t.type === 'number') {
@@ -2003,7 +2306,7 @@
             });
 
             // Commit on Enter for text/number inputs
-            container.addEventListener('keydown', function(ev){
+            container.addEventListener('keydown', function (ev) {
                 const t = ev.target;
                 if (!t.classList || !t.classList.contains('inline-input')) return;
                 if (ev.key === 'Enter') {
@@ -2016,4 +2319,5 @@
         }
     </script>
 </body>
-</html> 
+
+</html>

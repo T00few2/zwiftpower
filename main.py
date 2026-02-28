@@ -3627,6 +3627,12 @@ def get_role_panels():
         formatted_panels.sort(key=lambda x: x['order'])
         
         print(f"[DEBUG] Returning formatted_panels: {formatted_panels}")
+        
+        # In case we need footerText to be correctly mapped for the frontend
+        for p in formatted_panels:
+            original_panel = panels_doc['panels'].get(p['panelId'], {})
+            p['footerText'] = original_panel.get('footerText', '')
+            
         return jsonify({"panels": formatted_panels})
         
     except Exception as e:
@@ -3697,6 +3703,7 @@ def create_role_panel():
             'channelId': channel_id,
             'name': name,
             'description': description,
+            'footerText': data.get('footerText', ''),
             'roles': [],
             'panelMessageId': None,
             'requiredRoles': required_roles,
@@ -3740,6 +3747,8 @@ def update_role_panel(panel_id):
             panel['name'] = data['name']
         if 'description' in data:
             panel['description'] = data['description']
+        if 'footerText' in data:
+            panel['footerText'] = data['footerText']
         if 'channelId' in data:
             panel['channelId'] = data['channelId']
         if 'requiredRoles' in data:
