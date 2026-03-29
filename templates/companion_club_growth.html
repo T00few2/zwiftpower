@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Club roster growth - DZR Admin</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; background: #f5f5f5; min-height: 100vh; }
+    header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #fff;
+      padding: 18px 20px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .header-inner { max-width: 1100px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    h1 { font-size: 1.25rem; margin: 0; font-weight: 600; }
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+    .btn {
+      display: inline-block;
+      background: rgba(255,255,255,0.2);
+      color: #fff;
+      text-decoration: none;
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      border: none;
+      cursor: pointer;
+    }
+    .btn:hover { background: rgba(255,255,255,0.3); }
+    .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 48px; }
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+      padding: 22px;
+      margin-bottom: 20px;
+    }
+    .muted { color: #6b7280; font-size: 0.9rem; line-height: 1.5; margin: 0 0 12px; }
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+    .meta-item { text-align: center; padding: 14px; background: #f9fafb; border-radius: 10px; }
+    .meta-value { font-size: 1.75rem; font-weight: 700; color: #667eea; }
+    .meta-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; color: #6b7280; margin-top: 4px; }
+    .chart-wrap { position: relative; height: 420px; margin-top: 8px; }
+    .loading, .error { text-align: center; padding: 40px 16px; color: #6b7280; }
+    .error { color: #b91c1c; background: #fef2f2; border-radius: 10px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <h1>Zwift Companion club — membership over time</h1>
+      <div class="actions">
+        <a class="btn" href="{{ url_for('dashboard') }}">Dashboard</a>
+        <a class="btn" href="{{ url_for('membership_admin') }}">Membership</a>
+      </div>
+    </div>
+  </header>
+  <div class="container">
+    <div class="card">
+      <p class="muted">
+        Cumulative member count by day, from the earliest <strong>membership</strong> or <strong>profile</strong> date stored in your last roster sync
+        (<code>companion_club_members</code> in Firestore). Run <code>POST /api/zwift/club/roster/refresh</code> to refresh data.
+        If Zwift does not supply a join date for someone, that person is counted on the roster sync day (or today).
+      </p>
+      <div id="loading" class="loading">Loading chart…</div>
+      <div id="error" class="error" style="display:none;"></div>
+      <div id="content" style="display:none;">
+        <div class="meta-grid">
+          <div class="meta-item">
+            <div class="meta-value" id="m-total">—</div>
+            <div class="meta-label">Members (roster)</div>
+          </div>
+          <div class="meta-item">
+            <div class="meta-value" id="m-first">—</div>
+            <div class="meta-label">First join (UTC day)</div>
+          </div>
+          <div class="meta-item">
+            <div class="meta-value" id="m-est">—</div>
+            <div class="meta-label">Estimated dates</div>
+          </div>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="growth-chart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    let growthChart = null;
+
+    async function loadGrowth() {
+      const loading = document.getElementById('loading');
+      const errEl = document.getElementById('error');
+      const content = document.getElementById('content');
+
+      try {
+        const res = await fetch('/api/zwift/club/roster/growth');
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error || res.statusText);
+        }
+
+        loading.style.display = 'none';
+        errEl.style.display = 'none';
+
+        const meta = data.meta || {};
+        const labels = data.labels || [];
+        const cumulative = data.cumulative || [];
+
+        if (!labels.length) {
+          errEl.textContent = 'No roster members found. Sync the club roster first, then reload this page.';
+          errEl.style.display = 'block';
+          return;
+        }
+
+        document.getElementById('m-total').textContent = meta.totalMembers != null ? meta.totalMembers : '—';
+        document.getElementById('m-first').textContent = meta.firstJoinDate || '—';
+        document.getElementById('m-est').textContent =
+          meta.membersWithEstimatedJoinDate != null ? meta.membersWithEstimatedJoinDate : '0';
+
+        content.style.display = 'block';
+
+        if (growthChart) {
+          growthChart.destroy();
+        }
+
+        const ctx = document.getElementById('growth-chart').getContext('2d');
+        growthChart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [{
+              label: 'Club members (cumulative)',
+              data: cumulative,
+              borderColor: '#667eea',
+              backgroundColor: 'rgba(102, 126, 234, 0.12)',
+              fill: true,
+              tension: 0.25,
+              pointRadius: 0,
+              pointHitRadius: 6,
+              borderWidth: 2
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+              legend: { display: true },
+              tooltip: {
+                callbacks: {
+                  title(items) {
+                    return items.length ? items[0].label : '';
+                  }
+                }
+              }
+            },
+            scales: {
+              x: {
+                title: { display: true, text: 'Date (UTC calendar day)' },
+                ticks: { maxRotation: 45, minRotation: 0, maxTicksLimit: 14 }
+              },
+              y: {
+                beginAtZero: true,
+                title: { display: true, text: 'Members' },
+                ticks: { precision: 0 }
+              }
+            }
+          }
+        });
+      } catch (e) {
+        console.error(e);
+        loading.style.display = 'none';
+        errEl.textContent = 'Could not load data: ' + (e.message || String(e));
+        errEl.style.display = 'block';
+      }
+    }
+
+    loadGrowth();
+  </script>
+</body>
+</html>

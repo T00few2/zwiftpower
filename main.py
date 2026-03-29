@@ -6,7 +6,8 @@ from flask import Flask, request, jsonify, render_template, session, redirect, u
 from dotenv import load_dotenv
 from functools import wraps
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date, timezone
+from collections import Counter
 import firebase
 from discord_api import DiscordAPI
 from zwift import ZwiftAPI
@@ -354,6 +355,110 @@ def _refresh_companion_club_roster(club_id: str, limit: int = 100, paginate: boo
         "upserted": result["upserted"],
         "syncedAt": result["syncedAt"],
     }
+
+
+def _parse_roster_timestamp(v) -> Optional[datetime]:
+    """Parse Zwift / Firestore timestamps to naive UTC datetime for grouping by calendar day."""
+    if v is None:
+        return None
+    if isinstance(v, datetime):
+        dt = v
+        if dt.tzinfo is not None:
+            dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+        return dt
+    if isinstance(v, date) and not isinstance(v, datetime):
+        return datetime.combine(v, datetime.min.time())
+    if isinstance(v, (int, float)):
+        ts = float(v)
+        if ts > 1e12:
+            ts = ts / 1000.0
+        try:
+            return datetime.fromtimestamp(ts, tz=timezone.utc).replace(tzinfo=None)
+        except (ValueError, OSError):
+            return None
+    if isinstance(v, str):
+        s = v.strip()
+        if not s:
+            return None
+        if s.endswith("Z"):
+            s = s[:-1] + "+00:00"
+        try:
+            dt = datetime.fromisoformat(s)
+        except ValueError:
+            return None
+        if dt.tzinfo is not None:
+            dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+        return dt
+    return None
+
+
+def build_companion_club_growth_series() -> dict:
+    """
+    Cumulative club member count by calendar day from earliest known join date through today,
+    using Firestore companion_club_members (membershipCreatedOn, then createdOn; rosterSyncedAt as fallback).
+    """
+    today = datetime.now(timezone.utc).date()
+    col = firebase.db.collection("companion_club_members")
+    join_dates: list[date] = []
+    estimated_count = 0
+
+    for doc in col.stream():
+        d = doc.to_dict() or {}
+        dt = _parse_roster_timestamp(d.get("membershipCreatedOn"))
+        if dt is None:
+            dt = _parse_roster_timestamp(d.get("createdOn"))
+        used_estimate = False
+        if dt is None:
+            dt = _parse_roster_timestamp(d.get("rosterSyncedAt"))
+            if dt is not None:
+                used_estimate = True
+        if dt is None:
+            dt = datetime.combine(today, datetime.min.time())
+            used_estimate = True
+        if used_estimate:
+            estimated_count += 1
+
+        jd = dt.date()
+        if jd > today:
+            jd = today
+        join_dates.append(jd)
+
+    if not join_dates:
+        return {
+            "labels": [],
+            "cumulative": [],
+            "meta": {
+                "totalMembers": 0,
+                "firstJoinDate": None,
+                "endDate": today.isoformat(),
+                "membersWithEstimatedJoinDate": 0,
+            },
+        }
+
+    first = min(join_dates)
+    by_day = Counter(join_dates)
+    labels: list[str] = []
+    cumulative: list[int] = []
+    running = 0
+    cur = first
+    one_day = timedelta(days=1)
+    while cur <= today:
+        labels.append(cur.isoformat())
+        running += by_day.get(cur, 0)
+        cumulative.append(running)
+        cur += one_day
+
+    return {
+        "labels": labels,
+        "cumulative": cumulative,
+        "meta": {
+            "totalMembers": len(join_dates),
+            "firstJoinDate": first.isoformat(),
+            "endDate": today.isoformat(),
+            "membersWithEstimatedJoinDate": estimated_count,
+        },
+    }
+
 
 def get_authenticated_session() -> requests.Session:
     """Return a cached, authenticated session if available and still valid; otherwise, log in."""
@@ -4401,6 +4506,25 @@ def refresh_zwiftpower_club_roster():
     except Exception as e:
         print(f"Error refreshing ZwiftPower club roster: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/club/roster-growth', methods=['GET'])
+@login_required
+def companion_club_growth_page():
+    """Admin UI: cumulative Zwift Companion club members over time (Firestore roster)."""
+    return render_template('companion_club_growth.html', user=session.get('user', {}))
+
+
+@app.route('/api/zwift/club/roster/growth', methods=['GET'])
+@login_required
+def companion_club_roster_growth_api():
+    """Daily cumulative member counts from companion_club_members join dates."""
+    try:
+        return jsonify(build_companion_club_growth_series())
+    except Exception as e:
+        print(f"Error building companion club growth series: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
 
 @app.route('/signup-boards', methods=['GET'])
 @login_required
