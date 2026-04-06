@@ -2299,7 +2299,10 @@ def membership_payments_list():
         for p in docs:
             # Enrich with Zwift ID (from linked Discord user)
             uid = str(p.get('userId') or '').strip()
-            p['zwiftId'] = discord_to_zwift.get(uid, '')
+            # Payments store Discord user id as userId (some docs also set discordId)
+            did = str(p.get('discordId') or uid).strip()
+            p['discordId'] = did
+            p['zwiftId'] = discord_to_zwift.get(did, '') if did else ''
 
             provider = str(p.get('paymentProvider') or '').strip().lower() or 'unknown'
             p['provider'] = provider
@@ -2374,11 +2377,13 @@ def membership_payments_csv():
         buffer = io.StringIO()
         writer = csv.writer(buffer)
         writer.writerow([
-            'createdAt','paidAt','userId','zwiftId','fullName','userEmail','amountDkk','currency','status',
+            'createdAt','paidAt','userId','discordId','zwiftId','fullName','userEmail','amountDkk','currency','status',
             'coveredThroughYear','coversYears','provider','providerState','providerRef','reference'
         ])
         for p in payments:
-            zwift_id = discord_to_zwift.get(str(p.get('userId') or '').strip(), '')
+            uid_csv = str(p.get('userId') or '').strip()
+            discord_id_csv = str(p.get('discordId') or uid_csv).strip()
+            zwift_id = discord_to_zwift.get(discord_id_csv, '') if discord_id_csv else ''
             vipps = p.get('vipps') or {}
             checkout = p.get('checkout') or {}
             provider = str(p.get('paymentProvider') or '').strip().lower() or 'unknown'
@@ -2397,6 +2402,7 @@ def membership_payments_csv():
                 p.get('createdAt',''),
                 p.get('paidAt',''),
                 p.get('userId',''),
+                discord_id_csv,
                 zwift_id,
                 p.get('fullName',''),
                 p.get('userEmail',''),
