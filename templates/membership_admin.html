@@ -131,6 +131,7 @@
                   <th>Created</th>
                   <th>Status</th>
                   <th>Full name</th>
+                  <th>Email</th>
                   <th>Discord ID</th>
                   <th>Zwift ID</th>
                   <th>Amount</th>
@@ -142,7 +143,7 @@
                 </tr>
               </thead>
               <tbody id="paymentsTbody">
-                <tr><td colspan="11" class="muted">No data</td></tr>
+                <tr><td colspan="12" class="muted">No data</td></tr>
               </tbody>
             </table>
           </div>
@@ -330,7 +331,7 @@
         `;
         
         if (!list.length) {
-          tbody.innerHTML = '<tr><td colspan="11" class="muted">No payments found</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="12" class="muted">No payments found</td></tr>';
           return;
         }
         tbody.innerHTML = list.map(p => {
@@ -344,7 +345,8 @@
           return `<tr>
             <td>${formatDateTime(p.createdAt)}</td>
             <td><span class="status-badge ${statusClass}">${status || 'unknown'}</span></td>
-            <td title="${fmt(p.userEmail)}">${fmt(p.fullName)}</td>
+            <td>${fmt(p.fullName)}</td>
+            <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;" title="${fmt(p.userEmail)}">${fmt(p.userEmail)}</td>
             <td title="${fmt(p.discordId || p.userId)}">${fmt(p.discordId || p.userId)}</td>
             <td>${fmt(p.zwiftId)}</td>
             <td>${amt}</td>

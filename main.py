@@ -2277,19 +2277,25 @@ def membership_payments_list():
         status_filter = request.args.get('status', '').strip().lower()
         docs = firebase.get_collection('payments', limit=limit, include_id=True) or []
 
-        # Build discordId -> zwiftId lookup (to show Zwift ID in payments table)
+        # Build discordId -> zwiftId / email (doc id is Discord id when discordId field absent)
         discord_to_zwift: dict[str, str] = {}
+        discord_to_email: dict[str, str] = {}
         try:
-            users = firebase.get_collection('users', limit=100000) or []
+            users = firebase.get_collection('users', limit=100000, include_id=True) or []
             for u in users:
                 if not isinstance(u, dict):
                     continue
-                did = str(u.get('discordId') or '').strip()
+                doc_id = str(u.get('id') or '').strip()
+                did = str(u.get('discordId') or '').strip() or doc_id
                 zid = str(u.get('zwiftId') or '').strip()
                 if did and zid:
                     discord_to_zwift[did] = zid
+                em = str(u.get('email') or '').strip()
+                if did and em:
+                    discord_to_email[did] = em
         except Exception:
             discord_to_zwift = {}
+            discord_to_email = {}
         
         # Filter by status if provided
         if status_filter:
@@ -2303,6 +2309,10 @@ def membership_payments_list():
             did = str(p.get('discordId') or uid).strip()
             p['discordId'] = did
             p['zwiftId'] = discord_to_zwift.get(did, '') if did else ''
+            pay_em = str(p.get('userEmail') or '').strip()
+            if not pay_em and did:
+                pay_em = discord_to_email.get(did, '')
+            p['userEmail'] = pay_em
 
             provider = str(p.get('paymentProvider') or '').strip().lower() or 'unknown'
             p['provider'] = provider
@@ -2348,19 +2358,25 @@ def membership_payments_csv():
         # Large limit to include all
         payments = firebase.get_collection('payments', limit=100000, include_id=True) or []
 
-        # Build discordId -> zwiftId lookup for CSV export
+        # Build discordId -> zwiftId / email for CSV export
         discord_to_zwift: dict[str, str] = {}
+        discord_to_email: dict[str, str] = {}
         try:
-            users = firebase.get_collection('users', limit=100000) or []
+            users = firebase.get_collection('users', limit=100000, include_id=True) or []
             for u in users:
                 if not isinstance(u, dict):
                     continue
-                did = str(u.get('discordId') or '').strip()
+                doc_id = str(u.get('id') or '').strip()
+                did = str(u.get('discordId') or '').strip() or doc_id
                 zid = str(u.get('zwiftId') or '').strip()
                 if did and zid:
                     discord_to_zwift[did] = zid
+                em = str(u.get('email') or '').strip()
+                if did and em:
+                    discord_to_email[did] = em
         except Exception:
             discord_to_zwift = {}
+            discord_to_email = {}
 
         # Sort by createdAt desc
         def parse_date(x):
@@ -2384,6 +2400,9 @@ def membership_payments_csv():
             uid_csv = str(p.get('userId') or '').strip()
             discord_id_csv = str(p.get('discordId') or uid_csv).strip()
             zwift_id = discord_to_zwift.get(discord_id_csv, '') if discord_id_csv else ''
+            email_csv = str(p.get('userEmail') or '').strip()
+            if not email_csv and discord_id_csv:
+                email_csv = discord_to_email.get(discord_id_csv, '')
             vipps = p.get('vipps') or {}
             checkout = p.get('checkout') or {}
             provider = str(p.get('paymentProvider') or '').strip().lower() or 'unknown'
@@ -2405,7 +2424,7 @@ def membership_payments_csv():
                 discord_id_csv,
                 zwift_id,
                 p.get('fullName',''),
-                p.get('userEmail',''),
+                email_csv,
                 p.get('amountDkk',''),
                 p.get('currency',''),
                 p.get('status',''),
